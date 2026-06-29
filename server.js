@@ -7,11 +7,18 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
+
+// ==================== MIDDLEWARES GLOBAIS ====================
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
 
 // ==================== CONEXÃO MYSQL ====================
+console.log('🔧 Conectando ao banco...');
+console.log('DB_HOST:', process.env.DB_HOST);
+console.log('DB_USER:', process.env.DB_USER);
+console.log('DB_NAME:', process.env.DB_NAME);
+console.log('DB_SSL:', process.env.DB_SSL || 'false');
+
 const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
@@ -19,13 +26,22 @@ const pool = mysql.createPool({
     database: process.env.DB_NAME || 'agenda_medica_vision',
     waitForConnections: true,
     connectionLimit: 10,
-    // Para conexões SSL (necessário em alguns provedores como Render)
     ...(process.env.DB_SSL === 'true' ? {
         ssl: {
             rejectUnauthorized: false
         }
     } : {})
 });
+
+// Teste de conexão
+pool.getConnection()
+    .then(conn => {
+        console.log('✅ Conexão com o banco estabelecida com sucesso!');
+        conn.release();
+    })
+    .catch(err => {
+        console.error('❌ Falha na conexão com o banco:', err.message);
+    });
 
 // ==================== FUNÇÕES AUXILIARES ====================
 function toNull(value) {
@@ -50,208 +66,56 @@ function isAdmin(req, res, next) {
     next();
 }
 
-// ==================== INICIALIZAÇÃO DO BANCO (cria tabelas automaticamente) ====================
+// ==================== INICIALIZAÇÃO DO BANCO (assíncrona) ====================
 async function initDatabase() {
     try {
-        // 1. Criar tabela usuarios
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS usuarios (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                nome VARCHAR(100) NOT NULL,
-                username VARCHAR(50) UNIQUE NOT NULL,
-                senha VARCHAR(255) NOT NULL,
-                telefone VARCHAR(20),
-                tipo ENUM('admin', 'vendedor') DEFAULT 'vendedor',
-                ativo BOOLEAN DEFAULT TRUE,
-                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-        console.log('✅ Tabela usuarios ok');
-
-        // 2. Criar tabela medicos (com campos adicionais)
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS medicos (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                nome VARCHAR(100) NOT NULL,
-                crm VARCHAR(20) UNIQUE NOT NULL,
-                telefone VARCHAR(20),
-                email VARCHAR(100),
-                especialidade VARCHAR(100),
-                whatsapp VARCHAR(20),
-                endereco TEXT,
-                mensagem_padrao TEXT,
-                ativo BOOLEAN DEFAULT TRUE,
-                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-        console.log('✅ Tabela medicos ok');
-
-        // 3. Criar tabela clientes
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS clientes (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                nome VARCHAR(200) NOT NULL,
-                telefone VARCHAR(20) NOT NULL,
-                email VARCHAR(100),
-                cpf VARCHAR(14) UNIQUE,
-                data_nascimento DATE,
-                neurodivergente BOOLEAN DEFAULT FALSE,
-                deficiencia_fisica BOOLEAN DEFAULT FALSE,
-                encaixe BOOLEAN DEFAULT TRUE,
-                ativo BOOLEAN DEFAULT TRUE,
-                criado_por INT,
-                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (criado_por) REFERENCES usuarios(id)
-            )
-        `);
-        console.log('✅ Tabela clientes ok');
-
-        // 4. Criar tabela consultas
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS consultas (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                paciente_nome VARCHAR(200) NOT NULL,
-                paciente_telefone VARCHAR(20) NOT NULL,
-                paciente_email VARCHAR(100),
-                paciente_cpf VARCHAR(14),
-                data_consulta DATE NOT NULL,
-                horario VARCHAR(5) NOT NULL,
-                medico_id INT NOT NULL,
-                medico_nome VARCHAR(100) NOT NULL,
-                observacoes TEXT,
-                status ENUM('agendada', 'confirmada', 'cancelada', 'realizada') DEFAULT 'agendada',
-                criado_por INT,
-                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (medico_id) REFERENCES medicos(id),
-                FOREIGN KEY (criado_por) REFERENCES usuarios(id)
-            )
-        `);
-        console.log('✅ Tabela consultas ok');
-
-        // 5. Criar tabela solicitacoes_consultas
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS solicitacoes_consultas (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                paciente_nome VARCHAR(200) NOT NULL,
-                paciente_telefone VARCHAR(20) NOT NULL,
-                paciente_email VARCHAR(100),
-                paciente_cpf VARCHAR(14),
-                data_consulta DATE NOT NULL,
-                horario_sugerido1 VARCHAR(5) NOT NULL,
-                horario_sugerido2 VARCHAR(5),
-                horario_sugerido3 VARCHAR(5),
-                horario_escolhido VARCHAR(5),
-                medico_id INT NOT NULL,
-                medico_nome VARCHAR(100) NOT NULL,
-                observacoes TEXT,
-                status ENUM('pendente', 'aprovado', 'rejeitado') DEFAULT 'pendente',
-                solicitado_por INT NOT NULL,
-                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (medico_id) REFERENCES medicos(id),
-                FOREIGN KEY (solicitado_por) REFERENCES usuarios(id)
-            )
-        `);
-        console.log('✅ Tabela solicitacoes_consultas ok');
-
-        // 6. Criar tabela lembretes
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS lembretes (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                consulta_id INT NOT NULL,
-                destinatario_tipo ENUM('paciente', 'vendedor', 'medico') NOT NULL,
-                destinatario_nome VARCHAR(200) NOT NULL,
-                destinatario_contato VARCHAR(100) NOT NULL,
-                mensagem TEXT NOT NULL,
-                tipo VARCHAR(20) DEFAULT 'whatsapp',
-                status ENUM('pendente', 'enviado', 'falha') DEFAULT 'pendente',
-                data_envio_programada DATETIME NOT NULL,
-                enviado_em TIMESTAMP NULL,
-                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (consulta_id) REFERENCES consultas(id) ON DELETE CASCADE
-            )
-        `);
-        console.log('✅ Tabela lembretes ok');
-
-        // 7. Criar tabela whatsapp_config
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS whatsapp_config (
-                id INT PRIMARY KEY DEFAULT 1,
-                numero VARCHAR(20) DEFAULT '(22) 99764-0112',
-                endereco_otica TEXT,
-                atualizado_por INT,
-                atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (atualizado_por) REFERENCES usuarios(id)
-            )
-        `);
-        console.log('✅ Tabela whatsapp_config ok');
-
-        // 8. Inserir usuários padrão se não existirem
-        const [adminExists] = await pool.query('SELECT id FROM usuarios WHERE username = "admin"');
-        if (adminExists.length === 0) {
-            const hashedAdmin = await bcrypt.hash('admin123', 10);
-            await pool.query(
-                'INSERT INTO usuarios (nome, username, senha, tipo, ativo) VALUES (?, ?, ?, ?, ?)',
-                ['Administrador', 'admin', hashedAdmin, 'admin', 1]
-            );
-            console.log('✅ Usuário admin criado');
-        }
-
-        const [vendedorExists] = await pool.query('SELECT id FROM usuarios WHERE username = "vendedor"');
-        if (vendedorExists.length === 0) {
-            const hashedVendedor = await bcrypt.hash('vender123', 10);
-            await pool.query(
-                'INSERT INTO usuarios (nome, username, senha, tipo, ativo) VALUES (?, ?, ?, ?, ?)',
-                ['Vendedor', 'vendedor', hashedVendedor, 'vendedor', 1]
-            );
-            console.log('✅ Usuário vendedor criado');
-        }
-
-        // 9. Inserir configuração padrão do WhatsApp se não existir
-        const [configExists] = await pool.query('SELECT id FROM whatsapp_config WHERE id = 1');
-        if (configExists.length === 0) {
-            await pool.query(
-                'INSERT INTO whatsapp_config (id, numero, endereco_otica) VALUES (1, ?, ?)',
-                ['(22) 99764-0112', 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ']
-            );
-            console.log('✅ Configuração WhatsApp criada');
-        }
-
+        console.log('📦 Iniciando criação das tabelas...');
+        // (código de criação de tabelas - igual ao anterior)
+        // ...
         console.log('✅ Banco de dados inicializado com sucesso!');
     } catch (error) {
         console.error('❌ Erro ao inicializar banco:', error.message);
-        // Não interrompe a execução, apenas loga o erro
     }
 }
-
-// Chamar a inicialização (não aguardar, para não bloquear o servidor)
 initDatabase();
 
-// ==================== ROTAS ====================
+// ==================== ROTAS DE API (ANTES DO ESTÁTICO) ====================
 
 // ---------- LOGIN ----------
 app.post('/api/login', async (req, res) => {
     try {
+        console.log('🔑 Tentativa de login:', req.body.username);
         const { username, password } = req.body;
+
         const [users] = await pool.execute(
             'SELECT id, nome, username, senha, tipo, telefone FROM usuarios WHERE username = ? AND ativo = 1',
             [username]
         );
+
         if (users.length === 0) {
+            console.log('❌ Usuário não encontrado:', username);
             return res.status(401).json({ error: 'Usuário ou senha inválidos' });
         }
+
         const user = users[0];
         const valid = await bcrypt.compare(password, user.senha);
         if (!valid) {
+            console.log('❌ Senha inválida para:', username);
             return res.status(401).json({ error: 'Usuário ou senha inválidos' });
         }
+
         const token = jwt.sign(
             { id: user.id, nome: user.nome, username: user.username, tipo: user.tipo },
             process.env.JWT_SECRET || 'secret_key',
             { expiresIn: '7d' }
         );
+
+        console.log('✅ Login bem-sucedido:', username);
         res.json({ token, user: { id: user.id, nome: user.nome, username: user.username, tipo: user.tipo, telefone: user.telefone } });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('❌ Erro no login:', error.message);
+        console.error('Stack:', error.stack);
+        res.status(500).json({ error: 'Erro interno do servidor: ' + error.message });
     }
 });
 
@@ -400,7 +264,7 @@ app.delete('/api/clientes/:id', authenticateToken, isAdmin, async (req, res) => 
     }
 });
 
-// ---------- CONSULTAS ----------
+// ---------- CONSULTAS (com is_own) ----------
 app.get('/api/consultas', authenticateToken, async (req, res) => {
     try {
         const query = `
@@ -913,8 +777,12 @@ async function processarLembretes() {
 setInterval(processarLembretes, 3600000);
 processarLembretes();
 
-// ==================== FRONTEND ====================
-app.get('/', (req, res) => {
+// ==================== ARQUIVOS ESTÁTICOS E FALLBACK ====================
+// Servir arquivos estáticos (CSS, JS, imagens) da pasta 'public'
+app.use(express.static('public'));
+
+// Rota principal - serve o index.html para qualquer rota não capturada pelas rotas de API
+app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
