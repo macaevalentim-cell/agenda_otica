@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Agenda - Ótica Macaé</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f2f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .login-box { max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        input, select, button { padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; }
+        button { background: #667eea; color: white; cursor: pointer; border: none; }
+        button:hover { background: #764ba2; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; }
+        th { background: #667eea; color: white; text-align: center; }
+        .consulta-item { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 8px; margin: 5px 0; border-radius: 5px; font-size: 12px; cursor: pointer; }
+        .admin-panel { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .form-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+        .form-row input, .form-row select { flex: 1; }
+        .error { color: red; }
+        .success { color: green; }
+        .nav-btn { background: #48bb78; margin: 0 5px; }
+        .view-buttons { margin: 20px 0; }
+        .dia-semana { background: #f7fafc; padding: 10px; text-align: center; font-weight: bold; }
+        .horario-linha { border-bottom: 1px solid #eee; }
+        .horario-label { background: #f7fafc; text-align: center; font-weight: bold; }
+        .no-data { color: #999; text-align: center; padding: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- TELA DE LOGIN -->
+        <div id="loginDiv" class="login-box">
+            <h2 style="text-align:center;">Ótica Macaé</h2>
+            <p style="text-align:center;">Sistema de Agenda Médica</p>
+            <input type="text" id="username" placeholder="Usuário" value="admin">
+            <input type="password" id="password" placeholder="Senha" value="admin123">
+            <button onclick="fazerLogin()" style="width:100%;">Entrar</button>
+            <p style="text-align:center; font-size:12px; margin-top:15px;">Admin: admin / admin123 | Vendedor: vendedor / vender123</p>
+            <div id="loginMsg"></div>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div id="dashboardDiv" style="display:none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>📅 Agenda Médica</h2>
+                <div>
+                    <span id="userName"></span>
+                    <button onclick="logout()" style="margin-left: 10px;">Sair</button>
+                </div>
+            </div>
+
+            <!-- PAINEL ADMIN (só aparece para admin) -->
+            <div id="adminPanel" style="display:none;" class="admin-panel">
+                <h3>📋 Agendar Consulta</h3>
+                <div class="form-row">
+                    <input type="text" id="pacienteNome" placeholder="Nome do Paciente *">
+                    <input type="text" id="pacienteTelefone" placeholder="Telefone *">
+                </div>
+                <div class="form-row">
+                    <input type="email" id="pacienteEmail" placeholder="E-mail">
+                    <input type="text" id="pacienteCpf" placeholder="CPF">
+                </div>
+                <div class="form-row">
+                    <input type="date" id="dataConsulta" value="2026-04-30">
+                    <select id="horarioSelect">
+                        <option value="">Selecione Horário</option>
+                        <option value="08:00">08:00</option>
+                        <option value="08:30">08:30</option>
+                        <option value="09:00">09:00</option>
+                        <option value="09:30">09:30</option>
+                        <option value="10:00">10:00</option>
+                        <option value="10:30">10:30</option>
+                        <option value="11:00">11:00</option>
+                        <option value="11:30">11:30</option>
+                        <option value="13:00">13:00</option>
+                        <option value="13:30">13:30</option>
+                        <option value="14:00">14:00</option>
+                        <option value="14:30">14:30</option>
+                        <option value="15:00">15:00</option>
+                        <option value="15:30">15:30</option>
+                        <option value="16:00">16:00</option>
+                        <option value="16:30">16:30</option>
+                        <option value="17:00">17:00</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <select id="medicoSelect"></select>
+                    <input type="text" id="observacoes" placeholder="Observações">
+                </div>
+                <button onclick="salvarConsulta()">💾 Salvar Consulta</button>
+                <button id="cancelEditBtn" onclick="cancelarEdicao()" style="display:none;">Cancelar Edição</button>
+                <hr style="margin: 20px 0;">
+                <h3>📋 Consultas Agendadas</h3>
+                <div id="consultasList"></div>
+            </div>
+
+            <!-- BOTÕES DE VISUALIZAÇÃO -->
+            <div class="view-buttons">
+                <button onclick="mudarView('month')">📅 Mês</button>
+                <button onclick="mudarView('week')" style="background:#667eea;">📆 Semana</button>
+                <button onclick="mudarView('day')">📋 Dia</button>
+                <button id="toggleAdminBtn" onclick="toggleAdmin()" style="background:#ed8936; float:right;">⚙️ Painel Admin</button>
+            </div>
+
+            <!-- CALENDÁRIO -->
+            <div id="calendarioContainer"></div>
+        </div>
+    </div>
+
+    <!-- MODAL DE DETALHES -->
+    <div id="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000;">
+        <div style="background:white; border-radius:10px; max-width:500px; width:90%; padding:20px;">
+            <h3>Detalhes da Consulta</h3>
+            <div id="modalBody"></div>
+            <button onclick="fecharModal()" style="margin-top:10px;">Fechar</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin + '/api';
+        let token = null;
+        let user = null;
+        let consultas = [];
+        let medicos = [];
+        let currentView = 'week';
+        let currentDate = new Date(2026, 3, 30); // 30 de Abril de 2026
+        let editandoId = null;
+
+        function mostrarMsg(msg, isError = false) {
+            const div = document.getElementById('loginMsg');
+            if (div) {
+                div.innerHTML = `<p style="color:${isError ? 'red' : 'green'};">${msg}</p>`;
+                setTimeout(() => div.innerHTML = '', 3000);
+            } else {
+                alert(msg);
+            }
+        }
+
+        function formatDate(date) {
+            let d = new Date(date);
+            let year = d.getFullYear();
+            let month = String(d.getMonth() + 1).padStart(2, '0');
+            let day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function formatDisplay(dateStr) {
+            if (!dateStr) return '';
+            let parts = dateStr.split('-');
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            let div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function fazerLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const res = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.error || 'Erro no login');
+                
+                token = data.token;
+                user = data.user;
+                localStorage.setItem('token', token);
+                localStorage.setItem('user', JSON.stringify(user));
+                
+                document.getElementById('loginDiv').style.display = 'none';
+                document.getElementById('dashboardDiv').style.display = 'block';
+                document.getElementById('userName').innerHTML = `👤 ${user.nome} (${user.tipo === 'admin' ? 'Admin' : 'Vendedor'})`;
+                
+                if (user.tipo === 'admin') {
+                    document.getElementById('adminPanel').style.display = 'block';
+                    document.getElementById('toggleAdminBtn').style.display = 'block';
+                } else {
+                    document.getElementById('adminPanel').style.display = 'none';
+                    document.getElementById('toggleAdminBtn').style.display = 'none';
+                }
+                
+                await carregarDados();
+                renderizarCalendario();
+            } catch (err) {
+                mostrarMsg(err.message, true);
+            }
+        }
+
+        async function carregarDados() {
+            try {
+                console.log('Carregando consultas...');
+                const resConsultas = await fetch(`${API_URL}/consultas`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                let data = await resConsultas.json();
+                consultas = data.map(c => ({
+                    ...c,
+                    data_consulta: c.data_consulta ? c.data_consulta.split('T')[0] : null
+                }));
+                console.log('Consultas carregadas:', consultas.length);
+                consultas.forEach(c => console.log(`  ${c.data_consulta} ${c.horario} - ${c.paciente_nome}`));
+
+                console.log('Carregando médicos...');
+                const resMedicos = await fetch(`${API_URL}/medicos`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                medicos = await resMedicos.json();
+                console.log('Médicos carregados:', medicos.length);
+
+                const select = document.getElementById('medicoSelect');
+                if (select) {
+                    select.innerHTML = '<option value="">Selecione um médico</option>' + 
+                        medicos.map(m => `<option value="${m.id}">${m.nome} - ${m.especialidade}</option>`).join('');
+                }
+
+                await carregarConsultasList();
+            } catch (err) {
+                console.error('Erro ao carregar:', err);
+                mostrarMsg('Erro ao carregar dados: ' + err.message, true);
+            }
+        }
+
+        async function carregarConsultasList() {
+            const container = document.getElementById('consultasList');
+            if (!container) return;
+            
+            if (consultas.length === 0) {
+                container.innerHTML = '<p>Nenhuma consulta agendada</p>';
+                return;
+            }
+            
+            container.innerHTML = consultas.map(c => `
+                <div style="border-bottom:1px solid #ddd; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <strong>${escapeHtml(c.paciente_nome)}</strong><br>
+                        ${formatDisplay(c.data_consulta)} ${c.horario} | ${c.medico_nome}
+                    </div>
+                    <div>
+                        <button onclick="editarConsulta(${c.id})" style="background:#ed8936;">✏️</button>
+                        <button onclick="excluirConsulta(${c.id})" style="background:#f56565;">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function salvarConsulta() {
+            const pacienteNome = document.getElementById('pacienteNome').value;
+            const pacienteTelefone = document.getElementById('pacienteTelefone').value;
+            const dataConsulta = document.getElementById('dataConsulta').value;
+            const horario = document.getElementById('horarioSelect').value;
+            const medicoId = document.getElementById('medicoSelect').value;
+            const medicoNome = medicos.find(m => m.id == medicoId)?.nome;
+            
+            if (!pacienteNome || !pacienteTelefone || !dataConsulta || !horario || !medicoId) {
+                mostrarMsg('Preencha todos os campos obrigatórios!', true);
+                return;
+            }
+            
+            const dados = {
+                paciente_nome: pacienteNome,
+                paciente_telefone: pacienteTelefone,
+                paciente_email: document.getElementById('pacienteEmail').value,
+                paciente_cpf: document.getElementById('pacienteCpf').value,
+                data_consulta: dataConsulta,
+                horario: horario,
+                medico_id: parseInt(medicoId),
+                medico_nome: medicoNome,
+                observacoes: document.getElementById('observacoes').value
+            };
+            
+            console.log('Salvando consulta:', dados);
+            
+            const url = editandoId ? `${API_URL}/consultas/${editandoId}` : `${API_URL}/consultas`;
+            const method = editandoId ? 'PUT' : 'POST';
+            
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                    },
+                    body: JSON.stringify(dados)
+                });
+                
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Erro ao salvar');
+                }
+                
+                mostrarMsg(editandoId ? 'Consulta atualizada!' : 'Consulta agendada!');
+                cancelarEdicao();
+                await carregarDados();
+                renderizarCalendario();
+            } catch (err) {
+                mostrarMsg(err.message, true);
+            }
+        }
+
+        window.editarConsulta = function(id) {
+            const c = consultas.find(c => c.id === id);
+            if (!c) return;
+            editandoId = id;
+            document.getElementById('pacienteNome').value = c.paciente_nome;
+            document.getElementById('pacienteTelefone').value = c.paciente_telefone;
+            document.getElementById('pacienteEmail').value = c.paciente_email || '';
+            document.getElementById('pacienteCpf').value = c.paciente_cpf || '';
+            document.getElementById('dataConsulta').value = c.data_consulta;
+            document.getElementById('horarioSelect').value = c.horario;
+            document.getElementById('medicoSelect').value = c.medico_id;
+            document.getElementById('observacoes').value = c.observacoes || '';
+            document.getElementById('cancelEditBtn').style.display = 'inline-block';
+            document.getElementById('adminPanel').scrollIntoView();
+        };
+
+        window.cancelarEdicao = function() {
+            editandoId = null;
+            document.getElementById('consultaForm')?.reset();
+            document.getElementById('pacienteNome').value = '';
+            document.getElementById('pacienteTelefone').value = '';
+            document.getElementById('pacienteEmail').value = '';
+            document.getElementById('pacienteCpf').value = '';
+            document.getElementById('dataConsulta').value = '';
+            document.getElementById('horarioSelect').value = '';
+            document.getElementById('medicoSelect').value = '';
+            document.getElementById('observacoes').value = '';
+            document.getElementById('cancelEditBtn').style.display = 'none';
+        };
+
+        window.excluirConsulta = async function(id) {
+            if (!confirm('Excluir esta consulta?')) return;
+            try {
+                await fetch(`${API_URL}/consultas/${id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                mostrarMsg('Consulta excluída!');
+                await carregarDados();
+                renderizarCalendario();
+            } catch (err) {
+                mostrarMsg(err.message, true);
+            }
+        };
+
+        function renderizarCalendario() {
+            const container = document.getElementById('calendarioContainer');
+            if (!container) return;
+            
+            if (currentView === 'week') renderizarSemana(container);
+            else if (currentView === 'month') renderizarMes(container);
+            else renderizarDia(container);
+        }
+
+        function renderizarSemana(container) {
+            let start = new Date(currentDate);
+            start.setDate(currentDate.getDate() - currentDate.getDay());
+            let days = [];
+            for (let i = 0; i < 7; i++) {
+                let d = new Date(start);
+                d.setDate(start.getDate() + i);
+                days.push(d);
+            }
+            
+            let hours = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00'];
+            
+            let html = `<table><thead><tr><th>Horário</th>`;
+            days.forEach(day => {
+                let dateStr = formatDate(day);
+                let dayEvents = consultas.filter(c => c.data_consulta === dateStr);
+                html += `<th>${day.toLocaleDateString('pt-BR', { weekday: 'short' })}<br>${day.getDate()}<br><small>${dayEvents.length}</small></th>`;
+            });
+            html += `</tr></thead><tbody>`;
+            
+            hours.forEach(hour => {
+                html += `<tr><td class="horario-label">${hour}</td>`;
+                days.forEach(day => {
+                    let dateStr = formatDate(day);
+                    let hourEvents = consultas.filter(c => c.data_consulta === dateStr && c.horario === hour);
+                    html += `<td style="background: ${hourEvents.length > 0 ? '#e8f0fe' : 'white'};">`;
+                    hourEvents.forEach(e => {
+                        html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})">
+                            <strong>${escapeHtml(e.paciente_nome)}</strong><br>
+                            <small>${e.medico_nome}</small>
+                        </div>`;
+                    });
+                    html += `</td>`;
+                });
+                html += `</tr>`;
+            });
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+        }
+
+        function renderizarMes(container) {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const startDay = firstDay.getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const today = formatDate(new Date());
+            
+            let html = `<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:5px;">`;
+            ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].forEach(d => html += `<div class="dia-semana">${d}</div>`);
+            
+            for (let i = 0; i < startDay; i++) html += `<div></div>`;
+            
+            for (let d = 1; d <= daysInMonth; d++) {
+                let dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                let isToday = dateStr === today;
+                let dayEvents = consultas.filter(c => c.data_consulta === dateStr);
+                html += `<div style="border:1px solid #ddd; border-radius:8px; padding:8px; min-height:100px; background:${isToday ? '#e8f0fe' : 'white'}">
+                    <strong>${d}</strong><br>`;
+                dayEvents.slice(0, 3).forEach(e => {
+                    html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})" style="font-size:10px;">${e.horario} ${escapeHtml(e.paciente_nome.substring(0,15))}</div>`;
+                });
+                if (dayEvents.length > 3) html += `<small>+${dayEvents.length-3}</small>`;
+                html += `</div>`;
+            }
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        function renderizarDia(container) {
+            let dateStr = formatDate(currentDate);
+            let dayEvents = consultas.filter(c => c.data_consulta === dateStr).sort((a,b) => a.horario.localeCompare(b.horario));
+            
+            let html = `<div style="background:linear-gradient(135deg,#667eea,#764ba2); color:white; padding:20px; text-align:center; border-radius:10px; margin-bottom:20px;">
+                <h2>${currentDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</h2>
+                <p>${currentDate.toLocaleDateString('pt-BR', { weekday: 'long' })}</p>
+                <p>${dayEvents.length} consulta(s) agendada(s)</p>
+            </div>`;
+            
+            if (dayEvents.length === 0) {
+                html += `<div class="no-data">Nenhuma consulta para este dia</div>`;
+            } else {
+                dayEvents.forEach(e => {
+                    html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})" style="margin-bottom:10px; padding:15px;">
+                        <strong>🕐 ${e.horario}</strong><br>
+                        <strong>${escapeHtml(e.paciente_nome)}</strong><br>
+                        👨‍⚕️ Dr. ${escapeHtml(e.medico_nome)}<br>
+                        📞 ${e.paciente_telefone}
+                        ${e.observacoes ? `<br>📝 ${escapeHtml(e.observacoes)}` : ''}
+                    </div>`;
+                });
+            }
+            container.innerHTML = html;
+        }
+
+        window.mostrarDetalhes = function(id) {
+            const e = consultas.find(c => c.id === id);
+            if (!e) return;
+            const modal = document.getElementById('modal');
+            const modalBody = document.getElementById('modalBody');
+            modalBody.innerHTML = `
+                <div><strong>Paciente:</strong> ${escapeHtml(e.paciente_nome)}</div>
+                <div><strong>Data/Hora:</strong> ${formatDisplay(e.data_consulta)} ${e.horario}</div>
+                <div><strong>Médico:</strong> Dr. ${escapeHtml(e.medico_nome)}</div>
+                <div><strong>Telefone:</strong> ${e.paciente_telefone}</div>
+                ${e.paciente_email ? `<div><strong>E-mail:</strong> ${escapeHtml(e.paciente_email)}</div>` : ''}
+                ${e.observacoes ? `<div><strong>Observações:</strong> ${escapeHtml(e.observacoes)}</div>` : ''}
+                <button onclick="enviarWhatsApp(${e.id})" style="background:#25D366; width:100%; margin-top:10px;">📱 Enviar Guia WhatsApp</button>
+            `;
+            modal.style.display = 'flex';
+        };
+
+        window.enviarWhatsApp = function(id) {
+            const e = consultas.find(c => c.id === id);
+            if (!e) return;
+            const number = document.getElementById('whatsappNumber')?.textContent || '(22) 99764-0112';
+            const msg = `🏥 ÓTICA MACAÉ - GUIA DE CONSULTA\n\nPaciente: ${e.paciente_nome}\nData: ${formatDisplay(e.data_consulta)}\nHorário: ${e.horario}\nMédico: Dr. ${e.medico_nome}\nLocal: ${number}\nObservações: ${e.observacoes || 'Nenhuma'}`;
+            const phone = e.paciente_telefone.replace(/\D/g, '');
+            if (phone) window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+            else alert('Número não disponível');
+        };
+
+        window.fecharModal = function() {
+            document.getElementById('modal').style.display = 'none';
+        };
+
+        function mudarView(view) {
+            currentView = view;
+            renderizarCalendario();
+        }
+
+        function toggleAdmin() {
+            const panel = document.getElementById('adminPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.reload();
+        }
+
+        // Verificar auto login
+        const savedToken = localStorage.getItem('token');
+        if (savedToken) {
+            token = savedToken;
+            fetch(`${API_URL}/verify`, { headers: { Authorization: `Bearer ${token}` } })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.valid) {
+                        user = data.user;
+                        document.getElementById('loginDiv').style.display = 'none';
+                        document.getElementById('dashboardDiv').style.display = 'block';
+                        document.getElementById('userName').innerHTML = `👤 ${user.nome} (${user.tipo === 'admin' ? 'Admin' : 'Vendedor'})`;
+                        if (user.tipo === 'admin') {
+                            document.getElementById('adminPanel').style.display = 'block';
+                            document.getElementById('toggleAdminBtn').style.display = 'block';
+                        }
+                        carregarDados();
+                        renderizarCalendario();
+                    }
+                });
+        }
+    </script>
+</body>
+</html>
