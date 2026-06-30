@@ -93,6 +93,12 @@
         .horario-radio-group label { margin-right: 15px; cursor: pointer; }
         .horario-radio-group input[type="radio"] { margin-right: 4px; }
 
+        /* Estilos para a seção de horários */
+        #horariosMedico { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; }
+        #horariosMedico h4 { margin-bottom: 15px; color: #2d3748; }
+        .horario-item { border-bottom: 1px solid #e2e8f0; padding: 10px 0; display: flex; justify-content: space-between; align-items: center; }
+        .horario-item:last-child { border-bottom: none; }
+
         @media (max-width: 768px) {
             .header-title h2 { font-size: 16px; }
             .side-menu { width: 240px; left: -240px; }
@@ -202,15 +208,6 @@
                     <input type="date" id="dataConsulta">
                     <select id="horarioSelect">
                         <option value="">Horário</option>
-                        <option value="08:00">08:00</option><option value="08:30">08:30</option>
-                        <option value="09:00">09:00</option><option value="09:30">09:30</option>
-                        <option value="10:00">10:00</option><option value="10:30">10:30</option>
-                        <option value="11:00">11:00</option><option value="11:30">11:30</option>
-                        <option value="13:00">13:00</option><option value="13:30">13:30</option>
-                        <option value="14:00">14:00</option><option value="14:30">14:30</option>
-                        <option value="15:00">15:00</option><option value="15:30">15:30</option>
-                        <option value="16:00">16:00</option><option value="16:30">16:30</option>
-                        <option value="17:00">17:00</option>
                     </select>
                 </div>
                 <div class="form-row">
@@ -255,7 +252,31 @@
                     <h3>Médicos Cadastrados</h3>
                     <div id="medicosList"></div>
                 </div>
+
+                <!-- SEÇÃO DE HORÁRIOS -->
+                <div id="horariosMedico" style="display:none; background:#f8f9fa; padding:20px; border-radius:10px; margin-top:20px;">
+                    <h4>Gerenciar Horários de Atendimento</h4>
+                    <div id="horariosList"></div>
+                    <div style="margin-top:15px; display:flex; flex-wrap:wrap; gap:10px;">
+                        <select id="horarioDiaSemana" style="flex:1; min-width:120px;">
+                            <option value="0">Domingo</option>
+                            <option value="1">Segunda</option>
+                            <option value="2">Terça</option>
+                            <option value="3">Quarta</option>
+                            <option value="4">Quinta</option>
+                            <option value="5">Sexta</option>
+                            <option value="6">Sábado</option>
+                        </select>
+                        <input type="time" id="horarioInicio" value="08:00" style="flex:1;">
+                        <input type="time" id="horarioFim" value="17:00" style="flex:1;">
+                        <input type="number" id="horarioIntervalo" value="30" min="10" max="60" step="5" style="width:80px;">
+                        <button onclick="adicionarHorarioMedico()" class="btn-success">Adicionar</button>
+                        <button onclick="cancelarEdicaoHorario()" id="cancelHorarioBtn" style="display:none;">Cancelar</button>
+                    </div>
+                    <input type="hidden" id="editHorarioId">
+                </div>
             </div>
+
             <div id="subUsuarios" class="sub-page">
                 <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
                     <h3>Cadastrar Usuário</h3>
@@ -277,6 +298,7 @@
                     <div id="usuariosList"></div>
                 </div>
             </div>
+
             <div id="subPacientes" class="sub-page">
                 <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
                     <h3>Cadastrar Paciente</h3>
@@ -303,12 +325,14 @@
                     <div id="pacientesList"></div>
                 </div>
             </div>
+
             <div id="subSolicitacoes" class="sub-page">
                 <div style="background:white; padding:20px; border-radius:10px;">
                     <h3>Solicitações de Consulta</h3>
                     <div id="solicitacoesList"></div>
                 </div>
             </div>
+
             <div id="subWhatsapp" class="sub-page">
                 <div style="background:white; padding:20px; border-radius:10px;">
                     <h3>Configurar WhatsApp</h3>
@@ -350,39 +374,12 @@
                 <input type="date" id="solDataConsulta">
                 <select id="solHorario1" style="flex:1;">
                     <option value="">1º Horário *</option>
-                    <option value="08:00">08:00</option><option value="08:30">08:30</option>
-                    <option value="09:00">09:00</option><option value="09:30">09:30</option>
-                    <option value="10:00">10:00</option><option value="10:30">10:30</option>
-                    <option value="11:00">11:00</option><option value="11:30">11:30</option>
-                    <option value="13:00">13:00</option><option value="13:30">13:30</option>
-                    <option value="14:00">14:00</option><option value="14:30">14:30</option>
-                    <option value="15:00">15:00</option><option value="15:30">15:30</option>
-                    <option value="16:00">16:00</option><option value="16:30">16:30</option>
-                    <option value="17:00">17:00</option>
                 </select>
                 <select id="solHorario2" style="flex:1;">
                     <option value="">2º Horário (opcional)</option>
-                    <option value="08:00">08:00</option><option value="08:30">08:30</option>
-                    <option value="09:00">09:00</option><option value="09:30">09:30</option>
-                    <option value="10:00">10:00</option><option value="10:30">10:30</option>
-                    <option value="11:00">11:00</option><option value="11:30">11:30</option>
-                    <option value="13:00">13:00</option><option value="13:30">13:30</option>
-                    <option value="14:00">14:00</option><option value="14:30">14:30</option>
-                    <option value="15:00">15:00</option><option value="15:30">15:30</option>
-                    <option value="16:00">16:00</option><option value="16:30">16:30</option>
-                    <option value="17:00">17:00</option>
                 </select>
                 <select id="solHorario3" style="flex:1;">
                     <option value="">3º Horário (opcional)</option>
-                    <option value="08:00">08:00</option><option value="08:30">08:30</option>
-                    <option value="09:00">09:00</option><option value="09:30">09:30</option>
-                    <option value="10:00">10:00</option><option value="10:30">10:30</option>
-                    <option value="11:00">11:00</option><option value="11:30">11:30</option>
-                    <option value="13:00">13:00</option><option value="13:30">13:30</option>
-                    <option value="14:00">14:00</option><option value="14:30">14:30</option>
-                    <option value="15:00">15:00</option><option value="15:30">15:30</option>
-                    <option value="16:00">16:00</option><option value="16:30">16:30</option>
-                    <option value="17:00">17:00</option>
                 </select>
             </div>
             <div class="form-row">
@@ -394,9 +391,44 @@
         </div>
 
         <!-- MODAIS -->
-        <div id="modalLembretes" class="modal-overlay"><div class="modal-box"><h3><i class="fas fa-bell"></i> Lembretes</h3><div id="lembretesList"></div><button onclick="fecharModalLembretes()" style="margin-top:10px;">Fechar</button></div></div>
-        <div id="modalDetalhes" class="modal-overlay"><div class="modal-box"><h3>Detalhes da Consulta</h3><div id="detalhesBody"></div><button onclick="fecharModalDetalhes()" style="margin-top:10px;">Fechar</button></div></div>
-        <div id="modalCadastroPaciente" class="modal-overlay"><div class="modal-box"><h3>Novo Paciente</h3><div class="form-row"><input type="text" id="novoPacienteNome" placeholder="Nome *"><input type="text" id="novoPacienteTelefone" placeholder="Telefone *"></div><div class="form-row"><input type="email" id="novoPacienteEmail" placeholder="E-mail"><input type="text" id="novoPacienteCpf" placeholder="CPF"><input type="date" id="novoPacienteDataNasc" placeholder="Data Nascimento"></div><div class="form-row"><label><input type="checkbox" id="novoPacienteEncaixe" checked> Encaixe</label><label><input type="checkbox" id="novoPacienteNeurodivergente" disabled> Neurodivergente</label><label><input type="checkbox" id="novoPacienteDeficienciaFisica" disabled> Deficiência Física</label></div><div style="display:flex;gap:10px;margin-top:15px;"><button onclick="salvarNovoPaciente()" class="btn-success" style="flex:1;">Salvar e Usar</button><button onclick="fecharModalCadastroPaciente()" style="flex:1; background:#ccc;">Cancelar</button></div><div id="novoPacienteMsg"></div></div></div>
+        <div id="modalLembretes" class="modal-overlay">
+            <div class="modal-box">
+                <h3><i class="fas fa-bell"></i> Lembretes</h3>
+                <div id="lembretesList"></div>
+                <button onclick="fecharModalLembretes()" style="margin-top:10px;">Fechar</button>
+            </div>
+        </div>
+        <div id="modalDetalhes" class="modal-overlay">
+            <div class="modal-box">
+                <h3>Detalhes da Consulta</h3>
+                <div id="detalhesBody"></div>
+                <button onclick="fecharModalDetalhes()" style="margin-top:10px;">Fechar</button>
+            </div>
+        </div>
+        <div id="modalCadastroPaciente" class="modal-overlay">
+            <div class="modal-box">
+                <h3>Novo Paciente</h3>
+                <div class="form-row">
+                    <input type="text" id="novoPacienteNome" placeholder="Nome *">
+                    <input type="text" id="novoPacienteTelefone" placeholder="Telefone *">
+                </div>
+                <div class="form-row">
+                    <input type="email" id="novoPacienteEmail" placeholder="E-mail">
+                    <input type="text" id="novoPacienteCpf" placeholder="CPF">
+                    <input type="date" id="novoPacienteDataNasc" placeholder="Data Nascimento">
+                </div>
+                <div class="form-row">
+                    <label><input type="checkbox" id="novoPacienteEncaixe" checked> Encaixe</label>
+                    <label><input type="checkbox" id="novoPacienteNeurodivergente" disabled> Neurodivergente</label>
+                    <label><input type="checkbox" id="novoPacienteDeficienciaFisica" disabled> Deficiência Física</label>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:15px;">
+                    <button onclick="salvarNovoPaciente()" class="btn-success" style="flex:1;">Salvar e Usar</button>
+                    <button onclick="fecharModalCadastroPaciente()" style="flex:1; background:#ccc;">Cancelar</button>
+                </div>
+                <div id="novoPacienteMsg"></div>
+            </div>
+        </div>
         <div id="toast" class="toast"></div>
     </div>
 
@@ -414,6 +446,7 @@
         let currentView = 'week';
         let currentDate = new Date();
         let editandoId = null;
+        let medicoSelecionadoId = null;
 
         // ========================================================================
         // UTILITÁRIOS
@@ -627,7 +660,7 @@
         }
 
         // ========================================================================
-        // BUSCAR PACIENTE POR CPF (com correção de data)
+        // BUSCAR PACIENTE POR CPF
         // ========================================================================
         async function buscarPacientePorCpf() {
             const cpf = document.getElementById('buscarCpf').value.trim();
@@ -642,7 +675,7 @@
                 document.getElementById('pacienteTelefone').value = paciente.telefone;
                 document.getElementById('pacienteEmail').value = paciente.email || '';
                 document.getElementById('pacienteCpf').value = paciente.cpf || '';
-                document.getElementById('pacienteDataNasc').value = paciente.data_nascimento ? paciente.data_nascimento.split('T')[0] : '';
+                document.getElementById('pacienteDataNasc').value = paciente.data_nascimento || '';
                 document.getElementById('pacienteNeurodivergente').checked = paciente.neurodivergente === 1;
                 document.getElementById('pacienteDeficienciaFisica').checked = paciente.deficiencia_fisica === 1;
                 document.getElementById('pacienteEncaixe').checked = paciente.encaixe === 1;
@@ -683,7 +716,7 @@
                 document.getElementById('solPacienteTelefone').value = paciente.telefone;
                 document.getElementById('solPacienteEmail').value = paciente.email || '';
                 document.getElementById('solPacienteCpf').value = paciente.cpf || '';
-                document.getElementById('solPacienteDataNasc').value = paciente.data_nascimento ? paciente.data_nascimento.split('T')[0] : '';
+                document.getElementById('solPacienteDataNasc').value = paciente.data_nascimento || '';
                 document.getElementById('solNeurodivergente').checked = paciente.neurodivergente === 1;
                 document.getElementById('solDeficienciaFisica').checked = paciente.deficiencia_fisica === 1;
                 document.getElementById('solEncaixe').checked = paciente.encaixe === 1;
@@ -853,7 +886,248 @@
         }
 
         // ========================================================================
-        // CONSULTAS
+        // MÉDICOS (com gerenciamento de horários)
+        // ========================================================================
+        async function salvarMedico() {
+            const data = {
+                nome: document.getElementById('medicoNome').value,
+                crm: document.getElementById('medicoCrm').value,
+                telefone: document.getElementById('medicoTelefone').value,
+                email: document.getElementById('medicoEmail').value,
+                whatsapp: document.getElementById('medicoWhatsapp').value,
+                endereco: document.getElementById('medicoEndereco').value,
+                mensagem_padrao: document.getElementById('medicoMensagemPadrao').value,
+                especialidade: document.getElementById('medicoEspecialidade').value
+            };
+            const editId = document.getElementById('editMedicoId').value;
+            const url = editId ? `${API_URL}/medicos/${editId}` : `${API_URL}/medicos`;
+            const method = editId ? 'PUT' : 'POST';
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) throw new Error('Erro');
+                showToast(editId ? 'Atualizado' : 'Cadastrado');
+                cancelarEdicaoMedico();
+                await carregarDados();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        function renderMedicos() {
+            const container = document.getElementById('medicosList');
+            if (!container) return;
+            if (medicos.length === 0) { container.innerHTML = '<p class="no-data">Nenhum médico</p>'; return; }
+            container.innerHTML = medicos.map(m => `
+                <div style="border-bottom:1px solid #ddd; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <strong>Dr. ${escapeHtml(m.nome)}</strong><br>
+                        ${m.crm} | ${m.especialidade}<br>
+                        ${m.whatsapp ? '📱 ' + m.whatsapp : ''}
+                        ${m.endereco ? '<br>📍 ' + escapeHtml(m.endereco) : ''}
+                        ${m.mensagem_padrao ? '<br><small>📝 ' + escapeHtml(m.mensagem_padrao.substring(0,50)) + '...</small>' : ''}
+                    </div>
+                    <div>
+                        <button onclick="editarMedico(${m.id})">✏️</button>
+                        <button onclick="excluirMedico(${m.id})">🗑️</button>
+                        <button onclick="gerenciarHorarios(${m.id})" class="btn-primary" style="background:#48bb78;">🕐 Horários</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function editarMedico(id) {
+            const m = medicos.find(m => m.id === id);
+            if (!m) return;
+            document.getElementById('editMedicoId').value = m.id;
+            document.getElementById('medicoNome').value = m.nome;
+            document.getElementById('medicoCrm').value = m.crm;
+            document.getElementById('medicoTelefone').value = m.telefone || '';
+            document.getElementById('medicoEmail').value = m.email || '';
+            document.getElementById('medicoWhatsapp').value = m.whatsapp || '';
+            document.getElementById('medicoEndereco').value = m.endereco || '';
+            document.getElementById('medicoMensagemPadrao').value = m.mensagem_padrao || '';
+            document.getElementById('medicoEspecialidade').value = m.especialidade || '';
+            document.getElementById('cancelMedicoBtn').style.display = 'inline-block';
+            mostrarSubPage('medicos');
+        }
+
+        function cancelarEdicaoMedico() {
+            document.getElementById('editMedicoId').value = '';
+            document.getElementById('cancelMedicoBtn').style.display = 'none';
+            document.getElementById('medicoNome').value = '';
+            document.getElementById('medicoCrm').value = '';
+            document.getElementById('medicoTelefone').value = '';
+            document.getElementById('medicoEmail').value = '';
+            document.getElementById('medicoWhatsapp').value = '';
+            document.getElementById('medicoEndereco').value = '';
+            document.getElementById('medicoMensagemPadrao').value = '';
+            document.getElementById('medicoEspecialidade').value = '';
+        }
+
+        async function excluirMedico(id) {
+            if (!confirm('Excluir este médico?')) return;
+            try {
+                await fetch(`${API_URL}/medicos/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+                showToast('Excluído');
+                await carregarDados();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        // ========================================================================
+        // HORÁRIOS DOS MÉDICOS
+        // ========================================================================
+        function gerenciarHorarios(medicoId) {
+            medicoSelecionadoId = medicoId;
+            document.getElementById('horariosMedico').style.display = 'block';
+            carregarHorarios(medicoId);
+            document.getElementById('horariosMedico').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function carregarHorarios(medicoId) {
+            try {
+                const res = await fetch(`${API_URL}/medicos/${medicoId}/horarios`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const horarios = await res.json();
+                const container = document.getElementById('horariosList');
+                if (!container) return;
+                if (horarios.length === 0) {
+                    container.innerHTML = '<p>Nenhum horário configurado.</p>';
+                    return;
+                }
+                const dias = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+                container.innerHTML = horarios.map(h => `
+                    <div class="horario-item">
+                        <div>
+                            <strong>${dias[h.dia_semana]}</strong> 
+                            ${h.hora_inicio} - ${h.hora_fim} 
+                            (intervalo ${h.intervalo} min)
+                            ${!h.ativo ? ' <span style="color:red;">(inativo)</span>' : ''}
+                        </div>
+                        <div>
+                            <button onclick="editarHorario(${h.id})" class="btn-warning">✏️</button>
+                            <button onclick="excluirHorario(${h.id})" class="btn-danger">🗑️</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                showToast('Erro ao carregar horários', true);
+            }
+        }
+
+        async function adicionarHorarioMedico() {
+            if (!medicoSelecionadoId) return;
+            const data = {
+                dia_semana: parseInt(document.getElementById('horarioDiaSemana').value),
+                hora_inicio: document.getElementById('horarioInicio').value,
+                hora_fim: document.getElementById('horarioFim').value,
+                intervalo: parseInt(document.getElementById('horarioIntervalo').value) || 30
+            };
+            if (data.hora_inicio >= data.hora_fim) {
+                showToast('Hora de início deve ser menor que hora de fim', true);
+                return;
+            }
+            const editId = document.getElementById('editHorarioId').value;
+            const url = editId ? `${API_URL}/horarios/${editId}` : `${API_URL}/medicos/${medicoSelecionadoId}/horarios`;
+            const method = editId ? 'PUT' : 'POST';
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Erro'); }
+                showToast(editId ? 'Horário atualizado!' : 'Horário adicionado!');
+                cancelarEdicaoHorario();
+                carregarHorarios(medicoSelecionadoId);
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        async function editarHorario(id) {
+            try {
+                const res = await fetch(`${API_URL}/horarios/${id}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.id) {
+                    document.getElementById('editHorarioId').value = data.id;
+                    document.getElementById('horarioDiaSemana').value = data.dia_semana;
+                    document.getElementById('horarioInicio').value = data.hora_inicio;
+                    document.getElementById('horarioFim').value = data.hora_fim;
+                    document.getElementById('horarioIntervalo').value = data.intervalo || 30;
+                    document.getElementById('cancelHorarioBtn').style.display = 'inline-block';
+                }
+            } catch (err) {
+                showToast('Erro ao carregar horário', true);
+            }
+        }
+
+        function cancelarEdicaoHorario() {
+            document.getElementById('editHorarioId').value = '';
+            document.getElementById('cancelHorarioBtn').style.display = 'none';
+            document.getElementById('horarioDiaSemana').value = '1';
+            document.getElementById('horarioInicio').value = '08:00';
+            document.getElementById('horarioFim').value = '17:00';
+            document.getElementById('horarioIntervalo').value = '30';
+        }
+
+        async function excluirHorario(id) {
+            if (!confirm('Excluir este horário?')) return;
+            try {
+                const res = await fetch(`${API_URL}/horarios/${id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Erro');
+                showToast('Horário excluído');
+                carregarHorarios(medicoSelecionadoId);
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        // ========================================================================
+        // CARREGAR HORÁRIOS DISPONÍVEIS
+        // ========================================================================
+        async function carregarHorariosDisponiveis() {
+            const medicoId = document.getElementById('medicoSelect').value;
+            const data = document.getElementById('dataConsulta').value;
+            if (!medicoId || !data) return;
+            try {
+                const res = await fetch(`${API_URL}/medicos/${medicoId}/horarios/disponiveis?data=${data}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const horarios = await res.json();
+                const select = document.getElementById('horarioSelect');
+                select.innerHTML = '<option value="">Selecione um horário</option>';
+                if (horarios.length === 0) {
+                    select.innerHTML += '<option value="">Nenhum horário disponível</option>';
+                    return;
+                }
+                horarios.forEach(h => {
+                    const opt = document.createElement('option');
+                    opt.value = h.horario;
+                    opt.textContent = h.horario;
+                    select.appendChild(opt);
+                });
+            } catch (err) {
+                showToast('Erro ao carregar horários disponíveis', true);
+            }
+        }
+
+        document.getElementById('medicoSelect').addEventListener('change', carregarHorariosDisponiveis);
+        document.getElementById('dataConsulta').addEventListener('change', carregarHorariosDisponiveis);
+
+        // ========================================================================
+        // CONSULTAS (com horários disponíveis)
         // ========================================================================
         async function salvarConsulta() {
             if (user.tipo !== 'admin') { showToast('Apenas administradores podem agendar.', true); return; }
@@ -996,6 +1270,8 @@
                 atualizarIdadeDisplay();
                 setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
             }
+            // Carregar horários disponíveis para o médico e data
+            carregarHorariosDisponiveis();
             navegarPara('pageAgendar');
         }
 
@@ -1107,96 +1383,6 @@
         }
 
         // ========================================================================
-        // MÉDICOS
-        // ========================================================================
-        async function salvarMedico() {
-            const data = {
-                nome: document.getElementById('medicoNome').value,
-                crm: document.getElementById('medicoCrm').value,
-                telefone: document.getElementById('medicoTelefone').value,
-                email: document.getElementById('medicoEmail').value,
-                whatsapp: document.getElementById('medicoWhatsapp').value,
-                endereco: document.getElementById('medicoEndereco').value,
-                mensagem_padrao: document.getElementById('medicoMensagemPadrao').value,
-                especialidade: document.getElementById('medicoEspecialidade').value
-            };
-            const editId = document.getElementById('editMedicoId').value;
-            const url = editId ? `${API_URL}/medicos/${editId}` : `${API_URL}/medicos`;
-            const method = editId ? 'PUT' : 'POST';
-            try {
-                const res = await fetch(url, {
-                    method,
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify(data)
-                });
-                if (!res.ok) throw new Error('Erro');
-                showToast(editId ? 'Atualizado' : 'Cadastrado');
-                cancelarEdicaoMedico();
-                await carregarDados();
-            } catch (err) {
-                showToast(err.message, true);
-            }
-        }
-
-        function renderMedicos() {
-            const container = document.getElementById('medicosList');
-            if (!container) return;
-            if (medicos.length === 0) { container.innerHTML = '<p class="no-data">Nenhum médico</p>'; return; }
-            container.innerHTML = medicos.map(m => `
-                <div style="border-bottom:1px solid #ddd; padding:10px; display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                        <strong>Dr. ${escapeHtml(m.nome)}</strong><br>
-                        ${m.crm} | ${m.especialidade}<br>
-                        ${m.whatsapp ? '📱 ' + m.whatsapp : ''}
-                        ${m.endereco ? '<br>📍 ' + escapeHtml(m.endereco) : ''}
-                        ${m.mensagem_padrao ? '<br><small>📝 ' + escapeHtml(m.mensagem_padrao.substring(0,50)) + '...</small>' : ''}
-                    </div>
-                    <div><button onclick="editarMedico(${m.id})">✏️</button><button onclick="excluirMedico(${m.id})">🗑️</button></div>
-                </div>
-            `).join('');
-        }
-
-        function editarMedico(id) {
-            const m = medicos.find(m => m.id === id);
-            if (!m) return;
-            document.getElementById('editMedicoId').value = m.id;
-            document.getElementById('medicoNome').value = m.nome;
-            document.getElementById('medicoCrm').value = m.crm;
-            document.getElementById('medicoTelefone').value = m.telefone || '';
-            document.getElementById('medicoEmail').value = m.email || '';
-            document.getElementById('medicoWhatsapp').value = m.whatsapp || '';
-            document.getElementById('medicoEndereco').value = m.endereco || '';
-            document.getElementById('medicoMensagemPadrao').value = m.mensagem_padrao || '';
-            document.getElementById('medicoEspecialidade').value = m.especialidade || '';
-            document.getElementById('cancelMedicoBtn').style.display = 'inline-block';
-            mostrarSubPage('medicos');
-        }
-
-        function cancelarEdicaoMedico() {
-            document.getElementById('editMedicoId').value = '';
-            document.getElementById('cancelMedicoBtn').style.display = 'none';
-            document.getElementById('medicoNome').value = '';
-            document.getElementById('medicoCrm').value = '';
-            document.getElementById('medicoTelefone').value = '';
-            document.getElementById('medicoEmail').value = '';
-            document.getElementById('medicoWhatsapp').value = '';
-            document.getElementById('medicoEndereco').value = '';
-            document.getElementById('medicoMensagemPadrao').value = '';
-            document.getElementById('medicoEspecialidade').value = '';
-        }
-
-        async function excluirMedico(id) {
-            if (!confirm('Excluir?')) return;
-            try {
-                await fetch(`${API_URL}/medicos/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-                showToast('Excluído');
-                await carregarDados();
-            } catch (err) {
-                showToast(err.message, true);
-            }
-        }
-
-        // ========================================================================
         // USUÁRIOS
         // ========================================================================
         async function salvarUsuario() {
@@ -1273,7 +1459,7 @@
         }
 
         // ========================================================================
-        // SOLICITAÇÕES (com três horários)
+        // SOLICITAÇÕES
         // ========================================================================
         async function enviarSolicitacao() {
             const data = {
@@ -1773,7 +1959,7 @@
         }
 
         // ========================================================================
-        // AUTO LOGIN
+        // AUTO LOGIN (já incluso no final)
         // ========================================================================
         (async () => {
             const savedToken = localStorage.getItem('token');
@@ -1824,7 +2010,7 @@
             });
         });
 
-        console.log('✅ Sistema completo com três horários sugeridos.');
+        console.log('✅ Sistema completo com gerenciamento de horários.');
     </script>
 </body>
 </html>
