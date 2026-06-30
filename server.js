@@ -57,6 +57,7 @@ function isAdmin(req, res, next) {
 async function initDatabase() {
     try {
         console.log('📦 Criando tabelas...');
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS usuarios (
                 id SERIAL PRIMARY KEY,
@@ -69,6 +70,7 @@ async function initDatabase() {
                 criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS medicos (
                 id SERIAL PRIMARY KEY,
@@ -84,6 +86,7 @@ async function initDatabase() {
                 criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS clientes (
                 id SERIAL PRIMARY KEY,
@@ -100,6 +103,7 @@ async function initDatabase() {
                 criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS consultas (
                 id SERIAL PRIMARY KEY,
@@ -117,6 +121,7 @@ async function initDatabase() {
                 criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS solicitacoes_consultas (
                 id SERIAL PRIMARY KEY,
@@ -137,6 +142,7 @@ async function initDatabase() {
                 criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS lembretes (
                 id SERIAL PRIMARY KEY,
@@ -152,6 +158,7 @@ async function initDatabase() {
                 criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS whatsapp_config (
                 id INTEGER PRIMARY KEY DEFAULT 1,
@@ -170,7 +177,9 @@ async function initDatabase() {
                 'INSERT INTO usuarios (nome, username, senha, tipo, ativo) VALUES ($1, $2, $3, $4, $5)',
                 ['Administrador', 'admin', hash, 'admin', true]
             );
+            console.log('✅ Usuário admin criado');
         }
+
         const vendedor = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['vendedor']);
         if (vendedor.rows.length === 0) {
             const hash = await bcrypt.hash('vender123', 10);
@@ -178,6 +187,7 @@ async function initDatabase() {
                 'INSERT INTO usuarios (nome, username, senha, tipo, ativo) VALUES ($1, $2, $3, $4, $5)',
                 ['Vendedor', 'vendedor', hash, 'vendedor', true]
             );
+            console.log('✅ Usuário vendedor criado');
         }
 
         const config = await pool.query('SELECT id FROM whatsapp_config WHERE id = 1');
@@ -186,9 +196,10 @@ async function initDatabase() {
                 'INSERT INTO whatsapp_config (id, numero, endereco_otica) VALUES ($1, $2, $3)',
                 [1, '(22) 99764-0112', 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ']
             );
+            console.log('✅ Configuração WhatsApp criada');
         }
 
-        console.log('✅ Banco inicializado com sucesso!');
+        console.log('✅ Banco de dados inicializado com sucesso!');
     } catch (error) {
         console.error('❌ Erro ao inicializar banco:', error.message);
         console.error(error.stack);
@@ -196,27 +207,38 @@ async function initDatabase() {
 }
 initDatabase();
 
-// ==================== ROTAS (RESUMIDAS - use seu código original adaptado) ====================
+// ==================== ROTAS ====================
+
+// ---------- LOGIN ----------
 app.post('/api/login', async (req, res) => {
     try {
+        console.log('🔑 Tentativa de login:', req.body.username);
         const { username, password } = req.body;
+
         const result = await pool.query(
             'SELECT id, nome, username, senha, tipo, telefone FROM usuarios WHERE username = $1 AND ativo = true',
             [username]
         );
-        if (result.rows.length === 0) return res.status(401).json({ error: 'Usuário ou senha inválidos' });
+        if (result.rows.length === 0) {
+            console.log('❌ Usuário não encontrado:', username);
+            return res.status(401).json({ error: 'Usuário ou senha inválidos' });
+        }
         const user = result.rows[0];
         const valid = await bcrypt.compare(password, user.senha);
-        if (!valid) return res.status(401).json({ error: 'Usuário ou senha inválidos' });
+        if (!valid) {
+            console.log('❌ Senha inválida para:', username);
+            return res.status(401).json({ error: 'Usuário ou senha inválidos' });
+        }
         const token = jwt.sign(
             { id: user.id, nome: user.nome, username: user.username, tipo: user.tipo },
             process.env.JWT_SECRET || 'secret_key',
             { expiresIn: '7d' }
         );
+        console.log('✅ Login bem-sucedido:', username);
         res.json({ token, user: { id: user.id, nome: user.nome, username: user.username, tipo: user.tipo, telefone: user.telefone } });
     } catch (error) {
-        console.error('Erro no login:', error);
-        res.status(500).json({ error: 'Erro interno' });
+        console.error('❌ Erro no login:', error);
+        res.status(500).json({ error: 'Erro interno: ' + error.message });
     }
 });
 
@@ -239,8 +261,12 @@ app.get('/api/medicos', authenticateToken, async (req, res) => {
 app.post('/api/medicos', authenticateToken, isAdmin, async (req, res) => {
     try {
         const { nome, crm, telefone, email, especialidade, whatsapp, endereco, mensagem_padrao } = req.body;
-        const exist = await pool.query('SELECT id FROM medicos WHERE crm = $1', [crm]);
-        if (exist.rows.length > 0) return res.status(400).json({ error: 'CRM já cadastrado.' });
+        if (crm) {
+            const exist = await pool.query('SELECT id FROM medicos WHERE crm = $1', [crm]);
+            if (exist.rows.length > 0) {
+                return res.status(400).json({ error: 'CRM já cadastrado.' });
+            }
+        }
         const result = await pool.query(
             'INSERT INTO medicos (nome, crm, telefone, email, especialidade, whatsapp, endereco, mensagem_padrao) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
             [nome, crm, toNull(telefone), toNull(email), especialidade, toNull(whatsapp), toNull(endereco), toNull(mensagem_padrao)]
@@ -254,8 +280,12 @@ app.post('/api/medicos', authenticateToken, isAdmin, async (req, res) => {
 app.put('/api/medicos/:id', authenticateToken, isAdmin, async (req, res) => {
     try {
         const { nome, crm, telefone, email, especialidade, whatsapp, endereco, mensagem_padrao } = req.body;
-        const exist = await pool.query('SELECT id FROM medicos WHERE crm = $1 AND id != $2', [crm, req.params.id]);
-        if (exist.rows.length > 0) return res.status(400).json({ error: 'CRM já cadastrado.' });
+        if (crm) {
+            const exist = await pool.query('SELECT id FROM medicos WHERE crm = $1 AND id != $2', [crm, req.params.id]);
+            if (exist.rows.length > 0) {
+                return res.status(400).json({ error: 'CRM já cadastrado.' });
+            }
+        }
         await pool.query(
             'UPDATE medicos SET nome=$1, crm=$2, telefone=$3, email=$4, especialidade=$5, whatsapp=$6, endereco=$7, mensagem_padrao=$8 WHERE id=$9',
             [nome, crm, toNull(telefone), toNull(email), especialidade, toNull(whatsapp), toNull(endereco), toNull(mensagem_padrao), req.params.id]
@@ -307,7 +337,9 @@ app.post('/api/clientes', authenticateToken, async (req, res) => {
         const { nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe } = req.body;
         if (cpf) {
             const exist = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [cpf]);
-            if (exist.rows.length > 0) return res.status(400).json({ error: 'CPF já cadastrado.' });
+            if (exist.rows.length > 0) {
+                return res.status(400).json({ error: 'CPF já cadastrado.' });
+            }
         }
         const result = await pool.query(
             `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por) 
@@ -325,7 +357,9 @@ app.put('/api/clientes/:id', authenticateToken, async (req, res) => {
         const { nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe } = req.body;
         if (cpf) {
             const exist = await pool.query('SELECT id FROM clientes WHERE cpf = $1 AND id != $2', [cpf, req.params.id]);
-            if (exist.rows.length > 0) return res.status(400).json({ error: 'CPF já cadastrado.' });
+            if (exist.rows.length > 0) {
+                return res.status(400).json({ error: 'CPF já cadastrado.' });
+            }
         }
         await pool.query(
             `UPDATE clientes SET nome=$1, telefone=$2, email=$3, cpf=$4, data_nascimento=$5, neurodivergente=$6, deficiencia_fisica=$7, encaixe=$8 WHERE id=$9`,
@@ -365,22 +399,107 @@ app.get('/api/consultas', authenticateToken, async (req, res) => {
 
 app.post('/api/consultas', authenticateToken, isAdmin, async (req, res) => {
     try {
-        // Código completo – verifique se você tem todas as variáveis
         const { paciente_id, paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, data_consulta, horario, medico_id, medico_nome, observacoes } = req.body;
-        // Lógica para criar paciente se necessário e inserir consulta
-        // (mantenha o mesmo código que você já tinha para MySQL, apenas adapte os placeholders para $1, $2, etc.)
-        // Vou resumir aqui, mas você deve usar seu código original adaptado.
-        res.status(201).json({ message: 'Consulta criada' });
+
+        let pacienteId = paciente_id;
+        if (!pacienteId && paciente_cpf) {
+            const existente = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [paciente_cpf]);
+            if (existente.rows.length > 0) {
+                pacienteId = existente.rows[0].id;
+            } else {
+                const result = await pool.query(
+                    `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por) 
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+                    [paciente_nome, paciente_telefone, toNull(paciente_email), paciente_cpf, toNull(data_nascimento), neurodivergente ? 1 : 0, deficiencia_fisica ? 1 : 0, encaixe ? 1 : 0, req.user.id]
+                );
+                pacienteId = result.rows[0].id;
+            }
+        }
+
+        let nome = paciente_nome, telefone = paciente_telefone, email = paciente_email, cpf = paciente_cpf;
+        if (pacienteId) {
+            const cliente = await pool.query(
+                'SELECT nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe FROM clientes WHERE id = $1',
+                [pacienteId]
+            );
+            if (cliente.rows.length > 0) {
+                nome = cliente.rows[0].nome;
+                telefone = cliente.rows[0].telefone;
+                email = cliente.rows[0].email;
+                cpf = cliente.rows[0].cpf;
+            }
+        }
+
+        const existing = await pool.query(
+            'SELECT id FROM consultas WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 AND status NOT IN ($4, $5)',
+            [data_consulta, horario, medico_id, 'cancelada', 'realizada']
+        );
+        if (existing.rows.length > 0) {
+            return res.status(400).json({ error: 'Horário já ocupado para este médico' });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO consultas (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta, horario, medico_id, medico_nome, observacoes, criado_por) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+            [nome, telefone, toNull(email), toNull(cpf), data_consulta, horario, medico_id, medico_nome, toNull(observacoes), req.user.id]
+        );
+        const consultaId = result.rows[0].id;
+        await agendarLembrete(consultaId, nome, telefone, data_consulta, horario, medico_nome, medico_id, req.user.id);
+        res.status(201).json({ id: consultaId });
     } catch (error) {
+        console.error('Erro ao criar consulta:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
 app.put('/api/consultas/:id', authenticateToken, isAdmin, async (req, res) => {
     try {
-        // Lógica similar ao POST
+        const { paciente_id, paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, data_consulta, horario, medico_id, medico_nome, observacoes, status } = req.body;
+
+        let pacienteId = paciente_id;
+        if (!pacienteId && paciente_cpf) {
+            const existente = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [paciente_cpf]);
+            if (existente.rows.length > 0) {
+                pacienteId = existente.rows[0].id;
+            } else {
+                const result = await pool.query(
+                    `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por) 
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+                    [paciente_nome, paciente_telefone, toNull(paciente_email), paciente_cpf, toNull(data_nascimento), neurodivergente ? 1 : 0, deficiencia_fisica ? 1 : 0, encaixe ? 1 : 0, req.user.id]
+                );
+                pacienteId = result.rows[0].id;
+            }
+        }
+
+        let nome = paciente_nome, telefone = paciente_telefone, email = paciente_email, cpf = paciente_cpf;
+        if (pacienteId) {
+            const cliente = await pool.query(
+                'SELECT nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe FROM clientes WHERE id = $1',
+                [pacienteId]
+            );
+            if (cliente.rows.length > 0) {
+                nome = cliente.rows[0].nome;
+                telefone = cliente.rows[0].telefone;
+                email = cliente.rows[0].email;
+                cpf = cliente.rows[0].cpf;
+            }
+        }
+
+        const existing = await pool.query(
+            'SELECT id FROM consultas WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 AND id != $4 AND status NOT IN ($5, $6)',
+            [data_consulta, horario, medico_id, req.params.id, 'cancelada', 'realizada']
+        );
+        if (existing.rows.length > 0) {
+            return res.status(400).json({ error: 'Horário já ocupado para este médico' });
+        }
+
+        await pool.query(
+            `UPDATE consultas SET paciente_nome=$1, paciente_telefone=$2, paciente_email=$3, paciente_cpf=$4, data_consulta=$5, horario=$6, medico_id=$7, medico_nome=$8, observacoes=$9, status=$10 WHERE id=$11`,
+            [nome, telefone, toNull(email), toNull(cpf), data_consulta, horario, medico_id, medico_nome, toNull(observacoes), status || 'agendada', req.params.id]
+        );
         res.json({ message: 'Atualizado' });
     } catch (error) {
+        console.error('Erro ao atualizar consulta:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -422,9 +541,80 @@ app.get('/api/solicitacoes/pendentes/count', authenticateToken, isAdmin, async (
 
 app.post('/api/solicitacoes', authenticateToken, async (req, res) => {
     try {
-        // Código para criar solicitação com 3 horários – adapte para PostgreSQL
-        res.status(201).json({ message: 'Solicitação criada' });
+        const {
+            paciente_nome,
+            paciente_telefone,
+            paciente_email,
+            paciente_cpf,
+            data_nascimento,
+            neurodivergente,
+            deficiencia_fisica,
+            encaixe,
+            data_consulta,
+            horario1,
+            horario2,
+            horario3,
+            medico_id,
+            medico_nome,
+            observacoes
+        } = req.body;
+
+        let pacienteId = null;
+        if (paciente_cpf) {
+            const existente = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [paciente_cpf]);
+            if (existente.rows.length > 0) {
+                pacienteId = existente.rows[0].id;
+            } else {
+                const neuro = neurodivergente ? 1 : 0;
+                const defFis = deficiencia_fisica ? 1 : 0;
+                const enc = encaixe ? 1 : 0;
+                const result = await pool.query(
+                    `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por) 
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+                    [paciente_nome, paciente_telefone, toNull(paciente_email), toNull(paciente_cpf), toNull(data_nascimento), neuro, defFis, enc, req.user.id]
+                );
+                pacienteId = result.rows[0].id;
+            }
+        }
+
+        // Verifica conflito
+        const horarios = [horario1, horario2, horario3].filter(h => h);
+        for (const hor of horarios) {
+            const conflito = await pool.query(
+                `SELECT id FROM solicitacoes_consultas 
+                 WHERE data_consulta = $1 AND medico_id = $2 AND status = $3 
+                 AND (horario_sugerido1 = $4 OR horario_sugerido2 = $5 OR horario_sugerido3 = $6)`,
+                [data_consulta, medico_id, 'pendente', hor, hor, hor]
+            );
+            if (conflito.rows.length > 0) {
+                return res.status(400).json({ error: `Horário ${hor} já possui solicitação pendente para este médico.` });
+            }
+        }
+
+        const result = await pool.query(
+            `INSERT INTO solicitacoes_consultas 
+             (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta, 
+              horario_sugerido1, horario_sugerido2, horario_sugerido3, 
+              medico_id, medico_nome, observacoes, solicitado_por) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+            [
+                paciente_nome,
+                paciente_telefone,
+                toNull(paciente_email),
+                toNull(paciente_cpf),
+                data_consulta,
+                horario1,
+                toNull(horario2),
+                toNull(horario3),
+                medico_id,
+                medico_nome,
+                toNull(observacoes),
+                req.user.id
+            ]
+        );
+        res.status(201).json({ id: result.rows[0].id });
     } catch (error) {
+        console.error('Erro ao criar solicitação:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -432,8 +622,46 @@ app.post('/api/solicitacoes', authenticateToken, async (req, res) => {
 app.put('/api/solicitacoes/:id', authenticateToken, isAdmin, async (req, res) => {
     try {
         const { status, horario_escolhido } = req.body;
-        // Lógica de aprovação – adapte para PostgreSQL
-        res.json({ message: `Solicitação ${status}` });
+        if (!['aprovado', 'rejeitado'].includes(status)) {
+            return res.status(400).json({ error: 'Status inválido' });
+        }
+
+        const solic = await pool.query('SELECT * FROM solicitacoes_consultas WHERE id = $1', [req.params.id]);
+        if (solic.rows.length === 0) {
+            return res.status(404).json({ error: 'Solicitação não encontrada' });
+        }
+        const s = solic.rows[0];
+
+        if (status === 'aprovado') {
+            if (!horario_escolhido) {
+                return res.status(400).json({ error: 'Selecione um horário para aprovar.' });
+            }
+            const horarios = [s.horario_sugerido1, s.horario_sugerido2, s.horario_sugerido3].filter(h => h);
+            if (!horarios.includes(horario_escolhido)) {
+                return res.status(400).json({ error: 'Horário escolhido não está entre os sugeridos.' });
+            }
+
+            const conflito = await pool.query(
+                'SELECT id FROM consultas WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 AND status NOT IN ($4, $5)',
+                [s.data_consulta, horario_escolhido, s.medico_id, 'cancelada', 'realizada']
+            );
+            if (conflito.rows.length > 0) {
+                return res.status(400).json({ error: 'Horário já ocupado para este médico.' });
+            }
+
+            const result = await pool.query(
+                `INSERT INTO consultas 
+                 (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta, horario, medico_id, medico_nome, observacoes, criado_por) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+                [s.paciente_nome, s.paciente_telefone, s.paciente_email, s.paciente_cpf, s.data_consulta, horario_escolhido, s.medico_id, s.medico_nome, s.observacoes, s.solicitado_por]
+            );
+            const consultaId = result.rows[0].id;
+            await agendarLembrete(consultaId, s.paciente_nome, s.paciente_telefone, s.data_consulta, horario_escolhido, s.medico_nome, s.medico_id, s.solicitado_por);
+            await pool.query('UPDATE solicitacoes_consultas SET horario_escolhido = $1 WHERE id = $2', [horario_escolhido, req.params.id]);
+        }
+
+        await pool.query('UPDATE solicitacoes_consultas SET status = $1 WHERE id = $2', [status, req.params.id]);
+        res.json({ message: `Solicitação ${status} com sucesso` });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -442,8 +670,52 @@ app.put('/api/solicitacoes/:id', authenticateToken, isAdmin, async (req, res) =>
 // ---------- LEMBRETES ----------
 async function agendarLembrete(consultaId, pacienteNome, pacienteTelefone, dataConsulta, horario, medicoNome, medicoId, vendedorId) {
     try {
-        // Código para inserir lembretes – adapte para PostgreSQL com $1, $2, etc.
-        console.log('Lembrete agendado (exemplo)');
+        const medico = await pool.query('SELECT whatsapp, mensagem_padrao FROM medicos WHERE id = $1', [medicoId]);
+        const medicoWhatsapp = medico.rows.length ? medico.rows[0].whatsapp : null;
+        const mensagemPadrao = medico.rows.length ? medico.rows[0].mensagem_padrao : '';
+
+        const paciente = await pool.query(
+            'SELECT neurodivergente, deficiencia_fisica, encaixe FROM clientes WHERE nome = $1 AND telefone = $2',
+            [pacienteNome, pacienteTelefone]
+        );
+        let condicao = 'Encaixe';
+        if (paciente.rows.length) {
+            const p = paciente.rows[0];
+            if (p.neurodivergente && p.deficiencia_fisica) condicao = 'Neurodivergente e Def. Física';
+            else if (p.neurodivergente) condicao = 'Neurodivergente';
+            else if (p.deficiencia_fisica) condicao = 'Deficiência Física';
+            else if (p.encaixe) condicao = 'Encaixe';
+            else condicao = 'Encaixe';
+        }
+
+        const endereco = 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ';
+        const dataLembrete = new Date(dataConsulta);
+        dataLembrete.setDate(dataLembrete.getDate() - 1);
+        dataLembrete.setHours(8, 0, 0, 0);
+
+        const msgPaciente = `🏥 *ÓTICA MACAÉ - GUIA DE CONSULTA*\n\nPaciente: ${pacienteNome}\nData: ${dataConsulta}\nHorário: ${horario}\nMédico: Dr. ${medicoNome}\nLocal: ${endereco}\nCondição: ${condicao}\n\n${mensagemPadrao ? '*Mensagem do médico:*\n' + mensagemPadrao : ''}`;
+        const msgMedico = `📋 *Nova consulta agendada*\n\nPaciente: ${pacienteNome}\nData: ${dataConsulta}\nHorário: ${horario}\nTelefone: ${pacienteTelefone}\nLocal: ${endereco}\nCondição: ${condicao}`;
+
+        await pool.query(
+            `INSERT INTO lembretes (consulta_id, destinatario_tipo, destinatario_nome, destinatario_contato, mensagem, tipo, data_envio_programada) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [consultaId, 'paciente', pacienteNome, pacienteTelefone, msgPaciente, 'whatsapp', dataLembrete]
+        );
+
+        if (medicoWhatsapp) {
+            await pool.query(
+                `INSERT INTO lembretes (consulta_id, destinatario_tipo, destinatario_nome, destinatario_contato, mensagem, tipo, data_envio_programada) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [consultaId, 'medico', medicoNome, medicoWhatsapp, msgMedico, 'whatsapp', dataLembrete]
+            );
+        } else {
+            await pool.query(
+                `INSERT INTO lembretes (consulta_id, destinatario_tipo, destinatario_nome, destinatario_contato, mensagem, tipo, data_envio_programada) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [consultaId, 'medico', medicoNome, 'sistema', msgMedico, 'sistema', dataLembrete]
+            );
+        }
+        console.log('✅ Lembrete agendado para:', pacienteNome);
     } catch (error) {
         console.error('Erro ao agendar lembrete:', error);
     }
