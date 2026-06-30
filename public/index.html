@@ -101,6 +101,15 @@
         .msg-horarios { margin: 5px 0 10px 0; padding: 10px; border-radius: 5px; background: #fff3cd; border: 1px solid #ffeeba; color: #856404; }
         .msg-horarios a { color: #0056b3; text-decoration: underline; cursor: pointer; }
 
+        /* Título do calendário */
+        .calendario-titulo {
+            font-size: 22px;
+            font-weight: 600;
+            color: #2d3748;
+            margin: 10px 0 15px 0;
+            text-align: center;
+        }
+
         @media (max-width: 768px) {
             .header-title h2 { font-size: 16px; }
             .side-menu { width: 240px; left: -240px; }
@@ -170,6 +179,8 @@
                     <button onclick="anterior()">◀</button>
                     <button onclick="proximo()">▶</button>
                 </div>
+                <!-- TÍTULO DO CALENDÁRIO (NOVO) -->
+                <div id="tituloCalendario" class="calendario-titulo"></div>
                 <div id="calendarioContainer"></div>
             </div>
         </div>
@@ -385,6 +396,8 @@
                     <option value="">3º Horário (opcional)</option>
                 </select>
             </div>
+            <!-- Div para mensagens de horário na solicitação -->
+            <div id="solMsgHorarios" class="msg-horarios" style="display:none;"></div>
             <div class="form-row">
                 <select id="solMedicoSelect"></select>
                 <input type="text" id="solObservacoes" placeholder="Observações">
@@ -491,19 +504,24 @@
             return idade;
         }
 
-        function atualizarIdadeDisplay() {
-            const dataNasc = document.getElementById('pacienteDataNasc').value;
-            const idade = calcularIdade(dataNasc);
-            document.getElementById('idadeDisplay').innerHTML = idade !== null ? `Idade: ${idade} anos` : '';
+        // ========================================================================
+        // VALIDAÇÃO DE DATA RETROATIVA (NOVA)
+        // ========================================================================
+        function isDataPassada(dataStr) {
+            if (!dataStr) return false;
+            const hoje = new Date();
+            hoje.setHours(0,0,0,0);
+            const data = new Date(dataStr + 'T00:00:00');
+            return data < hoje;
         }
-        document.getElementById('pacienteDataNasc').addEventListener('change', atualizarIdadeDisplay);
 
-        function atualizarIdadeSol() {
-            const dataNasc = document.getElementById('solPacienteDataNasc').value;
-            const idade = calcularIdade(dataNasc);
-            document.getElementById('solIdadeDisplay').innerHTML = idade !== null ? `Idade: ${idade} anos` : '';
+        function validarDataNaoPassada(dataStr, campoNome = 'Data') {
+            if (isDataPassada(dataStr)) {
+                showToast(`${campoNome} não pode ser no passado. Escolha hoje ou uma data futura.`, true);
+                return false;
+            }
+            return true;
         }
-        document.getElementById('solPacienteDataNasc').addEventListener('change', atualizarIdadeSol);
 
         // ========================================================================
         // LÓGICA DO CHECKBOX "ENCAIXE"
@@ -1098,7 +1116,7 @@
         }
 
         // ========================================================================
-        // CARREGAR HORÁRIOS DISPONÍVEIS (CORRIGIDO)
+        // CARREGAR HORÁRIOS DISPONÍVEIS (ADMIN)
         // ========================================================================
         async function carregarHorariosDisponiveis() {
             const medicoId = document.getElementById('medicoSelect').value;
@@ -1106,12 +1124,19 @@
             const select = document.getElementById('horarioSelect');
             const msgDiv = document.getElementById('msgHorarios');
 
-            // Limpa mensagem anterior
             msgDiv.style.display = 'none';
             msgDiv.innerHTML = '';
 
             if (!medicoId || !data) {
                 select.innerHTML = '<option value="">Selecione médico e data</option>';
+                return;
+            }
+
+            // Validar data passada
+            if (isDataPassada(data)) {
+                select.innerHTML = '<option value="">Data inválida (passado)</option>';
+                msgDiv.style.display = 'block';
+                msgDiv.innerHTML = '⚠️ Não é permitido agendar em datas passadas. Escolha hoje ou uma data futura.';
                 return;
             }
 
@@ -1123,7 +1148,6 @@
                 });
                 const result = await res.json();
 
-                // Verifica se há erro (ex: médico sem horários)
                 if (result && typeof result === 'object' && result.error) {
                     select.innerHTML = '<option value="">Nenhum horário disponível</option>';
                     msgDiv.style.display = 'block';
@@ -1146,7 +1170,6 @@
                     select.appendChild(opt);
                 });
 
-                // Limpa mensagem de erro se houver
                 msgDiv.style.display = 'none';
                 msgDiv.innerHTML = '';
             } catch (err) {
@@ -1157,6 +1180,88 @@
 
         document.getElementById('medicoSelect').addEventListener('change', carregarHorariosDisponiveis);
         document.getElementById('dataConsulta').addEventListener('change', carregarHorariosDisponiveis);
+
+        // ========================================================================
+        // CARREGAR HORÁRIOS DISPONÍVEIS PARA SOLICITAÇÃO (VENDEDOR) - NOVA FUNÇÃO
+        // ========================================================================
+        async function carregarHorariosDisponiveisSol() {
+            const medicoId = document.getElementById('solMedicoSelect').value;
+            const data = document.getElementById('solDataConsulta').value;
+            const selects = [
+                document.getElementById('solHorario1'),
+                document.getElementById('solHorario2'),
+                document.getElementById('solHorario3')
+            ];
+            const msgDiv = document.getElementById('solMsgHorarios');
+
+            msgDiv.style.display = 'none';
+            msgDiv.innerHTML = '';
+
+            // Limpar selects
+            selects.forEach(sel => {
+                sel.innerHTML = '<option value="">Carregando...</option>';
+            });
+
+            if (!medicoId || !data) {
+                selects.forEach(sel => {
+                    sel.innerHTML = '<option value="">Selecione médico e data</option>';
+                });
+                return;
+            }
+
+            // Validar data passada
+            if (isDataPassada(data)) {
+                selects.forEach(sel => {
+                    sel.innerHTML = '<option value="">Data inválida (passado)</option>';
+                });
+                msgDiv.style.display = 'block';
+                msgDiv.innerHTML = '⚠️ Não é permitido solicitar consulta em datas passadas. Escolha hoje ou uma data futura.';
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/medicos/${medicoId}/horarios/disponiveis?data=${data}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const result = await res.json();
+
+                if (result && typeof result === 'object' && result.error) {
+                    selects.forEach(sel => {
+                        sel.innerHTML = '<option value="">Nenhum horário disponível</option>';
+                    });
+                    msgDiv.style.display = 'block';
+                    msgDiv.innerHTML = `⚠️ ${result.error}. Entre em contato com o administrador para configurar horários.`;
+                    return;
+                }
+
+                if (!Array.isArray(result) || result.length === 0) {
+                    selects.forEach(sel => {
+                        sel.innerHTML = '<option value="">Nenhum horário disponível</option>';
+                    });
+                    msgDiv.style.display = 'block';
+                    msgDiv.innerHTML = '⚠️ Nenhum horário disponível para esta data. Escolha outra data ou contate o administrador.';
+                    return;
+                }
+
+                // Preenche os três selects com as mesmas opções
+                const optionsHtml = result.map(h => `<option value="${h.horario}">${h.horario}</option>`).join('');
+                selects.forEach((sel, index) => {
+                    const label = index === 0 ? '1º Horário *' : (index === 1 ? '2º Horário (opcional)' : '3º Horário (opcional)');
+                    sel.innerHTML = `<option value="">${label}</option>` + optionsHtml;
+                });
+
+                msgDiv.style.display = 'none';
+                msgDiv.innerHTML = '';
+            } catch (err) {
+                showToast('Erro ao carregar horários disponíveis', true);
+                selects.forEach(sel => {
+                    sel.innerHTML = '<option value="">Erro ao carregar</option>';
+                });
+            }
+        }
+
+        document.getElementById('solMedicoSelect').addEventListener('change', carregarHorariosDisponiveisSol);
+        document.getElementById('solDataConsulta').addEventListener('change', carregarHorariosDisponiveisSol);
 
         // ========================================================================
         // CONSULTAS (com horários disponíveis)
@@ -1170,10 +1275,16 @@
             const horario = document.getElementById('horarioSelect').value;
             const medicoId = document.getElementById('medicoSelect').value;
             const medicoNome = medicos.find(m => m.id == medicoId)?.nome;
+
+            // Validações
             if (!pacienteNome || !pacienteTelefone || !dataConsulta || !horario || !medicoId) {
                 showToast('Preencha todos os campos obrigatórios!', true);
                 return;
             }
+
+            // Validar data passada
+            if (!validarDataNaoPassada(dataConsulta, 'Data da consulta')) return;
+
             const dados = {
                 paciente_id: pacienteId || null,
                 paciente_nome: pacienteNome,
@@ -1325,7 +1436,6 @@
             document.getElementById('cancelEditBtn').style.display = 'none';
             document.getElementById('idadeDisplay').innerHTML = '';
             document.getElementById('buscarCpf').value = '';
-            // Limpa mensagem de horários
             const msgDiv = document.getElementById('msgHorarios');
             msgDiv.style.display = 'none';
             msgDiv.innerHTML = '';
@@ -1498,6 +1608,13 @@
         // SOLICITAÇÕES
         // ========================================================================
         async function enviarSolicitacao() {
+            const dataConsulta = document.getElementById('solDataConsulta').value;
+
+            // Validar data passada
+            if (!validarDataNaoPassada(dataConsulta, 'Data da consulta')) {
+                return;
+            }
+
             const data = {
                 paciente_nome: document.getElementById('solPacienteNome').value,
                 paciente_telefone: document.getElementById('solPacienteTelefone').value,
@@ -1507,7 +1624,7 @@
                 neurodivergente: document.getElementById('solNeurodivergente').checked ? 1 : 0,
                 deficiencia_fisica: document.getElementById('solDeficienciaFisica').checked ? 1 : 0,
                 encaixe: document.getElementById('solEncaixe').checked ? 1 : 0,
-                data_consulta: document.getElementById('solDataConsulta').value,
+                data_consulta: dataConsulta,
                 horario1: document.getElementById('solHorario1').value,
                 horario2: document.getElementById('solHorario2').value,
                 horario3: document.getElementById('solHorario3').value,
@@ -1515,10 +1632,12 @@
                 medico_nome: medicos.find(m => m.id == document.getElementById('solMedicoSelect').value)?.nome,
                 observacoes: document.getElementById('solObservacoes').value
             };
+
             if (!data.paciente_nome || !data.paciente_telefone || !data.data_consulta || !data.horario1 || !data.medico_id) {
                 document.getElementById('solMsg').innerHTML = '<p style="color:red;">Preencha todos os campos obrigatórios (pelo menos o 1º horário).</p>';
                 return;
             }
+
             try {
                 const res = await fetch(`${API_URL}/solicitacoes`, {
                     method: 'POST',
@@ -1772,14 +1891,21 @@
         }
 
         // ========================================================================
-        // CALENDÁRIO
+        // CALENDÁRIO (com título do mês)
         // ========================================================================
         function renderizarCalendario() {
             const container = document.getElementById('calendarioContainer');
             if (!container) return;
+
+            // Atualizar título do calendário
+            const titulo = document.getElementById('tituloCalendario');
+            const nomeMes = currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            titulo.textContent = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+
             if (currentView === 'week') renderizarSemana(container);
             else if (currentView === 'month') renderizarMes(container);
             else renderizarDia(container);
+
             document.querySelectorAll('.view-buttons button').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll(`.view-buttons button[onclick*="${currentView}"]`).forEach(btn => btn.classList.add('active'));
         }
