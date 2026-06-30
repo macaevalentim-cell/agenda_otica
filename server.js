@@ -12,7 +12,6 @@ const path = require('path');
 const app = express();
 
 // ==================== SEGURANÇA ====================
-// Helmet com CSP configurado para permitir scripts inline (necessário para o frontend)
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -27,14 +26,12 @@ app.use(helmet({
   }
 }));
 
-// CORS restrito
 const corsOptions = {
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
 
-// Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100
@@ -68,6 +65,15 @@ pool.connect()
 // ==================== FUNÇÕES AUXILIARES ====================
 function toNull(value) {
   return (value === undefined || value === '') ? null : value;
+}
+
+function formatDateToYYYYMMDD(date) {
+  if (!date) return null;
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function authenticateToken(req, res, next) {
@@ -498,7 +504,11 @@ app.get('/api/clientes', authenticateToken, async (req, res) => {
     const result = await pool.query(
       'SELECT id, nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe FROM clientes WHERE ativo = true ORDER BY nome'
     );
-    res.json(result.rows);
+    const clientes = result.rows.map(c => ({
+      ...c,
+      data_nascimento: formatDateToYYYYMMDD(c.data_nascimento)
+    }));
+    res.json(clientes);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -513,7 +523,9 @@ app.get('/api/clientes/buscar', authenticateToken, async (req, res) => {
       [cpf]
     );
     if (result.rows.length === 0) return res.json(null);
-    res.json(result.rows[0]);
+    const cliente = result.rows[0];
+    cliente.data_nascimento = formatDateToYYYYMMDD(cliente.data_nascimento);
+    res.json(cliente);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -578,7 +590,11 @@ app.get('/api/consultas', authenticateToken, async (req, res) => {
       ORDER BY c.data_consulta ASC, c.horario ASC
     `;
     const result = await pool.query(query, [req.user.id]);
-    res.json(result.rows);
+    const consultas = result.rows.map(c => ({
+      ...c,
+      data_consulta: formatDateToYYYYMMDD(c.data_consulta)
+    }));
+    res.json(consultas);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -726,6 +742,33 @@ app.delete('/api/consultas/:id', authenticateToken, isAdmin, async (req, res) =>
   }
 });
 
+// ---------- CONFIRMAR CONSULTA (NOVO ENDPOINT) ----------
+app.put('/api/consultas/:id/confirmar', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const consulta = await pool.query(
+      'SELECT status FROM consultas WHERE id = $1',
+      [id]
+    );
+    if (consulta.rows.length === 0) {
+      return res.status(404).json({ error: 'Consulta não encontrada' });
+    }
+    if (consulta.rows[0].status === 'cancelada') {
+      return res.status(400).json({ error: 'Não é possível confirmar uma consulta cancelada.' });
+    }
+    if (consulta.rows[0].status === 'realizada') {
+      return res.status(400).json({ error: 'Consulta já foi realizada.' });
+    }
+    await pool.query(
+      'UPDATE consultas SET status = $1 WHERE id = $2',
+      ['confirmada', id]
+    );
+    res.json({ message: 'Consulta confirmada com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ---------- SOLICITAÇÕES ----------
 app.get('/api/solicitacoes', authenticateToken, async (req, res) => {
   try {
@@ -737,7 +780,11 @@ app.get('/api/solicitacoes', authenticateToken, async (req, res) => {
     }
     query += ' ORDER BY s.criado_em DESC';
     const result = await pool.query(query, params);
-    res.json(result.rows);
+    const solicitacoes = result.rows.map(s => ({
+      ...s,
+      data_consulta: formatDateToYYYYMMDD(s.data_consulta)
+    }));
+    res.json(solicitacoes);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -962,6 +1009,61 @@ app.put('/api/lembretes/:id/enviar', authenticateToken, async (req, res) => {
     await pool.query('UPDATE lembretes SET status = $1, enviado_em = NOW() WHERE id = $2', ['enviado', req.params.id]);
     res.json({ message: 'Lembrete marcado como enviado' });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------- DASHBOARD (NOVO) ----------
+app.get('/api/dashboard', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    // Total de consultas por status
+    const statusResult = await pool.query(`
+      SELECT status, COUNT(*) as total 
+      FROM consultas 
+      GROUP BY status
+    `);
+    const statusCounts = {};
+    statusResult.rows.forEach(row => {
+      statusCounts[row.status || 'agendada'] = parseInt(row.total);
+    });
+
+    // Consultas por vendedor
+    const vendedoresResult = await pool.query(`
+      SELECT 
+        u.id as vendedor_id,
+        u.nome as vendedor_nome,
+        COUNT(c.id) as total,
+        COUNT(CASE WHEN c.status = 'agendada' THEN 1 END) as agendadas,
+        COUNT(CASE WHEN c.status = 'confirmada' THEN 1 END) as confirmadas,
+        COUNT(CASE WHEN c.status = 'cancelada' THEN 1 END) as canceladas,
+        COUNT(CASE WHEN c.status = 'realizada' THEN 1 END) as realizadas
+      FROM usuarios u
+      LEFT JOIN consultas c ON c.criado_por = u.id
+      WHERE u.tipo IN ('vendedor', 'admin')
+      GROUP BY u.id, u.nome
+      ORDER BY u.nome
+    `);
+    const vendedores = vendedoresResult.rows.map(v => ({
+      ...v,
+      total: parseInt(v.total),
+      agendadas: parseInt(v.agendadas || 0),
+      confirmadas: parseInt(v.confirmadas || 0),
+      canceladas: parseInt(v.canceladas || 0),
+      realizadas: parseInt(v.realizadas || 0)
+    }));
+
+    // Totais gerais
+    const totalConsultas = await pool.query('SELECT COUNT(*) as total FROM consultas');
+    const totalMedicos = await pool.query('SELECT COUNT(*) as total FROM medicos WHERE ativo = true');
+
+    res.json({
+      total_consultas: parseInt(totalConsultas.rows[0].total),
+      total_medicos: parseInt(totalMedicos.rows[0].total),
+      por_status: statusCounts,
+      por_vendedor: vendedores
+    });
+  } catch (error) {
+    console.error('Erro no dashboard:', error);
     res.status(500).json({ error: error.message });
   }
 });
