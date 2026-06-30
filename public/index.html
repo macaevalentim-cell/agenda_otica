@@ -93,11 +93,13 @@
         .horario-radio-group label { margin-right: 15px; cursor: pointer; }
         .horario-radio-group input[type="radio"] { margin-right: 4px; }
 
-        /* Estilos para a seção de horários */
         #horariosMedico { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; }
         #horariosMedico h4 { margin-bottom: 15px; color: #2d3748; }
         .horario-item { border-bottom: 1px solid #e2e8f0; padding: 10px 0; display: flex; justify-content: space-between; align-items: center; }
         .horario-item:last-child { border-bottom: none; }
+
+        .msg-horarios { margin: 5px 0 10px 0; padding: 10px; border-radius: 5px; background: #fff3cd; border: 1px solid #ffeeba; color: #856404; }
+        .msg-horarios a { color: #0056b3; text-decoration: underline; cursor: pointer; }
 
         @media (max-width: 768px) {
             .header-title h2 { font-size: 16px; }
@@ -207,9 +209,10 @@
                 <div class="form-row">
                     <input type="date" id="dataConsulta">
                     <select id="horarioSelect">
-                        <option value="">Horário</option>
+                        <option value="">Selecione médico e data</option>
                     </select>
                 </div>
+                <div id="msgHorarios" class="msg-horarios" style="display:none;"></div>
                 <div class="form-row">
                     <select id="medicoSelect"></select>
                     <input type="text" id="observacoes" placeholder="Observações">
@@ -1095,31 +1098,60 @@
         }
 
         // ========================================================================
-        // CARREGAR HORÁRIOS DISPONÍVEIS
+        // CARREGAR HORÁRIOS DISPONÍVEIS (CORRIGIDO)
         // ========================================================================
         async function carregarHorariosDisponiveis() {
             const medicoId = document.getElementById('medicoSelect').value;
             const data = document.getElementById('dataConsulta').value;
-            if (!medicoId || !data) return;
+            const select = document.getElementById('horarioSelect');
+            const msgDiv = document.getElementById('msgHorarios');
+
+            // Limpa mensagem anterior
+            msgDiv.style.display = 'none';
+            msgDiv.innerHTML = '';
+
+            if (!medicoId || !data) {
+                select.innerHTML = '<option value="">Selecione médico e data</option>';
+                return;
+            }
+
+            select.innerHTML = '<option value="">Carregando...</option>';
+
             try {
                 const res = await fetch(`${API_URL}/medicos/${medicoId}/horarios/disponiveis?data=${data}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                const horarios = await res.json();
-                const select = document.getElementById('horarioSelect');
-                select.innerHTML = '<option value="">Selecione um horário</option>';
-                if (horarios.length === 0) {
-                    select.innerHTML += '<option value="">Nenhum horário disponível</option>';
+                const result = await res.json();
+
+                // Verifica se há erro (ex: médico sem horários)
+                if (result && typeof result === 'object' && result.error) {
+                    select.innerHTML = '<option value="">Nenhum horário disponível</option>';
+                    msgDiv.style.display = 'block';
+                    msgDiv.innerHTML = `⚠️ ${result.error}. <a href="#" onclick="navegarPara('pageAdmin'); mostrarSubPage('medicos');">Clique aqui para configurar horários.</a>`;
                     return;
                 }
-                horarios.forEach(h => {
+
+                if (!Array.isArray(result) || result.length === 0) {
+                    select.innerHTML = '<option value="">Nenhum horário disponível</option>';
+                    msgDiv.style.display = 'block';
+                    msgDiv.innerHTML = `⚠️ Nenhum horário disponível para esta data. <a href="#" onclick="navegarPara('pageAdmin'); mostrarSubPage('medicos');">Gerenciar horários do médico.</a>`;
+                    return;
+                }
+
+                select.innerHTML = '<option value="">Selecione um horário</option>';
+                result.forEach(h => {
                     const opt = document.createElement('option');
                     opt.value = h.horario;
                     opt.textContent = h.horario;
                     select.appendChild(opt);
                 });
+
+                // Limpa mensagem de erro se houver
+                msgDiv.style.display = 'none';
+                msgDiv.innerHTML = '';
             } catch (err) {
                 showToast('Erro ao carregar horários disponíveis', true);
+                select.innerHTML = '<option value="">Erro ao carregar</option>';
             }
         }
 
@@ -1293,6 +1325,10 @@
             document.getElementById('cancelEditBtn').style.display = 'none';
             document.getElementById('idadeDisplay').innerHTML = '';
             document.getElementById('buscarCpf').value = '';
+            // Limpa mensagem de horários
+            const msgDiv = document.getElementById('msgHorarios');
+            msgDiv.style.display = 'none';
+            msgDiv.innerHTML = '';
             setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
         }
 
@@ -1959,7 +1995,7 @@
         }
 
         // ========================================================================
-        // AUTO LOGIN (já incluso no final)
+        // AUTO LOGIN
         // ========================================================================
         (async () => {
             const savedToken = localStorage.getItem('token');
