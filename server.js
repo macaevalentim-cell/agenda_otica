@@ -67,6 +67,7 @@ function toNull(value) {
   return (value === undefined || value === '') ? null : value;
 }
 
+// Formata data para YYYY-MM-DD (sem timezone)
 function formatDateToYYYYMMDD(date) {
   if (!date) return null;
   const d = new Date(date);
@@ -592,7 +593,8 @@ app.get('/api/consultas', authenticateToken, async (req, res) => {
     const result = await pool.query(query, [req.user.id]);
     const consultas = result.rows.map(c => ({
       ...c,
-      data_consulta: formatDateToYYYYMMDD(c.data_consulta)
+      data_consulta: formatDateToYYYYMMDD(c.data_consulta),
+      criado_em: c.criado_em ? new Date(c.criado_em).toISOString() : null
     }));
     res.json(consultas);
   } catch (error) {
@@ -672,6 +674,18 @@ app.put('/api/consultas/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
     const { paciente_id, paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, data_consulta, horario, medico_id, medico_nome, observacoes, status } = req.body;
 
+    // Verifica se a consulta já está realizada (não pode editar)
+    const consultaAtual = await pool.query('SELECT status FROM consultas WHERE id = $1', [req.params.id]);
+    if (consultaAtual.rows.length === 0) {
+      return res.status(404).json({ error: 'Consulta não encontrada' });
+    }
+    if (consultaAtual.rows[0].status === 'realizada') {
+      return res.status(400).json({ error: 'Consulta já realizada. Não é possível editar.' });
+    }
+    if (consultaAtual.rows[0].status === 'cancelada') {
+      return res.status(400).json({ error: 'Consulta cancelada. Não é possível editar.' });
+    }
+
     const diaSemana = new Date(data_consulta).getDay();
     const horarioConfig = await pool.query(
       'SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true',
@@ -735,6 +749,14 @@ app.put('/api/consultas/:id', authenticateToken, isAdmin, async (req, res) => {
 
 app.delete('/api/consultas/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
+    // Verifica se a consulta já está realizada (não pode excluir)
+    const consultaAtual = await pool.query('SELECT status FROM consultas WHERE id = $1', [req.params.id]);
+    if (consultaAtual.rows.length === 0) {
+      return res.status(404).json({ error: 'Consulta não encontrada' });
+    }
+    if (consultaAtual.rows[0].status === 'realizada') {
+      return res.status(400).json({ error: 'Consulta já realizada. Não é possível excluir.' });
+    }
     await pool.query('DELETE FROM consultas WHERE id = $1', [req.params.id]);
     res.json({ message: 'Excluído' });
   } catch (error) {
@@ -742,7 +764,7 @@ app.delete('/api/consultas/:id', authenticateToken, isAdmin, async (req, res) =>
   }
 });
 
-// ---------- CONFIRMAR CONSULTA (NOVO ENDPOINT) ----------
+// ---------- CONFIRMAR CONSULTA ----------
 app.put('/api/consultas/:id/confirmar', authenticateToken, isAdmin, async (req, res) => {
   try {
     const id = req.params.id;
@@ -759,11 +781,41 @@ app.put('/api/consultas/:id/confirmar', authenticateToken, isAdmin, async (req, 
     if (consulta.rows[0].status === 'realizada') {
       return res.status(400).json({ error: 'Consulta já foi realizada.' });
     }
+    if (consulta.rows[0].status === 'confirmada') {
+      return res.status(400).json({ error: 'Consulta já está confirmada.' });
+    }
     await pool.query(
       'UPDATE consultas SET status = $1 WHERE id = $2',
       ['confirmada', id]
     );
     res.json({ message: 'Consulta confirmada com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------- PROCESSAR CONSULTA (marcar como realizada) ----------
+app.put('/api/consultas/:id/processar', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const consulta = await pool.query(
+      'SELECT status FROM consultas WHERE id = $1',
+      [id]
+    );
+    if (consulta.rows.length === 0) {
+      return res.status(404).json({ error: 'Consulta não encontrada' });
+    }
+    if (consulta.rows[0].status === 'cancelada') {
+      return res.status(400).json({ error: 'Não é possível processar uma consulta cancelada.' });
+    }
+    if (consulta.rows[0].status === 'realizada') {
+      return res.status(400).json({ error: 'Consulta já foi processada.' });
+    }
+    await pool.query(
+      'UPDATE consultas SET status = $1 WHERE id = $2',
+      ['realizada', id]
+    );
+    res.json({ message: 'Consulta processada (realizada) com sucesso!' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -782,7 +834,8 @@ app.get('/api/solicitacoes', authenticateToken, async (req, res) => {
     const result = await pool.query(query, params);
     const solicitacoes = result.rows.map(s => ({
       ...s,
-      data_consulta: formatDateToYYYYMMDD(s.data_consulta)
+      data_consulta: formatDateToYYYYMMDD(s.data_consulta),
+      criado_em: s.criado_em ? new Date(s.criado_em).toISOString() : null
     }));
     res.json(solicitacoes);
   } catch (error) {
@@ -1013,7 +1066,7 @@ app.put('/api/lembretes/:id/enviar', authenticateToken, async (req, res) => {
   }
 });
 
-// ---------- DASHBOARD (NOVO) ----------
+// ---------- DASHBOARD ----------
 app.get('/api/dashboard', authenticateToken, isAdmin, async (req, res) => {
   try {
     // Total de consultas por status
@@ -1064,23 +1117,6 @@ app.get('/api/dashboard', authenticateToken, isAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error('Erro no dashboard:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ---------- STATS ----------
-app.get('/api/stats', authenticateToken, async (req, res) => {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const consultasHoje = await pool.query('SELECT COUNT(*) as total FROM consultas WHERE data_consulta = $1', [today]);
-    const totalConsultas = await pool.query('SELECT COUNT(*) as total FROM consultas');
-    const totalMedicos = await pool.query('SELECT COUNT(*) as total FROM medicos WHERE ativo = true');
-    res.json({
-      consultas_hoje: parseInt(consultasHoje.rows[0].total),
-      total_consultas: parseInt(totalConsultas.rows[0].total),
-      total_medicos: parseInt(totalMedicos.rows[0].total)
-    });
-  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
