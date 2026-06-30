@@ -68,8 +68,9 @@
         .consulta-card .info { flex: 1; }
         .consulta-card.other-vendor { background: #f7fafc; border-left: 4px solid #a0aec0; }
         .status-cancelada { color: red; font-weight: bold; }
-        .status-agendada { color: green; }
-        .status-realizada { color: blue; }
+        .status-agendada { color: #ed8936; font-weight: bold; }
+        .status-confirmada { color: #48bb78; font-weight: bold; }
+        .status-realizada { color: #4299e1; font-weight: bold; }
         .no-data { color: #999; text-align: center; padding: 20px; }
 
         .toast { position: fixed; bottom: 20px; right: 20px; background: #48bb78; color: white; padding: 12px 24px; border-radius: 8px; z-index: 3000; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
@@ -101,7 +102,6 @@
         .msg-horarios { margin: 5px 0 10px 0; padding: 10px; border-radius: 5px; background: #fff3cd; border: 1px solid #ffeeba; color: #856404; }
         .msg-horarios a { color: #0056b3; text-decoration: underline; cursor: pointer; }
 
-        /* Título do calendário */
         .calendario-titulo {
             font-size: 22px;
             font-weight: 600;
@@ -109,6 +109,19 @@
             margin: 10px 0 15px 0;
             text-align: center;
         }
+
+        /* Dashboard cards */
+        .dashboard-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+        .dashboard-card h4 { color: #718096; font-size: 14px; margin-bottom: 5px; }
+        .dashboard-card .valor { font-size: 28px; font-weight: bold; color: #2d3748; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
 
         @media (max-width: 768px) {
             .header-title h2 { font-size: 16px; }
@@ -156,6 +169,7 @@
             <button class="menu-item active" data-page="pageConsultas">📋 Consultas Agendadas</button>
             <button class="menu-item" data-page="pageAgendar" id="menuAgendar">📝 Agendar Consulta</button>
             <button class="menu-item" data-page="pageAdmin" id="menuAdmin">⚙️ Painel Admin</button>
+            <button class="menu-item" data-page="pageDashboard" id="menuDashboard">📊 Dashboard</button>
             <hr style="border-color: #4a5568; margin: 10px 0;">
             <button class="menu-item" data-page="pageSolicitar" style="background:#48bb78; color:white;">📝 Solicitar Consulta</button>
             <hr style="border-color: #4a5568; margin: 10px 0;">
@@ -179,7 +193,6 @@
                     <button onclick="anterior()">◀</button>
                     <button onclick="proximo()">▶</button>
                 </div>
-                <!-- TÍTULO DO CALENDÁRIO (NOVO) -->
                 <div id="tituloCalendario" class="calendario-titulo"></div>
                 <div id="calendarioContainer"></div>
             </div>
@@ -359,6 +372,40 @@
             </div>
         </div>
 
+        <!-- PÁGINA DASHBOARD -->
+        <div id="pageDashboard" class="page-section">
+            <h3>📊 Dashboard de Métricas</h3>
+            <div class="dashboard-grid">
+                <div class="dashboard-card" style="border-left-color: #667eea;">
+                    <h4>Total de Consultas</h4>
+                    <div class="valor" id="totalConsultas">0</div>
+                </div>
+                <div class="dashboard-card" style="border-left-color: #48bb78;">
+                    <h4>Médicos Ativos</h4>
+                    <div class="valor" id="totalMedicos">0</div>
+                </div>
+                <div class="dashboard-card" style="border-left-color: #ed8936;">
+                    <h4>Agendadas</h4>
+                    <div class="valor" id="totalAgendadas">0</div>
+                </div>
+                <div class="dashboard-card" style="border-left-color: #38a169;">
+                    <h4>Confirmadas</h4>
+                    <div class="valor" id="totalConfirmadas">0</div>
+                </div>
+                <div class="dashboard-card" style="border-left-color: #f56565;">
+                    <h4>Canceladas</h4>
+                    <div class="valor" id="totalCanceladas">0</div>
+                </div>
+                <div class="dashboard-card" style="border-left-color: #4299e1;">
+                    <h4>Realizadas</h4>
+                    <div class="valor" id="totalRealizadas">0</div>
+                </div>
+            </div>
+
+            <h4>📋 Consultas por Vendedor</h4>
+            <div id="vendedoresRelatorio"></div>
+        </div>
+
         <!-- PÁGINA SOLICITAR CONSULTA (VENDEDOR) -->
         <div id="pageSolicitar" class="page-section">
             <h3>📝 Solicitar Consulta</h3>
@@ -396,7 +443,6 @@
                     <option value="">3º Horário (opcional)</option>
                 </select>
             </div>
-            <!-- Div para mensagens de horário na solicitação -->
             <div id="solMsgHorarios" class="msg-horarios" style="display:none;"></div>
             <div class="form-row">
                 <select id="solMedicoSelect"></select>
@@ -504,8 +550,22 @@
             return idade;
         }
 
+        function atualizarIdadeDisplay() {
+            const dataNasc = document.getElementById('pacienteDataNasc').value;
+            const idade = calcularIdade(dataNasc);
+            document.getElementById('idadeDisplay').innerHTML = idade !== null ? `Idade: ${idade} anos` : '';
+        }
+        document.getElementById('pacienteDataNasc').addEventListener('change', atualizarIdadeDisplay);
+
+        function atualizarIdadeSol() {
+            const dataNasc = document.getElementById('solPacienteDataNasc').value;
+            const idade = calcularIdade(dataNasc);
+            document.getElementById('solIdadeDisplay').innerHTML = idade !== null ? `Idade: ${idade} anos` : '';
+        }
+        document.getElementById('solPacienteDataNasc').addEventListener('change', atualizarIdadeSol);
+
         // ========================================================================
-        // VALIDAÇÃO DE DATA RETROATIVA (NOVA)
+        // VALIDAÇÃO DE DATA RETROATIVA
         // ========================================================================
         function isDataPassada(dataStr) {
             if (!dataStr) return false;
@@ -588,9 +648,11 @@
                 if (user.tipo === 'admin') {
                     document.getElementById('menuAgendar').style.display = 'block';
                     document.getElementById('menuAdmin').style.display = 'block';
+                    document.getElementById('menuDashboard').style.display = 'block';
                 } else {
                     document.getElementById('menuAgendar').style.display = 'none';
                     document.getElementById('menuAdmin').style.display = 'none';
+                    document.getElementById('menuDashboard').style.display = 'none';
                 }
 
                 await carregarDados();
@@ -1132,7 +1194,6 @@
                 return;
             }
 
-            // Validar data passada
             if (isDataPassada(data)) {
                 select.innerHTML = '<option value="">Data inválida (passado)</option>';
                 msgDiv.style.display = 'block';
@@ -1182,7 +1243,7 @@
         document.getElementById('dataConsulta').addEventListener('change', carregarHorariosDisponiveis);
 
         // ========================================================================
-        // CARREGAR HORÁRIOS DISPONÍVEIS PARA SOLICITAÇÃO (VENDEDOR) - NOVA FUNÇÃO
+        // CARREGAR HORÁRIOS DISPONÍVEIS PARA SOLICITAÇÃO (VENDEDOR)
         // ========================================================================
         async function carregarHorariosDisponiveisSol() {
             const medicoId = document.getElementById('solMedicoSelect').value;
@@ -1197,7 +1258,6 @@
             msgDiv.style.display = 'none';
             msgDiv.innerHTML = '';
 
-            // Limpar selects
             selects.forEach(sel => {
                 sel.innerHTML = '<option value="">Carregando...</option>';
             });
@@ -1209,7 +1269,6 @@
                 return;
             }
 
-            // Validar data passada
             if (isDataPassada(data)) {
                 selects.forEach(sel => {
                     sel.innerHTML = '<option value="">Data inválida (passado)</option>';
@@ -1243,7 +1302,6 @@
                     return;
                 }
 
-                // Preenche os três selects com as mesmas opções
                 const optionsHtml = result.map(h => `<option value="${h.horario}">${h.horario}</option>`).join('');
                 selects.forEach((sel, index) => {
                     const label = index === 0 ? '1º Horário *' : (index === 1 ? '2º Horário (opcional)' : '3º Horário (opcional)');
@@ -1276,13 +1334,11 @@
             const medicoId = document.getElementById('medicoSelect').value;
             const medicoNome = medicos.find(m => m.id == medicoId)?.nome;
 
-            // Validações
             if (!pacienteNome || !pacienteTelefone || !dataConsulta || !horario || !medicoId) {
                 showToast('Preencha todos os campos obrigatórios!', true);
                 return;
             }
 
-            // Validar data passada
             if (!validarDataNaoPassada(dataConsulta, 'Data da consulta')) return;
 
             const dados = {
@@ -1319,6 +1375,26 @@
             }
         }
 
+        // ========================================================================
+        // CONFIRMAR CONSULTA (admin)
+        // ========================================================================
+        async function confirmarConsulta(id) {
+            if (user.tipo !== 'admin') { showToast('Apenas administradores podem confirmar.', true); return; }
+            if (!confirm('Confirmar esta consulta?')) return;
+            try {
+                const res = await fetch(`${API_URL}/consultas/${id}/confirmar`, {
+                    method: 'PUT',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Erro'); }
+                showToast('Consulta confirmada!');
+                await carregarDados();
+                renderizarCalendario();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
         function renderizarConsultasListaPrincipal() {
             const container = document.getElementById('consultasListMain');
             if (!container) return;
@@ -1330,8 +1406,10 @@
             container.innerHTML = consultas.map(c => {
                 const isOwn = c.is_own;
                 let statusClass = 'status-agendada';
-                if (c.status === 'cancelada') statusClass = 'status-cancelada';
-                else if (c.status === 'realizada') statusClass = 'status-realizada';
+                let statusLabel = c.status || 'agendada';
+                if (statusLabel === 'cancelada') statusClass = 'status-cancelada';
+                else if (statusLabel === 'confirmada') statusClass = 'status-confirmada';
+                else if (statusLabel === 'realizada') statusClass = 'status-realizada';
 
                 let actions = '';
                 let extraClass = '';
@@ -1343,13 +1421,14 @@
                             <button onclick="editarConsulta(${c.id})" class="btn-warning">✏️</button>
                             <button onclick="cancelarConsulta(${c.id})" class="btn-danger">🚫</button>
                             <button onclick="excluirConsulta(${c.id})" class="btn-danger">🗑️</button>
+                            ${(statusLabel === 'agendada' || statusLabel === 'confirmada') ? `<button onclick="confirmarConsulta(${c.id})" class="btn-success">✅ Confirmar</button>` : ''}
                             <button onclick="enviarWhatsAppPaciente(${c.id})" class="btn-whatsapp">📱 WhatsApp Paciente</button>
                             <button onclick="enviarWhatsAppMedico(${c.id})" class="btn-medico">📱 WhatsApp Médico</button>
                         </div>
                     `;
                     infoHtml = `
                         <strong>${escapeHtml(c.paciente_nome)}</strong>
-                        <span class="${statusClass}">${c.status || 'agendada'}</span><br>
+                        <span class="${statusClass}">${statusLabel}</span><br>
                         ${formatDisplay(c.data_consulta)} ${c.horario} | Dr. ${escapeHtml(c.medico_nome)}
                         ${c.observacoes ? `<br><small>📝 ${escapeHtml(c.observacoes)}</small>` : ''}
                         <br><small>👤 Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
@@ -1363,7 +1442,7 @@
                         `;
                         infoHtml = `
                             <strong>${escapeHtml(c.paciente_nome)}</strong>
-                            <span class="${statusClass}">${c.status || 'agendada'}</span><br>
+                            <span class="${statusClass}">${statusLabel}</span><br>
                             ${formatDisplay(c.data_consulta)} ${c.horario} | Dr. ${escapeHtml(c.medico_nome)}
                             ${c.observacoes ? `<br><small>📝 ${escapeHtml(c.observacoes)}</small>` : ''}
                             <br><small>👤 Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
@@ -1413,7 +1492,6 @@
                 atualizarIdadeDisplay();
                 setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
             }
-            // Carregar horários disponíveis para o médico e data
             carregarHorariosDisponiveis();
             navegarPara('pageAgendar');
         }
@@ -1610,7 +1688,6 @@
         async function enviarSolicitacao() {
             const dataConsulta = document.getElementById('solDataConsulta').value;
 
-            // Validar data passada
             if (!validarDataNaoPassada(dataConsulta, 'Data da consulta')) {
                 return;
             }
@@ -1859,6 +1936,62 @@
         }
 
         // ========================================================================
+        // DASHBOARD
+        // ========================================================================
+        async function carregarDashboard() {
+            if (user.tipo !== 'admin') return;
+            try {
+                const res = await fetch(`${API_URL}/dashboard`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Erro');
+
+                document.getElementById('totalConsultas').textContent = data.total_consultas || 0;
+                document.getElementById('totalMedicos').textContent = data.total_medicos || 0;
+                document.getElementById('totalAgendadas').textContent = data.por_status?.agendada || 0;
+                document.getElementById('totalConfirmadas').textContent = data.por_status?.confirmada || 0;
+                document.getElementById('totalCanceladas').textContent = data.por_status?.cancelada || 0;
+                document.getElementById('totalRealizadas').textContent = data.por_status?.realizada || 0;
+
+                const container = document.getElementById('vendedoresRelatorio');
+                if (!data.por_vendedor || data.por_vendedor.length === 0) {
+                    container.innerHTML = '<p>Nenhum vendedor com consultas.</p>';
+                    return;
+                }
+
+                let html = `<table>
+                    <thead>
+                        <tr>
+                            <th>Vendedor</th>
+                            <th>Total</th>
+                            <th>Agendadas</th>
+                            <th>Confirmadas</th>
+                            <th>Canceladas</th>
+                            <th>Realizadas</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+                data.por_vendedor.forEach(v => {
+                    html += `<tr>
+                        <td>${escapeHtml(v.vendedor_nome)}</td>
+                        <td>${v.total}</td>
+                        <td>${v.agendadas}</td>
+                        <td>${v.confirmadas}</td>
+                        <td>${v.canceladas}</td>
+                        <td>${v.realizadas}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table>`;
+                container.innerHTML = html;
+
+            } catch (err) {
+                console.error(err);
+                showToast('Erro ao carregar dashboard', true);
+            }
+        }
+
+        // ========================================================================
         // WHATSAPP CONFIG
         // ========================================================================
         async function carregarConfigWhatsapp() {
@@ -1897,7 +2030,6 @@
             const container = document.getElementById('calendarioContainer');
             if (!container) return;
 
-            // Atualizar título do calendário
             const titulo = document.getElementById('tituloCalendario');
             const nomeMes = currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
             titulo.textContent = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
@@ -2022,6 +2154,9 @@
             document.querySelectorAll('.side-menu .menu-item').forEach(btn => btn.classList.remove('active'));
             const menuBtn = document.querySelector(`.side-menu .menu-item[data-page="${pageId}"]`);
             if (menuBtn) menuBtn.classList.add('active');
+            if (pageId === 'pageDashboard') {
+                carregarDashboard();
+            }
             fecharMenu();
         }
 
@@ -2076,17 +2211,21 @@
             const modal = document.getElementById('modalDetalhes');
             const body = document.getElementById('detalhesBody');
 
+            let statusLabel = e.status || 'agendada';
             let statusHtml = '';
-            if (e.status === 'cancelada') statusHtml = ' <span style="color:red;">(Cancelada)</span>';
-            else if (e.status === 'realizada') statusHtml = ' <span style="color:green;">(Realizada)</span>';
+            if (statusLabel === 'cancelada') statusHtml = ' <span style="color:red;">(Cancelada)</span>';
+            else if (statusLabel === 'confirmada') statusHtml = ' <span style="color:green;">(Confirmada)</span>';
+            else if (statusLabel === 'realizada') statusHtml = ' <span style="color:blue;">(Realizada)</span>';
+            else if (statusLabel === 'agendada') statusHtml = ' <span style="color:orange;">(Agendada)</span>';
 
             const vendedor = e.vendedor_nome || 'Não informado';
 
             let adminActions = '';
-            if (user.tipo === 'admin' && e.status !== 'cancelada') {
+            if (user.tipo === 'admin' && statusLabel !== 'cancelada' && statusLabel !== 'realizada') {
                 adminActions = `
                     <button onclick="editarConsulta(${e.id}); fecharModalDetalhes();" class="btn-warning" style="width:100%; margin-top:5px;">✏️ Editar</button>
                     <button onclick="cancelarConsulta(${e.id}); fecharModalDetalhes();" class="btn-danger" style="width:100%; margin-top:5px;">🚫 Cancelar</button>
+                    ${(statusLabel === 'agendada' || statusLabel === 'confirmada') ? `<button onclick="confirmarConsulta(${e.id}); fecharModalDetalhes();" class="btn-success" style="width:100%; margin-top:5px;">✅ Confirmar</button>` : ''}
                     <button onclick="enviarWhatsAppPaciente(${e.id})" class="btn-whatsapp" style="width:100%; margin-top:5px;">📱 WhatsApp Paciente</button>
                     <button onclick="enviarWhatsAppMedico(${e.id})" class="btn-medico" style="width:100%; margin-top:5px;">📱 WhatsApp Médico</button>
                 `;
@@ -2099,7 +2238,7 @@
                 <div><strong>Telefone:</strong> ${e.paciente_telefone}</div>
                 ${e.paciente_email ? `<div><strong>E-mail:</strong> ${escapeHtml(e.paciente_email)}</div>` : ''}
                 ${e.observacoes ? `<div><strong>Observações:</strong> ${escapeHtml(e.observacoes)}</div>` : ''}
-                <div><strong>Status:</strong> ${e.status || 'agendada'}${statusHtml}</div>
+                <div><strong>Status:</strong> ${statusLabel}${statusHtml}</div>
                 <div><strong>Vendedor:</strong> ${escapeHtml(vendedor)}</div>
                 <div style="margin-top:15px; display:flex; flex-direction:column; gap:5px;">
                     ${adminActions}
@@ -2142,9 +2281,11 @@
                         if (user.tipo === 'admin') {
                             document.getElementById('menuAgendar').style.display = 'block';
                             document.getElementById('menuAdmin').style.display = 'block';
+                            document.getElementById('menuDashboard').style.display = 'block';
                         } else {
                             document.getElementById('menuAgendar').style.display = 'none';
                             document.getElementById('menuAdmin').style.display = 'none';
+                            document.getElementById('menuDashboard').style.display = 'none';
                         }
                         await carregarDados();
                         renderizarCalendario();
@@ -2172,7 +2313,7 @@
             });
         });
 
-        console.log('✅ Sistema completo com gerenciamento de horários.');
+        console.log('✅ Sistema completo com gerenciamento de horários, confirmação e dashboard.');
     </script>
 </body>
 </html>
