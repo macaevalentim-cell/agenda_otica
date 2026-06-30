@@ -12,13 +12,29 @@ const path = require('path');
 const app = express();
 
 // ==================== SEGURANÇA ====================
-app.use(helmet());
+// Helmet com CSP configurado para permitir scripts inline (necessário para o frontend)
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-hashes'"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3000'],
+      fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
+    }
+  }
+}));
+
+// CORS restrito
 const corsOptions = {
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
 
+// Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100
@@ -477,22 +493,586 @@ app.get('/api/medicos/:id/horarios/disponiveis', authenticateToken, async (req, 
 });
 
 // ---------- CLIENTES ----------
-// (mantido igual ao original)
+app.get('/api/clientes', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe FROM clientes WHERE ativo = true ORDER BY nome'
+    );
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/clientes/buscar', authenticateToken, async (req, res) => {
+  try {
+    const { cpf } = req.query;
+    if (!cpf) return res.json(null);
+    const result = await pool.query(
+      'SELECT id, nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe FROM clientes WHERE cpf = $1 AND ativo = true',
+      [cpf]
+    );
+    if (result.rows.length === 0) return res.json(null);
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/clientes', authenticateToken, async (req, res) => {
+  try {
+    const { nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe } = req.body;
+    if (cpf) {
+      const exist = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [cpf]);
+      if (exist.rows.length > 0) {
+        return res.status(400).json({ error: 'CPF já cadastrado.' });
+      }
+    }
+    const result = await pool.query(
+      `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [nome, telefone, toNull(email), toNull(cpf), toNull(data_nascimento), neurodivergente ? 1 : 0, deficiencia_fisica ? 1 : 0, encaixe ? 1 : 0, req.user.id]
+    );
+    res.status(201).json({ id: result.rows[0].id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/clientes/:id', authenticateToken, async (req, res) => {
+  try {
+    const { nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe } = req.body;
+    if (cpf) {
+      const exist = await pool.query('SELECT id FROM clientes WHERE cpf = $1 AND id != $2', [cpf, req.params.id]);
+      if (exist.rows.length > 0) {
+        return res.status(400).json({ error: 'CPF já cadastrado.' });
+      }
+    }
+    await pool.query(
+      `UPDATE clientes SET nome=$1, telefone=$2, email=$3, cpf=$4, data_nascimento=$5, neurodivergente=$6, deficiencia_fisica=$7, encaixe=$8 WHERE id=$9`,
+      [nome, telefone, toNull(email), toNull(cpf), toNull(data_nascimento), neurodivergente ? 1 : 0, deficiencia_fisica ? 1 : 0, encaixe ? 1 : 0, req.params.id]
+    );
+    res.json({ message: 'Atualizado' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/clientes/:id', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    await pool.query('UPDATE clientes SET ativo = false WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Excluído' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ---------- CONSULTAS ----------
-// (mantido igual ao original)
+app.get('/api/consultas', authenticateToken, async (req, res) => {
+  try {
+    const query = `
+      SELECT c.*, u.nome as vendedor_nome,
+             CASE WHEN c.criado_por = $1 THEN 1 ELSE 0 END as is_own
+      FROM consultas c 
+      LEFT JOIN usuarios u ON c.criado_por = u.id
+      ORDER BY c.data_consulta ASC, c.horario ASC
+    `;
+    const result = await pool.query(query, [req.user.id]);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/consultas', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { paciente_id, paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, data_consulta, horario, medico_id, medico_nome, observacoes } = req.body;
+
+    const diaSemana = new Date(data_consulta).getDay();
+    const horarioConfig = await pool.query(
+      'SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true',
+      [medico_id, diaSemana]
+    );
+    if (horarioConfig.rows.length === 0) {
+      return res.status(400).json({ error: 'Médico não atende neste dia da semana.' });
+    }
+    const config = horarioConfig.rows[0];
+    if (horario < config.hora_inicio || horario >= config.hora_fim) {
+      return res.status(400).json({ error: 'Horário fora do período de atendimento do médico.' });
+    }
+
+    const conflito = await pool.query(
+      'SELECT id FROM consultas WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 AND status NOT IN ($4, $5)',
+      [data_consulta, horario, medico_id, 'cancelada', 'realizada']
+    );
+    if (conflito.rows.length > 0) {
+      return res.status(400).json({ error: 'Horário já ocupado para este médico.' });
+    }
+
+    let pacienteId = paciente_id;
+    if (!pacienteId && paciente_cpf) {
+      const existente = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [paciente_cpf]);
+      if (existente.rows.length > 0) {
+        pacienteId = existente.rows[0].id;
+      } else {
+        const result = await pool.query(
+          `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+          [paciente_nome, paciente_telefone, toNull(paciente_email), paciente_cpf, toNull(data_nascimento), neurodivergente ? 1 : 0, deficiencia_fisica ? 1 : 0, encaixe ? 1 : 0, req.user.id]
+        );
+        pacienteId = result.rows[0].id;
+      }
+    }
+
+    let nome = paciente_nome, telefone = paciente_telefone, email = paciente_email, cpf = paciente_cpf;
+    if (pacienteId) {
+      const cliente = await pool.query(
+        'SELECT nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe FROM clientes WHERE id = $1',
+        [pacienteId]
+      );
+      if (cliente.rows.length > 0) {
+        nome = cliente.rows[0].nome;
+        telefone = cliente.rows[0].telefone;
+        email = cliente.rows[0].email;
+        cpf = cliente.rows[0].cpf;
+      }
+    }
+
+    const result = await pool.query(
+      `INSERT INTO consultas (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta, horario, medico_id, medico_nome, observacoes, criado_por) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+      [nome, telefone, toNull(email), toNull(cpf), data_consulta, horario, medico_id, medico_nome, toNull(observacoes), req.user.id]
+    );
+    const consultaId = result.rows[0].id;
+    await agendarLembrete(consultaId, nome, telefone, data_consulta, horario, medico_nome, medico_id, req.user.id);
+    res.status(201).json({ id: consultaId });
+  } catch (error) {
+    console.error('Erro ao criar consulta:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/consultas/:id', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { paciente_id, paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, data_consulta, horario, medico_id, medico_nome, observacoes, status } = req.body;
+
+    const diaSemana = new Date(data_consulta).getDay();
+    const horarioConfig = await pool.query(
+      'SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true',
+      [medico_id, diaSemana]
+    );
+    if (horarioConfig.rows.length === 0) {
+      return res.status(400).json({ error: 'Médico não atende neste dia da semana.' });
+    }
+    const config = horarioConfig.rows[0];
+    if (horario < config.hora_inicio || horario >= config.hora_fim) {
+      return res.status(400).json({ error: 'Horário fora do período de atendimento do médico.' });
+    }
+
+    const conflito = await pool.query(
+      'SELECT id FROM consultas WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 AND id != $4 AND status NOT IN ($5, $6)',
+      [data_consulta, horario, medico_id, req.params.id, 'cancelada', 'realizada']
+    );
+    if (conflito.rows.length > 0) {
+      return res.status(400).json({ error: 'Horário já ocupado para este médico.' });
+    }
+
+    let pacienteId = paciente_id;
+    if (!pacienteId && paciente_cpf) {
+      const existente = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [paciente_cpf]);
+      if (existente.rows.length > 0) {
+        pacienteId = existente.rows[0].id;
+      } else {
+        const result = await pool.query(
+          `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+          [paciente_nome, paciente_telefone, toNull(paciente_email), paciente_cpf, toNull(data_nascimento), neurodivergente ? 1 : 0, deficiencia_fisica ? 1 : 0, encaixe ? 1 : 0, req.user.id]
+        );
+        pacienteId = result.rows[0].id;
+      }
+    }
+
+    let nome = paciente_nome, telefone = paciente_telefone, email = paciente_email, cpf = paciente_cpf;
+    if (pacienteId) {
+      const cliente = await pool.query(
+        'SELECT nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe FROM clientes WHERE id = $1',
+        [pacienteId]
+      );
+      if (cliente.rows.length > 0) {
+        nome = cliente.rows[0].nome;
+        telefone = cliente.rows[0].telefone;
+        email = cliente.rows[0].email;
+        cpf = cliente.rows[0].cpf;
+      }
+    }
+
+    await pool.query(
+      `UPDATE consultas SET paciente_nome=$1, paciente_telefone=$2, paciente_email=$3, paciente_cpf=$4, data_consulta=$5, horario=$6, medico_id=$7, medico_nome=$8, observacoes=$9, status=$10 WHERE id=$11`,
+      [nome, telefone, toNull(email), toNull(cpf), data_consulta, horario, medico_id, medico_nome, toNull(observacoes), status || 'agendada', req.params.id]
+    );
+    res.json({ message: 'Atualizado' });
+  } catch (error) {
+    console.error('Erro ao atualizar consulta:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/consultas/:id', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM consultas WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Excluído' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ---------- SOLICITAÇÕES ----------
-// (mantido igual ao original)
+app.get('/api/solicitacoes', authenticateToken, async (req, res) => {
+  try {
+    let query = 'SELECT s.*, u.nome as solicitante_nome FROM solicitacoes_consultas s JOIN usuarios u ON s.solicitado_por = u.id';
+    const params = [];
+    if (req.user.tipo !== 'admin') {
+      query += ' WHERE s.solicitado_por = $1';
+      params.push(req.user.id);
+    }
+    query += ' ORDER BY s.criado_em DESC';
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/solicitacoes/pendentes/count', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT COUNT(*) as total FROM solicitacoes_consultas WHERE status = $1', ['pendente']);
+    res.json({ total: parseInt(result.rows[0].total) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/solicitacoes', authenticateToken, async (req, res) => {
+  try {
+    const {
+      paciente_nome, paciente_telefone, paciente_email, paciente_cpf,
+      data_nascimento, neurodivergente, deficiencia_fisica, encaixe,
+      data_consulta, horario1, horario2, horario3,
+      medico_id, medico_nome, observacoes
+    } = req.body;
+
+    const diaSemana = new Date(data_consulta).getDay();
+    const horarioConfig = await pool.query(
+      'SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true',
+      [medico_id, diaSemana]
+    );
+    if (horarioConfig.rows.length === 0) {
+      return res.status(400).json({ error: 'Médico não atende neste dia da semana.' });
+    }
+    const config = horarioConfig.rows[0];
+    const horariosSugeridos = [horario1, horario2, horario3].filter(h => h);
+    for (const hor of horariosSugeridos) {
+      if (hor < config.hora_inicio || hor >= config.hora_fim) {
+        return res.status(400).json({ error: `Horário ${hor} fora do período de atendimento do médico.` });
+      }
+    }
+
+    let pacienteId = null;
+    if (paciente_cpf) {
+      const existente = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [paciente_cpf]);
+      if (existente.rows.length > 0) {
+        pacienteId = existente.rows[0].id;
+      } else {
+        const neuro = neurodivergente ? 1 : 0;
+        const defFis = deficiencia_fisica ? 1 : 0;
+        const enc = encaixe ? 1 : 0;
+        const result = await pool.query(
+          `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+          [paciente_nome, paciente_telefone, toNull(paciente_email), toNull(paciente_cpf), toNull(data_nascimento), neuro, defFis, enc, req.user.id]
+        );
+        pacienteId = result.rows[0].id;
+      }
+    }
+
+    for (const hor of horariosSugeridos) {
+      const conflito = await pool.query(
+        `SELECT id FROM solicitacoes_consultas 
+         WHERE data_consulta = $1 AND medico_id = $2 AND status = $3 
+         AND (horario_sugerido1 = $4 OR horario_sugerido2 = $5 OR horario_sugerido3 = $6)`,
+        [data_consulta, medico_id, 'pendente', hor, hor, hor]
+      );
+      if (conflito.rows.length > 0) {
+        return res.status(400).json({ error: `Horário ${hor} já possui solicitação pendente para este médico.` });
+      }
+    }
+
+    const result = await pool.query(
+      `INSERT INTO solicitacoes_consultas 
+       (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta, 
+        horario_sugerido1, horario_sugerido2, horario_sugerido3, 
+        medico_id, medico_nome, observacoes, solicitado_por) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+      [
+        paciente_nome, paciente_telefone, toNull(paciente_email), toNull(paciente_cpf),
+        data_consulta, horario1, toNull(horario2), toNull(horario3),
+        medico_id, medico_nome, toNull(observacoes), req.user.id
+      ]
+    );
+    res.status(201).json({ id: result.rows[0].id });
+  } catch (error) {
+    console.error('Erro ao criar solicitação:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/solicitacoes/:id', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { status, horario_escolhido } = req.body;
+    if (!['aprovado', 'rejeitado'].includes(status)) {
+      return res.status(400).json({ error: 'Status inválido' });
+    }
+
+    const solic = await pool.query('SELECT * FROM solicitacoes_consultas WHERE id = $1', [req.params.id]);
+    if (solic.rows.length === 0) {
+      return res.status(404).json({ error: 'Solicitação não encontrada' });
+    }
+    const s = solic.rows[0];
+
+    if (status === 'aprovado') {
+      if (!horario_escolhido) {
+        return res.status(400).json({ error: 'Selecione um horário para aprovar.' });
+      }
+      const horarios = [s.horario_sugerido1, s.horario_sugerido2, s.horario_sugerido3].filter(h => h);
+      if (!horarios.includes(horario_escolhido)) {
+        return res.status(400).json({ error: 'Horário escolhido não está entre os sugeridos.' });
+      }
+
+      const diaSemana = new Date(s.data_consulta).getDay();
+      const horarioConfig = await pool.query(
+        'SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true',
+        [s.medico_id, diaSemana]
+      );
+      if (horarioConfig.rows.length === 0) {
+        return res.status(400).json({ error: 'Médico não atende neste dia da semana.' });
+      }
+      const config = horarioConfig.rows[0];
+      if (horario_escolhido < config.hora_inicio || horario_escolhido >= config.hora_fim) {
+        return res.status(400).json({ error: 'Horário fora do período de atendimento do médico.' });
+      }
+
+      const conflito = await pool.query(
+        'SELECT id FROM consultas WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 AND status NOT IN ($4, $5)',
+        [s.data_consulta, horario_escolhido, s.medico_id, 'cancelada', 'realizada']
+      );
+      if (conflito.rows.length > 0) {
+        return res.status(400).json({ error: 'Horário já ocupado para este médico.' });
+      }
+
+      const result = await pool.query(
+        `INSERT INTO consultas 
+         (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta, horario, medico_id, medico_nome, observacoes, criado_por) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+        [s.paciente_nome, s.paciente_telefone, s.paciente_email, s.paciente_cpf, s.data_consulta, horario_escolhido, s.medico_id, s.medico_nome, s.observacoes, s.solicitado_por]
+      );
+      const consultaId = result.rows[0].id;
+      await agendarLembrete(consultaId, s.paciente_nome, s.paciente_telefone, s.data_consulta, horario_escolhido, s.medico_nome, s.medico_id, s.solicitado_por);
+      await pool.query('UPDATE solicitacoes_consultas SET horario_escolhido = $1 WHERE id = $2', [horario_escolhido, req.params.id]);
+    }
+
+    await pool.query('UPDATE solicitacoes_consultas SET status = $1 WHERE id = $2', [status, req.params.id]);
+    res.json({ message: `Solicitação ${status} com sucesso` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ---------- LEMBRETES ----------
-// (mantido igual ao original)
+async function agendarLembrete(consultaId, pacienteNome, pacienteTelefone, dataConsulta, horario, medicoNome, medicoId, vendedorId) {
+  try {
+    const medico = await pool.query('SELECT whatsapp, mensagem_padrao FROM medicos WHERE id = $1', [medicoId]);
+    const medicoWhatsapp = medico.rows.length ? medico.rows[0].whatsapp : null;
+    const mensagemPadrao = medico.rows.length ? medico.rows[0].mensagem_padrao : '';
 
-// ---------- USUÁRIOS ----------
-// (mantido igual ao original)
+    const paciente = await pool.query(
+      'SELECT neurodivergente, deficiencia_fisica, encaixe FROM clientes WHERE nome = $1 AND telefone = $2',
+      [pacienteNome, pacienteTelefone]
+    );
+    let condicao = 'Encaixe';
+    if (paciente.rows.length) {
+      const p = paciente.rows[0];
+      if (p.neurodivergente && p.deficiencia_fisica) condicao = 'Neurodivergente e Def. Física';
+      else if (p.neurodivergente) condicao = 'Neurodivergente';
+      else if (p.deficiencia_fisica) condicao = 'Deficiência Física';
+      else if (p.encaixe) condicao = 'Encaixe';
+      else condicao = 'Encaixe';
+    }
+
+    const endereco = 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ';
+    const dataLembrete = new Date(dataConsulta);
+    dataLembrete.setDate(dataLembrete.getDate() - 1);
+    dataLembrete.setHours(8, 0, 0, 0);
+
+    const msgPaciente = `🏥 *ÓTICA MACAÉ - GUIA DE CONSULTA*\n\nPaciente: ${pacienteNome}\nData: ${dataConsulta}\nHorário: ${horario}\nMédico: Dr. ${medicoNome}\nLocal: ${endereco}\nCondição: ${condicao}\n\n${mensagemPadrao ? '*Mensagem do médico:*\n' + mensagemPadrao : ''}`;
+    const msgMedico = `📋 *Nova consulta agendada*\n\nPaciente: ${pacienteNome}\nData: ${dataConsulta}\nHorário: ${horario}\nTelefone: ${pacienteTelefone}\nLocal: ${endereco}\nCondição: ${condicao}`;
+
+    await pool.query(
+      `INSERT INTO lembretes (consulta_id, destinatario_tipo, destinatario_nome, destinatario_contato, mensagem, tipo, data_envio_programada) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [consultaId, 'paciente', pacienteNome, pacienteTelefone, msgPaciente, 'whatsapp', dataLembrete]
+    );
+
+    if (medicoWhatsapp) {
+      await pool.query(
+        `INSERT INTO lembretes (consulta_id, destinatario_tipo, destinatario_nome, destinatario_contato, mensagem, tipo, data_envio_programada) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [consultaId, 'medico', medicoNome, medicoWhatsapp, msgMedico, 'whatsapp', dataLembrete]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO lembretes (consulta_id, destinatario_tipo, destinatario_nome, destinatario_contato, mensagem, tipo, data_envio_programada) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [consultaId, 'medico', medicoNome, 'sistema', msgMedico, 'sistema', dataLembrete]
+      );
+    }
+    console.log('✅ Lembrete agendado para:', pacienteNome);
+  } catch (error) {
+    console.error('Erro ao agendar lembrete:', error);
+  }
+}
+
+app.get('/api/lembretes', authenticateToken, async (req, res) => {
+  try {
+    let query = 'SELECT * FROM lembretes WHERE status = $1';
+    const params = ['pendente'];
+    if (req.user.tipo !== 'admin') {
+      query += ' AND destinatario_tipo = $2 AND destinatario_nome = $3';
+      params.push('vendedor', req.user.nome);
+    }
+    query += ' ORDER BY data_envio_programada ASC';
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/lembretes/:id/enviar', authenticateToken, async (req, res) => {
+  try {
+    await pool.query('UPDATE lembretes SET status = $1, enviado_em = NOW() WHERE id = $2', ['enviado', req.params.id]);
+    res.json({ message: 'Lembrete marcado como enviado' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------- STATS ----------
+app.get('/api/stats', authenticateToken, async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const consultasHoje = await pool.query('SELECT COUNT(*) as total FROM consultas WHERE data_consulta = $1', [today]);
+    const totalConsultas = await pool.query('SELECT COUNT(*) as total FROM consultas');
+    const totalMedicos = await pool.query('SELECT COUNT(*) as total FROM medicos WHERE ativo = true');
+    res.json({
+      consultas_hoje: parseInt(consultasHoje.rows[0].total),
+      total_consultas: parseInt(totalConsultas.rows[0].total),
+      total_medicos: parseInt(totalMedicos.rows[0].total)
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ---------- WHATSAPP CONFIG ----------
-// (mantido igual ao original)
+app.get('/api/whatsapp/config', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT numero, endereco_otica FROM whatsapp_config WHERE id = 1');
+    if (result.rows.length === 0) {
+      return res.json({ numero: '(22) 99764-0112', endereco_otica: 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/whatsapp/config', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { numero, endereco_otica } = req.body;
+    await pool.query(
+      `INSERT INTO whatsapp_config (id, numero, endereco_otica, atualizado_por) 
+       VALUES (1, $1, $2, $3) 
+       ON CONFLICT (id) DO UPDATE 
+       SET numero = EXCLUDED.numero, 
+           endereco_otica = EXCLUDED.endereco_otica, 
+           atualizado_por = EXCLUDED.atualizado_por`,
+      [numero, endereco_otica, req.user.id]
+    );
+    res.json({ message: 'Configurações salvas' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------- USUÁRIOS ----------
+app.get('/api/usuarios', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, nome, username, telefone, tipo, ativo FROM usuarios ORDER BY id');
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/usuarios', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { nome, username, senha, telefone, tipo } = req.body;
+    if (tipo === 'vendedor' && !telefone) {
+      return res.status(400).json({ error: 'Telefone obrigatório para vendedor.' });
+    }
+    const hashed = await bcrypt.hash(senha, 10);
+    const result = await pool.query(
+      'INSERT INTO usuarios (nome, username, senha, telefone, tipo) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      [nome, username, hashed, toNull(telefone), tipo]
+    );
+    res.status(201).json({ id: result.rows[0].id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/usuarios/:id', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { nome, username, senha, telefone, tipo, ativo } = req.body;
+    if (tipo === 'vendedor' && !telefone) {
+      return res.status(400).json({ error: 'Telefone obrigatório para vendedor.' });
+    }
+    if (senha) {
+      const hashed = await bcrypt.hash(senha, 10);
+      await pool.query(
+        `UPDATE usuarios SET nome=$1, username=$2, senha=$3, telefone=$4, tipo=$5, ativo=$6 WHERE id=$7`,
+        [nome, username, hashed, toNull(telefone), tipo, ativo !== undefined ? ativo : true, req.params.id]
+      );
+    } else {
+      await pool.query(
+        `UPDATE usuarios SET nome=$1, username=$2, telefone=$3, tipo=$4, ativo=$5 WHERE id=$6`,
+        [nome, username, toNull(telefone), tipo, ativo !== undefined ? ativo : true, req.params.id]
+      );
+    }
+    res.json({ message: 'Atualizado' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/usuarios/:id', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM usuarios WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Excluído' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ==================== JOB DE LEMBRETES ====================
 setInterval(async () => {
