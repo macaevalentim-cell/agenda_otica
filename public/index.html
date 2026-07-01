@@ -141,34 +141,13 @@
             padding-bottom: 4px;
         }
 
-        /* Estilos para impressão do comprovante */
-        @media print {
-            body * {
-                visibility: hidden;
-            }
-            #comprovante, #comprovante * {
-                visibility: visible;
-            }
-            #comprovante {
-                position: fixed;
-                left: 0;
-                top: 0;
-                width: 100%;
-                padding: 20px;
-                background: white;
-                font-family: 'Courier New', monospace;
-            }
-            #comprovante .cancelar-imprimir {
-                display: none;
-            }
-        }
-
+        /* ======= ESTILOS PARA IMPRESSÃO ======= */
+        /* Estilos base do comprovante */
         .comprovante-container {
             background: white;
             padding: 20px;
             border: 1px solid #ddd;
             border-radius: 8px;
-            max-width: 600px;
             margin: 0 auto;
             font-family: 'Courier New', monospace;
         }
@@ -193,9 +172,101 @@
             color: #666;
         }
 
+        /* Estilos para bobina (80mm) */
+        .comprovante-bobina {
+            width: 80mm;
+            padding: 10px;
+            font-size: 12px;
+            border: none;
+            margin: 0 auto;
+        }
+        .comprovante-bobina .detalhe {
+            padding: 4px 0;
+            font-size: 11px;
+        }
+        .comprovante-bobina h2 {
+            font-size: 16px;
+        }
+        .comprovante-bobina .rodape {
+            font-size: 10px;
+        }
+        @media print {
+            .comprovante-bobina {
+                width: 80mm;
+                margin: 0 auto;
+                border: none;
+                padding: 5mm;
+            }
+            body * { visibility: hidden; }
+            .comprovante-bobina, .comprovante-bobina * { visibility: visible; }
+            .comprovante-bobina { position: fixed; left: 0; top: 0; width: 80mm; }
+            .no-print { display: none; }
+        }
+
+        /* Estilos para A4 */
+        .comprovante-a4 {
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 20mm;
+            font-size: 14px;
+        }
+        @media print {
+            .comprovante-a4 {
+                max-width: 210mm;
+                padding: 20mm;
+            }
+            body * { visibility: hidden; }
+            .comprovante-a4, .comprovante-a4 * { visibility: visible; }
+            .comprovante-a4 { position: fixed; left: 0; top: 0; width: 100%; }
+            .no-print { display: none; }
+        }
+
+        /* Estilos para PDF (similar ao A4, mas com sugestão de salvar) */
+        .comprovante-pdf {
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 15mm;
+            font-size: 14px;
+        }
+        @media print {
+            .comprovante-pdf {
+                max-width: 210mm;
+                padding: 15mm;
+            }
+            body * { visibility: hidden; }
+            .comprovante-pdf, .comprovante-pdf * { visibility: visible; }
+            .comprovante-pdf { position: fixed; left: 0; top: 0; width: 100%; }
+            .no-print { display: none; }
+        }
+
+        /* Botões no modal de impressão */
+        .btn-tipo-impressao {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 15px 0;
+        }
+        .btn-tipo-impressao button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: none;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .btn-tipo-impressao button:hover {
+            transform: scale(1.05);
+        }
+        .btn-tipo-impressao .btn-bobina { background: #2d3748; color: white; }
+        .btn-tipo-impressao .btn-a4 { background: #667eea; color: white; }
+        .btn-tipo-impressao .btn-pdf { background: #e53e3e; color: white; }
+
         @media (max-width: 768px) {
             .header-title h2 { font-size: 16px; }
             .side-menu { width: 240px; left: -240px; }
+            .btn-tipo-impressao { flex-direction: column; align-items: center; }
+            .btn-tipo-impressao button { width: 100%; }
         }
     </style>
 </head>
@@ -572,6 +643,20 @@
             </div>
         </div>
 
+        <!-- MODAL DE SELEÇÃO DE TIPO DE IMPRESSÃO -->
+        <div id="modalImpressao" class="modal-overlay">
+            <div class="modal-box">
+                <h3>🖨️ Escolha o tipo de impressão</h3>
+                <p style="margin-bottom:10px; color:#555;">Selecione o formato desejado para o comprovante:</p>
+                <div class="btn-tipo-impressao">
+                    <button class="btn-bobina" onclick="imprimirComprovanteSelecionado('bobina')">🧾 Bobina (80mm)</button>
+                    <button class="btn-a4" onclick="imprimirComprovanteSelecionado('a4')">📄 A4</button>
+                    <button class="btn-pdf" onclick="imprimirComprovanteSelecionado('pdf')">📁 PDF</button>
+                </div>
+                <button onclick="fecharModalImpressao()" style="display:block; margin:10px auto; background:#ccc; color:#333; padding:8px 20px;">Cancelar</button>
+            </div>
+        </div>
+
         <div id="toast" class="toast"></div>
     </div>
 
@@ -593,6 +678,7 @@
         let currentDate = new Date();
         let editandoId = null;
         let medicoSelecionadoId = null;
+        let consultaParaImprimir = null; // guarda o ID da consulta a imprimir
 
         // ========================================================================
         // UTILITÁRIOS
@@ -1519,7 +1605,7 @@
                                 `<button onclick="processarConsulta(${c.id})" class="btn-process">🔄 Processar</button>` : ''}
                             <button onclick="enviarWhatsAppPaciente(${c.id})" class="btn-whatsapp">📱 WhatsApp</button>
                             <button onclick="enviarWhatsAppMedico(${c.id})" class="btn-medico">📱 Médico</button>
-                            ${c.status === 'confirmada' ? `<button onclick="imprimirComprovante(${c.id})" class="btn-print">🖨️ Imprimir Comprovante</button>` : ''}
+                            ${c.status === 'confirmada' ? `<button onclick="abrirModalImpressao(${c.id})" class="btn-print">🖨️ Imprimir Comprovante</button>` : ''}
                         </div>
                     `;
                     infoHtml = `
@@ -1569,25 +1655,64 @@
         }
 
         // ========================================================================
-        // IMPRIMIR COMPROVANTE
+        // IMPRESSÃO COM SELEÇÃO DE TIPO
         // ========================================================================
-        function imprimirComprovante(id) {
+        function abrirModalImpressao(id) {
+            consultaParaImprimir = id;
+            document.getElementById('modalImpressao').classList.add('show');
+        }
+
+        function fecharModalImpressao() {
+            document.getElementById('modalImpressao').classList.remove('show');
+            consultaParaImprimir = null;
+        }
+
+        function imprimirComprovanteSelecionado(tipo) {
+            fecharModalImpressao();
+            if (consultaParaImprimir) {
+                gerarComprovante(consultaParaImprimir, tipo);
+            } else {
+                showToast('Erro: nenhuma consulta selecionada.', true);
+            }
+        }
+
+        function gerarComprovante(id, tipo) {
             const c = consultas.find(cons => cons.id === id);
             if (!c) {
                 showToast('Consulta não encontrada.', true);
                 return;
             }
 
-            const comprovanteDiv = document.getElementById('comprovante');
             const dataFormatada = formatDisplay(c.data_consulta);
             const status = c.status || 'agendada';
             const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
             const pedido = c.numero_pedido || 'Não informado';
 
+            // Define a classe CSS conforme o tipo
+            let classeComprovante = '';
+            let tituloAcao = '';
+            switch (tipo) {
+                case 'bobina':
+                    classeComprovante = 'comprovante-bobina';
+                    tituloAcao = 'Bobina (80mm)';
+                    break;
+                case 'pdf':
+                    classeComprovante = 'comprovante-pdf';
+                    tituloAcao = 'PDF (salvar como)';
+                    break;
+                case 'a4':
+                default:
+                    classeComprovante = 'comprovante-a4';
+                    tituloAcao = 'A4';
+                    break;
+            }
+
+            const comprovanteDiv = document.getElementById('comprovante');
             comprovanteDiv.innerHTML = `
-                <div class="comprovante-container">
+                <div class="comprovante-container ${classeComprovante}">
                     <h2>🏥 ÓTICA MACAÉ</h2>
                     <h3 style="text-align:center; color:#2d3748;">Comprovante de Consulta</h3>
+                    <p style="text-align:center; font-size:12px; color:#888;">Formato: ${tituloAcao}</p>
                     <hr style="margin: 15px 0;">
                     <div class="detalhe"><span class="label">Paciente:</span> <span>${escapeHtml(c.paciente_nome)}</span></div>
                     <div class="detalhe"><span class="label">Data:</span> <span>${dataFormatada}</span></div>
@@ -1602,17 +1727,20 @@
                         Telefone: (22) 99764-0112<br>
                         <em>Este comprovante é válido como confirmação de agendamento.</em>
                     </div>
-                    <button onclick="fecharComprovante()" class="cancelar-imprimir" style="display:block; margin:20px auto; padding:8px 20px; background:#e53e3e; color:white; border:none; border-radius:5px; cursor:pointer;">Fechar</button>
+                    <button onclick="fecharComprovante()" class="no-print" style="display:block; margin:20px auto; padding:8px 20px; background:#e53e3e; color:white; border:none; border-radius:5px; cursor:pointer;">Fechar</button>
                 </div>
             `;
             comprovanteDiv.style.display = 'block';
 
-            // Abrir janela de impressão
-            window.print();
+            // Aguarda a renderização e chama a impressão
+            setTimeout(() => {
+                window.print();
+            }, 300);
         }
 
         function fecharComprovante() {
             document.getElementById('comprovante').style.display = 'none';
+            document.getElementById('comprovante').innerHTML = '';
         }
 
         // ========================================================================
@@ -2457,7 +2585,7 @@
                     ${podeEditar ? `<button onclick="cancelarConsulta(${e.id}); fecharModalDetalhes();" class="btn-danger" style="width:100%; margin-top:5px;">🚫 Cancelar</button>` : ''}
                     ${!isRealizada ? `<button onclick="enviarWhatsAppPaciente(${e.id})" class="btn-whatsapp" style="width:100%; margin-top:5px;">📱 WhatsApp Paciente</button>` : ''}
                     ${!isRealizada ? `<button onclick="enviarWhatsAppMedico(${e.id})" class="btn-medico" style="width:100%; margin-top:5px;">📱 WhatsApp Médico</button>` : ''}
-                    ${e.status === 'confirmada' ? `<button onclick="imprimirComprovante(${e.id}); fecharModalDetalhes();" class="btn-print" style="width:100%; margin-top:5px;">🖨️ Imprimir Comprovante</button>` : ''}
+                    ${e.status === 'confirmada' ? `<button onclick="abrirModalImpressao(${e.id}); fecharModalDetalhes();" class="btn-print" style="width:100%; margin-top:5px;">🖨️ Imprimir Comprovante</button>` : ''}
                     ${isRealizada ? '<p style="color:#2b6cb0; font-weight:bold; margin-top:10px;">✅ Consulta já realizada. Nenhuma ação disponível.</p>' : ''}
                 `;
             }
@@ -2547,7 +2675,12 @@
             });
         });
 
-        console.log('✅ Sistema com Número do Pedido, Comprovante de Impressão e Dashboard.');
+        // Fechar modal de impressão ao clicar fora
+        document.getElementById('modalImpressao').addEventListener('click', function(e) {
+            if (e.target === this) fecharModalImpressao();
+        });
+
+        console.log('✅ Sistema com impressão (Bobina/A4/PDF) e múltiplos turnos.');
     </script>
 </body>
 </html>
