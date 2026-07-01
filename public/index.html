@@ -125,12 +125,46 @@
             margin-bottom: 20px;
             border: 1px solid #e2e8f0;
         }
-
         .filtros-box .form-row { margin-bottom: 5px; }
+
+        /* Estilos para a tabela de atendimentos */
+        .tabela-atendimentos {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .tabela-atendimentos th {
+            background: #667eea;
+            color: white;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .tabela-atendimentos td {
+            padding: 8px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: middle;
+        }
+        .tabela-atendimentos tr:hover {
+            background: #f7fafc;
+        }
+        .tabela-atendimentos .badge-status {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .badge-status.agendada { background: #fef3c7; color: #92400e; }
+        .badge-status.confirmada { background: #d1fae5; color: #065f46; }
+        .badge-status.realizada { background: #dbeafe; color: #1e40af; }
+        .badge-status.cancelada { background: #fee2e2; color: #991b1b; }
 
         @media (max-width: 768px) {
             .header-title h2 { font-size: 16px; }
             .side-menu { width: 240px; left: -240px; }
+            .tabela-atendimentos { font-size: 12px; }
+            .tabela-atendimentos th, .tabela-atendimentos td { padding: 6px; }
         }
     </style>
 </head>
@@ -171,7 +205,8 @@
                 <span class="tipo" id="menuUserTipo">tipo</span>
             </div>
             <hr style="border-color: #4a5568; margin: 10px 0;">
-            <button class="menu-item active" data-page="pageConsultas">📋 Consultas</button>
+            <button class="menu-item active" data-page="pageConsultas">📋 Agenda</button>
+            <button class="menu-item" data-page="pageListar">📋 Listar Atendimentos</button>
             <button class="menu-item" data-page="pageAgendar" id="menuAgendar">📝 Agendar</button>
             <button class="menu-item" data-page="pageSolicitar" style="background:#48bb78; color:white;">📝 Solicitar</button>
             <button class="menu-item" data-page="pageDashboard" id="menuDashboard">📊 Dashboard</button>
@@ -184,40 +219,9 @@
             <button class="menu-item" data-page="pageAdmin" data-sub="whatsapp">📱 WhatsApp</button>
         </div>
 
-        <!-- PÁGINA CONSULTAS -->
+        <!-- PÁGINA AGENDA (consultas) -->
         <div id="pageConsultas" class="page-section active">
-            <h3>📋 Lista de Consultas</h3>
-
-            <!-- FILTROS -->
-            <div class="filtros-box">
-                <h4 style="margin-bottom:10px;">🔍 Filtrar Consultas</h4>
-                <div class="form-row">
-                    <input type="date" id="filtroDataInicio" placeholder="Data Início">
-                    <input type="date" id="filtroDataFim" placeholder="Data Fim">
-                    <select id="filtroMedico">
-                        <option value="">Todos os Médicos</option>
-                    </select>
-                </div>
-                <div class="form-row">
-                    <select id="filtroStatus">
-                        <option value="">Todos os Status</option>
-                        <option value="agendada">Agendada</option>
-                        <option value="confirmada">Confirmada</option>
-                        <option value="realizada">Realizada</option>
-                        <option value="cancelada">Cancelada</option>
-                    </select>
-                    <input type="text" id="filtroPaciente" placeholder="Buscar por nome do paciente">
-                    <select id="filtroVendedor" style="display:none;">
-                        <option value="">Todos os Vendedores</option>
-                    </select>
-                </div>
-                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:5px;">
-                    <button onclick="aplicarFiltros()" class="btn-primary" style="background:#667eea;">🔍 Filtrar</button>
-                    <button onclick="limparFiltros()" style="background:#718096;">Limpar Filtros</button>
-                    <span style="font-size:13px; color:#718096; align-self:center;" id="resultadoFiltros"></span>
-                </div>
-            </div>
-
+            <h3>📋 Agenda de Consultas</h3>
             <div id="consultasListMain"></div>
             <div style="margin-top:20px;">
                 <div class="view-buttons">
@@ -230,6 +234,42 @@
                 </div>
                 <div id="tituloCalendario" class="calendario-titulo"></div>
                 <div id="calendarioContainer"></div>
+            </div>
+        </div>
+
+        <!-- PÁGINA LISTAR ATENDIMENTOS -->
+        <div id="pageListar" class="page-section">
+            <h3>📋 Listar Atendimentos</h3>
+            <div class="filtros-box">
+                <h4 style="margin-bottom:10px;">🔍 Filtros</h4>
+                <div class="form-row">
+                    <input type="date" id="filtroListarDataInicio" placeholder="Data Início">
+                    <input type="date" id="filtroListarDataFim" placeholder="Data Fim">
+                    <select id="filtroListarMedico">
+                        <option value="">Todos os Médicos</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <select id="filtroListarStatus">
+                        <option value="">Todos os Status</option>
+                        <option value="agendada">Agendada</option>
+                        <option value="confirmada">Confirmada</option>
+                        <option value="realizada">Realizada</option>
+                        <option value="cancelada">Cancelada</option>
+                    </select>
+                    <input type="text" id="filtroListarPaciente" placeholder="Nome do paciente">
+                    <select id="filtroListarVendedor" style="display:none;">
+                        <option value="">Todos os Vendedores</option>
+                    </select>
+                </div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:5px;">
+                    <button onclick="aplicarFiltrosListar()" class="btn-primary" style="background:#667eea;">🔍 Filtrar</button>
+                    <button onclick="limparFiltrosListar()" style="background:#718096;">Limpar Filtros</button>
+                    <span style="font-size:13px; color:#718096; align-self:center;" id="resultadoListar"></span>
+                </div>
+            </div>
+            <div id="listaAtendimentosContainer">
+                <p class="no-data">Carregando atendimentos...</p>
             </div>
         </div>
 
@@ -674,12 +714,12 @@
                     document.getElementById('menuAgendar').style.display = 'block';
                     document.getElementById('menuAdmin').style.display = 'block';
                     document.getElementById('menuDashboard').style.display = 'block';
-                    document.getElementById('filtroVendedor').style.display = 'block';
+                    document.getElementById('filtroListarVendedor').style.display = 'block';
                 } else {
                     document.getElementById('menuAgendar').style.display = 'none';
                     document.getElementById('menuAdmin').style.display = 'none';
                     document.getElementById('menuDashboard').style.display = 'none';
-                    document.getElementById('filtroVendedor').style.display = 'none';
+                    document.getElementById('filtroListarVendedor').style.display = 'none';
                 }
 
                 await carregarDados();
@@ -719,8 +759,8 @@
                 medicos = await resMedicos.json();
                 preencherSelectMedico();
                 preencherSelectMedicoSol();
-                preencherFiltroMedico();
-                if (user.tipo === 'admin') preencherFiltroVendedor();
+                preencherFiltroMedicoListar();
+                if (user.tipo === 'admin') preencherFiltroVendedorListar();
 
                 const resClientes = await fetch(`${API_URL}/clientes`, {
                     headers: { Authorization: `Bearer ${token}` }
@@ -740,6 +780,10 @@
                     atualizarBadgeSolicitacoes();
                     carregarConfigWhatsapp();
                     carregarDashboard();
+                }
+                // Carregar lista de atendimentos se a página estiver ativa
+                if (document.getElementById('pageListar').classList.contains('active')) {
+                    carregarListaAtendimentos();
                 }
             } catch (err) {
                 console.error('Erro ao carregar dados:', err);
@@ -774,16 +818,16 @@
             }
         }
 
-        function preencherFiltroMedico() {
-            const select = document.getElementById('filtroMedico');
+        function preencherFiltroMedicoListar() {
+            const select = document.getElementById('filtroListarMedico');
             if (select) {
                 select.innerHTML = '<option value="">Todos os Médicos</option>' +
                     medicos.map(m => `<option value="${m.id}">${m.nome} - ${m.especialidade}</option>`).join('');
             }
         }
 
-        function preencherFiltroVendedor() {
-            const select = document.getElementById('filtroVendedor');
+        function preencherFiltroVendedorListar() {
+            const select = document.getElementById('filtroListarVendedor');
             if (select && usuarios.length > 0) {
                 const vendedores = usuarios.filter(u => u.tipo === 'vendedor' || u.tipo === 'admin');
                 select.innerHTML = '<option value="">Todos os Vendedores</option>' +
@@ -861,15 +905,15 @@
         }
 
         // ========================================================================
-        // FILTROS DE CONSULTAS (NOVO)
+        // FILTROS DA PÁGINA "LISTAR ATENDIMENTOS"
         // ========================================================================
-        async function aplicarFiltros() {
-            const dataInicio = document.getElementById('filtroDataInicio').value;
-            const dataFim = document.getElementById('filtroDataFim').value;
-            const medicoId = document.getElementById('filtroMedico').value;
-            const status = document.getElementById('filtroStatus').value;
-            const paciente = document.getElementById('filtroPaciente').value.trim();
-            const vendedorId = document.getElementById('filtroVendedor').value;
+        async function aplicarFiltrosListar() {
+            const dataInicio = document.getElementById('filtroListarDataInicio').value;
+            const dataFim = document.getElementById('filtroListarDataFim').value;
+            const medicoId = document.getElementById('filtroListarMedico').value;
+            const status = document.getElementById('filtroListarStatus').value;
+            const paciente = document.getElementById('filtroListarPaciente').value.trim();
+            const vendedorId = document.getElementById('filtroListarVendedor').value;
 
             let url = `${API_URL}/consultas/filtrar?`;
             const params = [];
@@ -881,12 +925,10 @@
             if (vendedorId) params.push(`vendedor_id=${vendedorId}`);
 
             if (params.length === 0) {
-                // Se não houver filtros, carrega todas as consultas
-                await carregarDados();
-                document.getElementById('resultadoFiltros').textContent = 'Mostrando todas as consultas';
+                await carregarListaAtendimentos();
+                document.getElementById('resultadoListar').textContent = 'Mostrando todos os atendimentos';
                 return;
             }
-
             url += params.join('&');
 
             try {
@@ -895,25 +937,84 @@
                 });
                 if (!res.ok) throw new Error('Erro ao filtrar');
                 const data = await res.json();
-                consultas = data.map(c => ({ ...c, data_consulta: c.data_consulta || null, is_own: c.is_own === 1 }));
-                renderizarConsultasListaPrincipal();
-                renderizarCalendario();
-                document.getElementById('resultadoFiltros').textContent = `${consultas.length} consultas encontradas`;
-                showToast(`${consultas.length} consultas encontradas`);
+                const lista = data.map(c => ({ ...c, data_consulta: c.data_consulta || null, is_own: c.is_own === 1 }));
+                renderizarListaAtendimentos(lista);
+                document.getElementById('resultadoListar').textContent = `${lista.length} atendimento(s) encontrado(s)`;
             } catch (err) {
                 showToast('Erro ao aplicar filtros: ' + err.message, true);
             }
         }
 
-        function limparFiltros() {
-            document.getElementById('filtroDataInicio').value = '';
-            document.getElementById('filtroDataFim').value = '';
-            document.getElementById('filtroMedico').value = '';
-            document.getElementById('filtroStatus').value = '';
-            document.getElementById('filtroPaciente').value = '';
-            document.getElementById('filtroVendedor').value = '';
-            document.getElementById('resultadoFiltros').textContent = '';
-            carregarDados();
+        function limparFiltrosListar() {
+            document.getElementById('filtroListarDataInicio').value = '';
+            document.getElementById('filtroListarDataFim').value = '';
+            document.getElementById('filtroListarMedico').value = '';
+            document.getElementById('filtroListarStatus').value = '';
+            document.getElementById('filtroListarPaciente').value = '';
+            document.getElementById('filtroListarVendedor').value = '';
+            document.getElementById('resultadoListar').textContent = '';
+            carregarListaAtendimentos();
+        }
+
+        // ========================================================================
+        // CARREGAR E RENDERIZAR LISTA DE ATENDIMENTOS
+        // ========================================================================
+        async function carregarListaAtendimentos() {
+            try {
+                const res = await fetch(`${API_URL}/consultas/filtrar?`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Erro ao carregar atendimentos');
+                const data = await res.json();
+                const lista = data.map(c => ({ ...c, data_consulta: c.data_consulta || null, is_own: c.is_own === 1 }));
+                renderizarListaAtendimentos(lista);
+                document.getElementById('resultadoListar').textContent = `${lista.length} atendimento(s)`;
+            } catch (err) {
+                showToast('Erro ao carregar atendimentos: ' + err.message, true);
+                document.getElementById('listaAtendimentosContainer').innerHTML = '<p class="no-data">Erro ao carregar atendimentos.</p>';
+            }
+        }
+
+        function renderizarListaAtendimentos(lista) {
+            const container = document.getElementById('listaAtendimentosContainer');
+            if (!container) return;
+            if (!lista || lista.length === 0) {
+                container.innerHTML = '<p class="no-data">Nenhum atendimento encontrado.</p>';
+                return;
+            }
+
+            let html = `<table class="tabela-atendimentos">
+                <thead>
+                    <tr>
+                        <th>Paciente</th>
+                        <th>Data</th>
+                        <th>Horário</th>
+                        <th>Médico</th>
+                        <th>Status</th>
+                        <th>Vendedor</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            lista.forEach(c => {
+                const statusClass = c.status || 'agendada';
+                const statusLabel = statusClass.charAt(0).toUpperCase() + statusClass.slice(1);
+                html += `<tr>
+                    <td><strong>${escapeHtml(c.paciente_nome)}</strong></td>
+                    <td>${formatDisplay(c.data_consulta)}</td>
+                    <td>${c.horario}</td>
+                    <td>${escapeHtml(c.medico_nome)}</td>
+                    <td><span class="badge-status ${statusClass}">${statusLabel}</span></td>
+                    <td>${escapeHtml(c.vendedor_nome || 'Não informado')}</td>
+                    <td>
+                        <button onclick="mostrarDetalhes(${c.id})" class="btn-primary" style="padding:4px 10px; font-size:12px;">👁️ Detalhes</button>
+                    </td>
+                </tr>`;
+            });
+
+            html += `</tbody></table>`;
+            container.innerHTML = html;
         }
 
         // ========================================================================
@@ -2316,6 +2417,7 @@
             const menuBtn = document.querySelector(`.side-menu .menu-item[data-page="${pageId}"]`);
             if (menuBtn) menuBtn.classList.add('active');
             if (pageId === 'pageDashboard' && user.tipo === 'admin') carregarDashboard();
+            if (pageId === 'pageListar') carregarListaAtendimentos();
             fecharMenu();
         }
 
@@ -2446,12 +2548,12 @@
                             document.getElementById('menuAgendar').style.display = 'block';
                             document.getElementById('menuAdmin').style.display = 'block';
                             document.getElementById('menuDashboard').style.display = 'block';
-                            document.getElementById('filtroVendedor').style.display = 'block';
+                            document.getElementById('filtroListarVendedor').style.display = 'block';
                         } else {
                             document.getElementById('menuAgendar').style.display = 'none';
                             document.getElementById('menuAdmin').style.display = 'none';
                             document.getElementById('menuDashboard').style.display = 'none';
-                            document.getElementById('filtroVendedor').style.display = 'none';
+                            document.getElementById('filtroListarVendedor').style.display = 'none';
                         }
                         await carregarDados();
                         renderizarCalendario();
@@ -2479,7 +2581,7 @@
             });
         });
 
-        console.log('✅ Sistema completo com gerenciamento de horários, dashboard, confirmação, processamento e filtros.');
+        console.log('✅ Sistema completo com Listar Atendimentos, Dashboard, Confirmação, Processamento e Filtros.');
     </script>
 </body>
 </html>
