@@ -127,44 +127,22 @@
         }
         .filtros-box .form-row { margin-bottom: 5px; }
 
-        /* Estilos para a tabela de atendimentos */
-        .tabela-atendimentos {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
+        .horario-periodo {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f0f4f8;
+            border-radius: 6px;
         }
-        .tabela-atendimentos th {
-            background: #667eea;
-            color: white;
-            padding: 10px 8px;
-            text-align: left;
-            font-weight: 600;
+        .horario-periodo h5 {
+            color: #2d3748;
+            margin-bottom: 8px;
+            border-bottom: 2px solid #cbd5e0;
+            padding-bottom: 4px;
         }
-        .tabela-atendimentos td {
-            padding: 8px;
-            border-bottom: 1px solid #e2e8f0;
-            vertical-align: middle;
-        }
-        .tabela-atendimentos tr:hover {
-            background: #f7fafc;
-        }
-        .tabela-atendimentos .badge-status {
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-            display: inline-block;
-        }
-        .badge-status.agendada { background: #fef3c7; color: #92400e; }
-        .badge-status.confirmada { background: #d1fae5; color: #065f46; }
-        .badge-status.realizada { background: #dbeafe; color: #1e40af; }
-        .badge-status.cancelada { background: #fee2e2; color: #991b1b; }
 
         @media (max-width: 768px) {
             .header-title h2 { font-size: 16px; }
             .side-menu { width: 240px; left: -240px; }
-            .tabela-atendimentos { font-size: 12px; }
-            .tabela-atendimentos th, .tabela-atendimentos td { padding: 6px; }
         }
     </style>
 </head>
@@ -205,8 +183,9 @@
                 <span class="tipo" id="menuUserTipo">tipo</span>
             </div>
             <hr style="border-color: #4a5568; margin: 10px 0;">
-            <button class="menu-item active" data-page="pageConsultas">📋 Agenda</button>
-            <button class="menu-item" data-page="pageListar">📋 Listar Atendimentos</button>
+            <!-- Menus: Lista e Calendário separados -->
+            <button class="menu-item active" data-page="pageLista">📋 Lista de Consultas</button>
+            <button class="menu-item" data-page="pageCalendario">📅 Calendário</button>
             <button class="menu-item" data-page="pageAgendar" id="menuAgendar">📝 Agendar</button>
             <button class="menu-item" data-page="pageSolicitar" style="background:#48bb78; color:white;">📝 Solicitar</button>
             <button class="menu-item" data-page="pageDashboard" id="menuDashboard">📊 Dashboard</button>
@@ -219,11 +198,16 @@
             <button class="menu-item" data-page="pageAdmin" data-sub="whatsapp">📱 WhatsApp</button>
         </div>
 
-        <!-- PÁGINA AGENDA (consultas) -->
-        <div id="pageConsultas" class="page-section active">
-            <h3>📋 Agenda de Consultas</h3>
+        <!-- PÁGINA LISTA DE CONSULTAS (cards) -->
+        <div id="pageLista" class="page-section active">
+            <h3>📋 Lista de Consultas</h3>
             <div id="consultasListMain"></div>
-            <div style="margin-top:20px;">
+        </div>
+
+        <!-- PÁGINA CALENDÁRIO -->
+        <div id="pageCalendario" class="page-section">
+            <h3>📅 Calendário de Consultas</h3>
+            <div style="margin-bottom:20px;">
                 <div class="view-buttons">
                     <button onclick="mudarView('month')">📅 Mês</button>
                     <button onclick="mudarView('week')" class="active">📆 Semana</button>
@@ -234,42 +218,6 @@
                 </div>
                 <div id="tituloCalendario" class="calendario-titulo"></div>
                 <div id="calendarioContainer"></div>
-            </div>
-        </div>
-
-        <!-- PÁGINA LISTAR ATENDIMENTOS -->
-        <div id="pageListar" class="page-section">
-            <h3>📋 Listar Atendimentos</h3>
-            <div class="filtros-box">
-                <h4 style="margin-bottom:10px;">🔍 Filtros</h4>
-                <div class="form-row">
-                    <input type="date" id="filtroListarDataInicio" placeholder="Data Início">
-                    <input type="date" id="filtroListarDataFim" placeholder="Data Fim">
-                    <select id="filtroListarMedico">
-                        <option value="">Todos os Médicos</option>
-                    </select>
-                </div>
-                <div class="form-row">
-                    <select id="filtroListarStatus">
-                        <option value="">Todos os Status</option>
-                        <option value="agendada">Agendada</option>
-                        <option value="confirmada">Confirmada</option>
-                        <option value="realizada">Realizada</option>
-                        <option value="cancelada">Cancelada</option>
-                    </select>
-                    <input type="text" id="filtroListarPaciente" placeholder="Nome do paciente">
-                    <select id="filtroListarVendedor" style="display:none;">
-                        <option value="">Todos os Vendedores</option>
-                    </select>
-                </div>
-                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:5px;">
-                    <button onclick="aplicarFiltrosListar()" class="btn-primary" style="background:#667eea;">🔍 Filtrar</button>
-                    <button onclick="limparFiltrosListar()" style="background:#718096;">Limpar Filtros</button>
-                    <span style="font-size:13px; color:#718096; align-self:center;" id="resultadoListar"></span>
-                </div>
-            </div>
-            <div id="listaAtendimentosContainer">
-                <p class="no-data">Carregando atendimentos...</p>
             </div>
         </div>
 
@@ -387,6 +335,7 @@
                     <h3>Médicos Cadastrados</h3>
                     <div id="medicosList"></div>
                 </div>
+                <!-- SEÇÃO DE HORÁRIOS com separação manhã/tarde -->
                 <div id="horariosMedico" style="display:none; background:#f8f9fa; padding:20px; border-radius:10px; margin-top:20px;">
                     <h4>Gerenciar Horários de Atendimento</h4>
                     <div id="horariosList"></div>
@@ -409,6 +358,7 @@
                     <input type="hidden" id="editHorarioId">
                 </div>
             </div>
+
             <div id="subUsuarios" class="sub-page">
                 <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
                     <h3>Cadastrar Usuário</h3>
@@ -430,6 +380,7 @@
                     <div id="usuariosList"></div>
                 </div>
             </div>
+
             <div id="subPacientes" class="sub-page">
                 <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
                     <h3>Cadastrar Paciente</h3>
@@ -456,12 +407,14 @@
                     <div id="pacientesList"></div>
                 </div>
             </div>
+
             <div id="subSolicitacoes" class="sub-page">
                 <div style="background:white; padding:20px; border-radius:10px;">
                     <h3>Solicitações de Consulta</h3>
                     <div id="solicitacoesList"></div>
                 </div>
             </div>
+
             <div id="subWhatsapp" class="sub-page">
                 <div style="background:white; padding:20px; border-radius:10px;">
                     <h3>Configurar WhatsApp</h3>
@@ -714,20 +667,18 @@
                     document.getElementById('menuAgendar').style.display = 'block';
                     document.getElementById('menuAdmin').style.display = 'block';
                     document.getElementById('menuDashboard').style.display = 'block';
-                    document.getElementById('filtroListarVendedor').style.display = 'block';
                 } else {
                     document.getElementById('menuAgendar').style.display = 'none';
                     document.getElementById('menuAdmin').style.display = 'none';
                     document.getElementById('menuDashboard').style.display = 'none';
-                    document.getElementById('filtroListarVendedor').style.display = 'none';
                 }
 
                 await carregarDados();
-                renderizarCalendario();
+                renderizarLista();
                 iniciarPollingLembretes();
                 if (user.tipo === 'admin') iniciarPollingSolicitacoes();
                 fecharMenu();
-                navegarPara('pageConsultas');
+                navegarPara('pageLista');
 
                 setTimeout(() => {
                     setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
@@ -759,8 +710,6 @@
                 medicos = await resMedicos.json();
                 preencherSelectMedico();
                 preencherSelectMedicoSol();
-                preencherFiltroMedicoListar();
-                if (user.tipo === 'admin') preencherFiltroVendedorListar();
 
                 const resClientes = await fetch(`${API_URL}/clientes`, {
                     headers: { Authorization: `Bearer ${token}` }
@@ -768,7 +717,7 @@
                 clientes = await resClientes.json();
                 preencherSelectPacientes();
 
-                renderizarConsultasListaPrincipal();
+                renderizarLista();
                 if (user.tipo === 'admin') {
                     const resUsuarios = await fetch(`${API_URL}/usuarios`, {
                         headers: { Authorization: `Bearer ${token}` }
@@ -780,10 +729,6 @@
                     atualizarBadgeSolicitacoes();
                     carregarConfigWhatsapp();
                     carregarDashboard();
-                }
-                // Carregar lista de atendimentos se a página estiver ativa
-                if (document.getElementById('pageListar').classList.contains('active')) {
-                    carregarListaAtendimentos();
                 }
             } catch (err) {
                 console.error('Erro ao carregar dados:', err);
@@ -815,23 +760,6 @@
             if (select) {
                 select.innerHTML = '<option value="">Selecione um paciente</option>' +
                     clientes.map(p => `<option value="${p.id}">${p.nome} - ${p.telefone}</option>`).join('');
-            }
-        }
-
-        function preencherFiltroMedicoListar() {
-            const select = document.getElementById('filtroListarMedico');
-            if (select) {
-                select.innerHTML = '<option value="">Todos os Médicos</option>' +
-                    medicos.map(m => `<option value="${m.id}">${m.nome} - ${m.especialidade}</option>`).join('');
-            }
-        }
-
-        function preencherFiltroVendedorListar() {
-            const select = document.getElementById('filtroListarVendedor');
-            if (select && usuarios.length > 0) {
-                const vendedores = usuarios.filter(u => u.tipo === 'vendedor' || u.tipo === 'admin');
-                select.innerHTML = '<option value="">Todos os Vendedores</option>' +
-                    vendedores.map(u => `<option value="${u.id}">${u.nome}</option>`).join('');
             }
         }
 
@@ -902,119 +830,6 @@
             } catch (err) {
                 showToast('Erro: ' + err.message, true);
             }
-        }
-
-        // ========================================================================
-        // FILTROS DA PÁGINA "LISTAR ATENDIMENTOS"
-        // ========================================================================
-        async function aplicarFiltrosListar() {
-            const dataInicio = document.getElementById('filtroListarDataInicio').value;
-            const dataFim = document.getElementById('filtroListarDataFim').value;
-            const medicoId = document.getElementById('filtroListarMedico').value;
-            const status = document.getElementById('filtroListarStatus').value;
-            const paciente = document.getElementById('filtroListarPaciente').value.trim();
-            const vendedorId = document.getElementById('filtroListarVendedor').value;
-
-            let url = `${API_URL}/consultas/filtrar?`;
-            const params = [];
-            if (dataInicio) params.push(`data_inicio=${dataInicio}`);
-            if (dataFim) params.push(`data_fim=${dataFim}`);
-            if (medicoId) params.push(`medico_id=${medicoId}`);
-            if (status) params.push(`status=${status}`);
-            if (paciente) params.push(`paciente=${encodeURIComponent(paciente)}`);
-            if (vendedorId) params.push(`vendedor_id=${vendedorId}`);
-
-            if (params.length === 0) {
-                await carregarListaAtendimentos();
-                document.getElementById('resultadoListar').textContent = 'Mostrando todos os atendimentos';
-                return;
-            }
-            url += params.join('&');
-
-            try {
-                const res = await fetch(url, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                if (!res.ok) throw new Error('Erro ao filtrar');
-                const data = await res.json();
-                const lista = data.map(c => ({ ...c, data_consulta: c.data_consulta || null, is_own: c.is_own === 1 }));
-                renderizarListaAtendimentos(lista);
-                document.getElementById('resultadoListar').textContent = `${lista.length} atendimento(s) encontrado(s)`;
-            } catch (err) {
-                showToast('Erro ao aplicar filtros: ' + err.message, true);
-            }
-        }
-
-        function limparFiltrosListar() {
-            document.getElementById('filtroListarDataInicio').value = '';
-            document.getElementById('filtroListarDataFim').value = '';
-            document.getElementById('filtroListarMedico').value = '';
-            document.getElementById('filtroListarStatus').value = '';
-            document.getElementById('filtroListarPaciente').value = '';
-            document.getElementById('filtroListarVendedor').value = '';
-            document.getElementById('resultadoListar').textContent = '';
-            carregarListaAtendimentos();
-        }
-
-        // ========================================================================
-        // CARREGAR E RENDERIZAR LISTA DE ATENDIMENTOS
-        // ========================================================================
-        async function carregarListaAtendimentos() {
-            try {
-                const res = await fetch(`${API_URL}/consultas/filtrar?`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                if (!res.ok) throw new Error('Erro ao carregar atendimentos');
-                const data = await res.json();
-                const lista = data.map(c => ({ ...c, data_consulta: c.data_consulta || null, is_own: c.is_own === 1 }));
-                renderizarListaAtendimentos(lista);
-                document.getElementById('resultadoListar').textContent = `${lista.length} atendimento(s)`;
-            } catch (err) {
-                showToast('Erro ao carregar atendimentos: ' + err.message, true);
-                document.getElementById('listaAtendimentosContainer').innerHTML = '<p class="no-data">Erro ao carregar atendimentos.</p>';
-            }
-        }
-
-        function renderizarListaAtendimentos(lista) {
-            const container = document.getElementById('listaAtendimentosContainer');
-            if (!container) return;
-            if (!lista || lista.length === 0) {
-                container.innerHTML = '<p class="no-data">Nenhum atendimento encontrado.</p>';
-                return;
-            }
-
-            let html = `<table class="tabela-atendimentos">
-                <thead>
-                    <tr>
-                        <th>Paciente</th>
-                        <th>Data</th>
-                        <th>Horário</th>
-                        <th>Médico</th>
-                        <th>Status</th>
-                        <th>Vendedor</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-
-            lista.forEach(c => {
-                const statusClass = c.status || 'agendada';
-                const statusLabel = statusClass.charAt(0).toUpperCase() + statusClass.slice(1);
-                html += `<tr>
-                    <td><strong>${escapeHtml(c.paciente_nome)}</strong></td>
-                    <td>${formatDisplay(c.data_consulta)}</td>
-                    <td>${c.horario}</td>
-                    <td>${escapeHtml(c.medico_nome)}</td>
-                    <td><span class="badge-status ${statusClass}">${statusLabel}</span></td>
-                    <td>${escapeHtml(c.vendedor_nome || 'Não informado')}</td>
-                    <td>
-                        <button onclick="mostrarDetalhes(${c.id})" class="btn-primary" style="padding:4px 10px; font-size:12px;">👁️ Detalhes</button>
-                    </td>
-                </tr>`;
-            });
-
-            html += `</tbody></table>`;
-            container.innerHTML = html;
         }
 
         // ========================================================================
@@ -1269,7 +1084,7 @@
         }
 
         // ========================================================================
-        // HORÁRIOS DOS MÉDICOS
+        // HORÁRIOS DOS MÉDICOS (com separação manhã/tarde)
         // ========================================================================
         function gerenciarHorarios(medicoId) {
             medicoSelecionadoId = medicoId;
@@ -1290,21 +1105,41 @@
                     container.innerHTML = '<p>Nenhum horário configurado.</p>';
                     return;
                 }
+
+                // Separar manhã (até 12:00) e tarde (13:00 em diante)
+                const manha = horarios.filter(h => h.hora_inicio < '12:00');
+                const tarde = horarios.filter(h => h.hora_inicio >= '13:00');
+
                 const dias = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-                container.innerHTML = horarios.map(h => `
-                    <div class="horario-item">
-                        <div>
-                            <strong>${dias[h.dia_semana]}</strong> 
-                            ${h.hora_inicio} - ${h.hora_fim} 
-                            (intervalo ${h.intervalo} min)
-                            ${!h.ativo ? ' <span style="color:red;">(inativo)</span>' : ''}
-                        </div>
-                        <div>
-                            <button onclick="editarHorario(${h.id})" class="btn-warning">✏️</button>
-                            <button onclick="excluirHorario(${h.id})" class="btn-danger">🗑️</button>
-                        </div>
-                    </div>
-                `).join('');
+                let html = '';
+
+                const renderGrupo = (lista, titulo) => {
+                    if (lista.length === 0) return '';
+                    let grupoHtml = `<div class="horario-periodo"><h5>${titulo}</h5>`;
+                    lista.forEach(h => {
+                        grupoHtml += `
+                            <div class="horario-item">
+                                <div>
+                                    <strong>${dias[h.dia_semana]}</strong> 
+                                    ${h.hora_inicio} - ${h.hora_fim} 
+                                    (intervalo ${h.intervalo} min)
+                                    ${!h.ativo ? ' <span style="color:red;">(inativo)</span>' : ''}
+                                </div>
+                                <div>
+                                    <button onclick="editarHorario(${h.id})" class="btn-warning">✏️</button>
+                                    <button onclick="excluirHorario(${h.id})" class="btn-danger">🗑️</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    grupoHtml += `</div>`;
+                    return grupoHtml;
+                };
+
+                html += renderGrupo(manha, '🌅 Manhã');
+                html += renderGrupo(tarde, '🌆 Tarde');
+
+                container.innerHTML = html;
             } catch (err) {
                 showToast('Erro ao carregar horários', true);
             }
@@ -1581,7 +1416,10 @@
             }
         }
 
-        function renderizarConsultasListaPrincipal() {
+        // ========================================================================
+        // RENDERIZAR LISTA DE CONSULTAS
+        // ========================================================================
+        function renderizarLista() {
             const container = document.getElementById('consultasListMain');
             if (!container) return;
             if (consultas.length === 0) {
@@ -1662,68 +1500,114 @@
             }).join('');
         }
 
-        function editarConsulta(id) {
-            if (user.tipo !== 'admin') { showToast('Apenas administradores podem editar.', true); return; }
-            const c = consultas.find(c => c.id === id);
-            if (!c) return;
-            if (c.status === 'realizada') {
-                showToast('Consulta já realizada. Não é possível editar.', true);
-                return;
-            }
-            if (c.status === 'cancelada') {
-                showToast('Consulta cancelada. Não é possível editar.', true);
-                return;
-            }
-            editandoId = id;
-            document.getElementById('pacienteNome').value = c.paciente_nome;
-            document.getElementById('pacienteTelefone').value = c.paciente_telefone;
-            document.getElementById('pacienteEmail').value = c.paciente_email || '';
-            document.getElementById('pacienteCpf').value = c.paciente_cpf || '';
-            document.getElementById('dataConsulta').value = c.data_consulta;
-            document.getElementById('horarioSelect').value = c.horario;
-            document.getElementById('medicoSelect').value = c.medico_id;
-            document.getElementById('observacoes').value = c.observacoes || '';
-            document.getElementById('cancelEditBtn').style.display = 'inline-block';
-            const paciente = clientes.find(p => p.nome === c.paciente_nome && p.telefone === c.paciente_telefone);
-            if (paciente) {
-                document.getElementById('pacienteDataNasc').value = paciente.data_nascimento || '';
-                document.getElementById('pacienteNeurodivergente').checked = paciente.neurodivergente === 1;
-                document.getElementById('pacienteDeficienciaFisica').checked = paciente.deficiencia_fisica === 1;
-                document.getElementById('pacienteEncaixe').checked = paciente.encaixe === 1;
-                document.getElementById('pacienteSelect').value = paciente.id;
-                atualizarIdadeDisplay();
-                setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
-            }
-            carregarHorariosDisponiveis();
-            navegarPara('pageAgendar');
+        // ========================================================================
+        // CALENDÁRIO
+        // ========================================================================
+        function renderizarCalendario() {
+            const container = document.getElementById('calendarioContainer');
+            if (!container) return;
+
+            const titulo = document.getElementById('tituloCalendario');
+            const nomeMes = currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            titulo.textContent = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+
+            if (currentView === 'week') renderizarSemana(container);
+            else if (currentView === 'month') renderizarMes(container);
+            else renderizarDia(container);
+
+            document.querySelectorAll('.view-buttons button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll(`.view-buttons button[onclick*="${currentView}"]`).forEach(btn => btn.classList.add('active'));
         }
 
-        function cancelarEdicao() {
-            editandoId = null;
-            document.getElementById('pacienteSelect').value = '';
-            document.getElementById('pacienteNome').value = '';
-            document.getElementById('pacienteTelefone').value = '';
-            document.getElementById('pacienteEmail').value = '';
-            document.getElementById('pacienteCpf').value = '';
-            document.getElementById('pacienteDataNasc').value = '';
-            document.getElementById('pacienteNeurodivergente').checked = false;
-            document.getElementById('pacienteDeficienciaFisica').checked = false;
-            document.getElementById('pacienteEncaixe').checked = true;
-            document.getElementById('dataConsulta').value = '';
-            document.getElementById('horarioSelect').value = '';
-            document.getElementById('medicoSelect').value = '';
-            document.getElementById('observacoes').value = '';
-            document.getElementById('cancelEditBtn').style.display = 'none';
-            document.getElementById('idadeDisplay').innerHTML = '';
-            document.getElementById('buscarCpf').value = '';
-            const msgDiv = document.getElementById('msgHorarios');
-            msgDiv.style.display = 'none';
-            msgDiv.innerHTML = '';
-            setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
+        function renderizarSemana(container) {
+            let start = new Date(currentDate);
+            start.setDate(currentDate.getDate() - currentDate.getDay());
+            let days = [];
+            for (let i = 0; i < 7; i++) {
+                let d = new Date(start);
+                d.setDate(start.getDate() + i);
+                days.push(d);
+            }
+            let hours = ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00'];
+            let html = `<table><thead><tr><th>Horário</th>`;
+            days.forEach(day => {
+                let dateStr = formatDate(day);
+                let dayEvents = consultas.filter(c => c.data_consulta === dateStr);
+                html += `<th>${day.toLocaleDateString('pt-BR', { weekday: 'short' })}<br>${day.getDate()}<br><small>${dayEvents.length}</small></th>`;
+            });
+            html += `</tr></thead><tbody>`;
+            hours.forEach(hour => {
+                html += `<tr><td class="horario-label">${hour}</td>`;
+                days.forEach(day => {
+                    let dateStr = formatDate(day);
+                    let hourEvents = consultas.filter(c => c.data_consulta === dateStr && c.horario === hour);
+                    html += `<td style="background: ${hourEvents.length > 0 ? '#e8f0fe' : 'white'};">`;
+                    hourEvents.forEach(e => {
+                        html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})">
+                            <strong>${escapeHtml(e.paciente_nome)}</strong><br>
+                            <small>${e.medico_nome}</small>
+                        </div>`;
+                    });
+                    html += `</td>`;
+                });
+                html += `</tr>`;
+            });
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+        }
+
+        function renderizarMes(container) {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const startDay = firstDay.getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const today = formatDate(new Date());
+            let html = `<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:5px;">`;
+            ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d => html += `<div style="font-weight:bold; padding:5px; background:#f7fafc; text-align:center;">${d}</div>`);
+            for (let i = 0; i < startDay; i++) html += `<div></div>`;
+            for (let d = 1; d <= daysInMonth; d++) {
+                let dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                let isToday = dateStr === today;
+                let dayEvents = consultas.filter(c => c.data_consulta === dateStr);
+                html += `<div style="border:1px solid #ddd; border-radius:8px; padding:8px; min-height:100px; background:${isToday ? '#e8f0fe' : 'white'}">
+                    <strong>${d}</strong><br>`;
+                dayEvents.slice(0, 3).forEach(e => {
+                    html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})" style="font-size:10px;">${e.horario} ${escapeHtml(e.paciente_nome.substring(0,15))}</div>`;
+                });
+                if (dayEvents.length > 3) html += `<small>+${dayEvents.length-3}</small>`;
+                html += `</div>`;
+            }
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        function renderizarDia(container) {
+            let dateStr = formatDate(currentDate);
+            let dayEvents = consultas.filter(c => c.data_consulta === dateStr).sort((a,b) => a.horario.localeCompare(b.horario));
+            let html = `<div style="background:linear-gradient(135deg,#667eea,#764ba2); color:white; padding:20px; text-align:center; border-radius:10px; margin-bottom:20px;">
+                <h2>${currentDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</h2>
+                <p>${currentDate.toLocaleDateString('pt-BR', { weekday: 'long' })}</p>
+                <p>${dayEvents.length} consulta(s)</p>
+            </div>`;
+            if (dayEvents.length === 0) {
+                html += `<div class="no-data">Nenhuma consulta</div>`;
+            } else {
+                dayEvents.forEach(e => {
+                    html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})" style="margin-bottom:10px; padding:15px;">
+                        <strong>🕐 ${e.horario}</strong><br>
+                        <strong>${escapeHtml(e.paciente_nome)}</strong><br>
+                        👨‍⚕️ Dr. ${escapeHtml(e.medico_nome)}<br>
+                        📞 ${e.paciente_telefone}
+                        ${e.observacoes ? `<br>📝 ${escapeHtml(e.observacoes)}` : ''}
+                    </div>`;
+                });
+            }
+            container.innerHTML = html;
         }
 
         // ========================================================================
-        // CONFIRMAR CONSULTA
+        // CONFIRMAR, PROCESSAR, CANCELAR, EXCLUIR CONSULTAS
         // ========================================================================
         async function confirmarConsulta(id) {
             if (user.tipo !== 'admin') { showToast('Apenas administradores podem confirmar.', true); return; }
@@ -1747,9 +1631,6 @@
             }
         }
 
-        // ========================================================================
-        // PROCESSAR CONSULTA
-        // ========================================================================
         async function processarConsulta(id) {
             if (user.tipo !== 'admin') { showToast('Apenas administradores podem processar.', true); return; }
             const c = consultas.find(cons => cons.id === id);
@@ -1818,6 +1699,66 @@
             } catch (err) {
                 showToast(err.message, true);
             }
+        }
+
+        function editarConsulta(id) {
+            if (user.tipo !== 'admin') { showToast('Apenas administradores podem editar.', true); return; }
+            const c = consultas.find(c => c.id === id);
+            if (!c) return;
+            if (c.status === 'realizada') {
+                showToast('Consulta já realizada. Não é possível editar.', true);
+                return;
+            }
+            if (c.status === 'cancelada') {
+                showToast('Consulta cancelada. Não é possível editar.', true);
+                return;
+            }
+            editandoId = id;
+            document.getElementById('pacienteNome').value = c.paciente_nome;
+            document.getElementById('pacienteTelefone').value = c.paciente_telefone;
+            document.getElementById('pacienteEmail').value = c.paciente_email || '';
+            document.getElementById('pacienteCpf').value = c.paciente_cpf || '';
+            document.getElementById('dataConsulta').value = c.data_consulta;
+            document.getElementById('horarioSelect').value = c.horario;
+            document.getElementById('medicoSelect').value = c.medico_id;
+            document.getElementById('observacoes').value = c.observacoes || '';
+            document.getElementById('cancelEditBtn').style.display = 'inline-block';
+            const paciente = clientes.find(p => p.nome === c.paciente_nome && p.telefone === c.paciente_telefone);
+            if (paciente) {
+                document.getElementById('pacienteDataNasc').value = paciente.data_nascimento || '';
+                document.getElementById('pacienteNeurodivergente').checked = paciente.neurodivergente === 1;
+                document.getElementById('pacienteDeficienciaFisica').checked = paciente.deficiencia_fisica === 1;
+                document.getElementById('pacienteEncaixe').checked = paciente.encaixe === 1;
+                document.getElementById('pacienteSelect').value = paciente.id;
+                atualizarIdadeDisplay();
+                setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
+            }
+            carregarHorariosDisponiveis();
+            navegarPara('pageAgendar');
+        }
+
+        function cancelarEdicao() {
+            editandoId = null;
+            document.getElementById('pacienteSelect').value = '';
+            document.getElementById('pacienteNome').value = '';
+            document.getElementById('pacienteTelefone').value = '';
+            document.getElementById('pacienteEmail').value = '';
+            document.getElementById('pacienteCpf').value = '';
+            document.getElementById('pacienteDataNasc').value = '';
+            document.getElementById('pacienteNeurodivergente').checked = false;
+            document.getElementById('pacienteDeficienciaFisica').checked = false;
+            document.getElementById('pacienteEncaixe').checked = true;
+            document.getElementById('dataConsulta').value = '';
+            document.getElementById('horarioSelect').value = '';
+            document.getElementById('medicoSelect').value = '';
+            document.getElementById('observacoes').value = '';
+            document.getElementById('cancelEditBtn').style.display = 'none';
+            document.getElementById('idadeDisplay').innerHTML = '';
+            document.getElementById('buscarCpf').value = '';
+            const msgDiv = document.getElementById('msgHorarios');
+            msgDiv.style.display = 'none';
+            msgDiv.innerHTML = '';
+            setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
         }
 
         // ========================================================================
@@ -2286,113 +2227,35 @@
         }
 
         // ========================================================================
-        // CALENDÁRIO
+        // NAVEGAÇÃO ENTRE PÁGINAS
         // ========================================================================
-        function renderizarCalendario() {
-            const container = document.getElementById('calendarioContainer');
-            if (!container) return;
+        function navegarPara(pageId) {
+            document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
+            const target = document.getElementById(pageId);
+            if (target) target.classList.add('active');
+            document.querySelectorAll('.side-menu .menu-item').forEach(btn => btn.classList.remove('active'));
+            const menuBtn = document.querySelector(`.side-menu .menu-item[data-page="${pageId}"]`);
+            if (menuBtn) menuBtn.classList.add('active');
 
-            const titulo = document.getElementById('tituloCalendario');
-            const nomeMes = currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-            titulo.textContent = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+            // Renderizar conteúdo específico
+            if (pageId === 'pageLista') renderizarLista();
+            else if (pageId === 'pageCalendario') renderizarCalendario();
+            else if (pageId === 'pageDashboard' && user.tipo === 'admin') carregarDashboard();
 
-            if (currentView === 'week') renderizarSemana(container);
-            else if (currentView === 'month') renderizarMes(container);
-            else renderizarDia(container);
-
-            document.querySelectorAll('.view-buttons button').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll(`.view-buttons button[onclick*="${currentView}"]`).forEach(btn => btn.classList.add('active'));
+            fecharMenu();
         }
 
-        function renderizarSemana(container) {
-            let start = new Date(currentDate);
-            start.setDate(currentDate.getDate() - currentDate.getDay());
-            let days = [];
-            for (let i = 0; i < 7; i++) {
-                let d = new Date(start);
-                d.setDate(start.getDate() + i);
-                days.push(d);
-            }
-            let hours = ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00'];
-            let html = `<table><thead><tr><th>Horário</th>`;
-            days.forEach(day => {
-                let dateStr = formatDate(day);
-                let dayEvents = consultas.filter(c => c.data_consulta === dateStr);
-                html += `<th>${day.toLocaleDateString('pt-BR', { weekday: 'short' })}<br>${day.getDate()}<br><small>${dayEvents.length}</small></th>`;
-            });
-            html += `</tr></thead><tbody>`;
-            hours.forEach(hour => {
-                html += `<tr><td class="horario-label">${hour}</td>`;
-                days.forEach(day => {
-                    let dateStr = formatDate(day);
-                    let hourEvents = consultas.filter(c => c.data_consulta === dateStr && c.horario === hour);
-                    html += `<td style="background: ${hourEvents.length > 0 ? '#e8f0fe' : 'white'};">`;
-                    hourEvents.forEach(e => {
-                        html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})">
-                            <strong>${escapeHtml(e.paciente_nome)}</strong><br>
-                            <small>${e.medico_nome}</small>
-                        </div>`;
-                    });
-                    html += `</td>`;
-                });
-                html += `</tr>`;
-            });
-            html += `</tbody></table>`;
-            container.innerHTML = html;
-        }
-
-        function renderizarMes(container) {
-            const year = currentDate.getFullYear();
-            const month = currentDate.getMonth();
-            const firstDay = new Date(year, month, 1);
-            const startDay = firstDay.getDay();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const today = formatDate(new Date());
-            let html = `<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:5px;">`;
-            ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d => html += `<div style="font-weight:bold; padding:5px; background:#f7fafc; text-align:center;">${d}</div>`);
-            for (let i = 0; i < startDay; i++) html += `<div></div>`;
-            for (let d = 1; d <= daysInMonth; d++) {
-                let dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                let isToday = dateStr === today;
-                let dayEvents = consultas.filter(c => c.data_consulta === dateStr);
-                html += `<div style="border:1px solid #ddd; border-radius:8px; padding:8px; min-height:100px; background:${isToday ? '#e8f0fe' : 'white'}">
-                    <strong>${d}</strong><br>`;
-                dayEvents.slice(0, 3).forEach(e => {
-                    html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})" style="font-size:10px;">${e.horario} ${escapeHtml(e.paciente_nome.substring(0,15))}</div>`;
-                });
-                if (dayEvents.length > 3) html += `<small>+${dayEvents.length-3}</small>`;
-                html += `</div>`;
-            }
-            html += `</div>`;
-            container.innerHTML = html;
-        }
-
-        function renderizarDia(container) {
-            let dateStr = formatDate(currentDate);
-            let dayEvents = consultas.filter(c => c.data_consulta === dateStr).sort((a,b) => a.horario.localeCompare(b.horario));
-            let html = `<div style="background:linear-gradient(135deg,#667eea,#764ba2); color:white; padding:20px; text-align:center; border-radius:10px; margin-bottom:20px;">
-                <h2>${currentDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</h2>
-                <p>${currentDate.toLocaleDateString('pt-BR', { weekday: 'long' })}</p>
-                <p>${dayEvents.length} consulta(s)</p>
-            </div>`;
-            if (dayEvents.length === 0) {
-                html += `<div class="no-data">Nenhuma consulta</div>`;
-            } else {
-                dayEvents.forEach(e => {
-                    html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})" style="margin-bottom:10px; padding:15px;">
-                        <strong>🕐 ${e.horario}</strong><br>
-                        <strong>${escapeHtml(e.paciente_nome)}</strong><br>
-                        👨‍⚕️ Dr. ${escapeHtml(e.medico_nome)}<br>
-                        📞 ${e.paciente_telefone}
-                        ${e.observacoes ? `<br>📝 ${escapeHtml(e.observacoes)}` : ''}
-                    </div>`;
-                });
-            }
-            container.innerHTML = html;
+        function mostrarSubPage(subId) {
+            document.querySelectorAll('#pageAdmin .sub-page').forEach(el => el.classList.remove('active'));
+            const target = document.getElementById('sub' + subId.charAt(0).toUpperCase() + subId.slice(1));
+            if (target) target.classList.add('active');
+            if (subId === 'solicitacoes') carregarSolicitacoes();
+            if (subId === 'whatsapp') carregarConfigWhatsapp();
+            navegarPara('pageAdmin');
         }
 
         // ========================================================================
-        // NAVEGAÇÃO
+        // NAVEGAÇÃO DO CALENDÁRIO
         // ========================================================================
         function mudarView(view) { currentView = view; renderizarCalendario(); }
         function hoje() { currentDate = new Date(); renderizarCalendario(); }
@@ -2407,27 +2270,6 @@
             else if (currentView === 'week') currentDate.setDate(currentDate.getDate() + 7);
             else currentDate.setDate(currentDate.getDate() + 1);
             renderizarCalendario();
-        }
-
-        function navegarPara(pageId) {
-            document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
-            const target = document.getElementById(pageId);
-            if (target) target.classList.add('active');
-            document.querySelectorAll('.side-menu .menu-item').forEach(btn => btn.classList.remove('active'));
-            const menuBtn = document.querySelector(`.side-menu .menu-item[data-page="${pageId}"]`);
-            if (menuBtn) menuBtn.classList.add('active');
-            if (pageId === 'pageDashboard' && user.tipo === 'admin') carregarDashboard();
-            if (pageId === 'pageListar') carregarListaAtendimentos();
-            fecharMenu();
-        }
-
-        function mostrarSubPage(subId) {
-            document.querySelectorAll('#pageAdmin .sub-page').forEach(el => el.classList.remove('active'));
-            const target = document.getElementById('sub' + subId.charAt(0).toUpperCase() + subId.slice(1));
-            if (target) target.classList.add('active');
-            if (subId === 'solicitacoes') carregarSolicitacoes();
-            if (subId === 'whatsapp') carregarConfigWhatsapp();
-            navegarPara('pageAdmin');
         }
 
         // ========================================================================
@@ -2548,15 +2390,13 @@
                             document.getElementById('menuAgendar').style.display = 'block';
                             document.getElementById('menuAdmin').style.display = 'block';
                             document.getElementById('menuDashboard').style.display = 'block';
-                            document.getElementById('filtroListarVendedor').style.display = 'block';
                         } else {
                             document.getElementById('menuAgendar').style.display = 'none';
                             document.getElementById('menuAdmin').style.display = 'none';
                             document.getElementById('menuDashboard').style.display = 'none';
-                            document.getElementById('filtroListarVendedor').style.display = 'none';
                         }
                         await carregarDados();
-                        renderizarCalendario();
+                        renderizarLista();
                         iniciarPollingLembretes();
                         if (user.tipo === 'admin') iniciarPollingSolicitacoes();
                         setTimeout(() => {
@@ -2565,7 +2405,7 @@
                             setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
                             setupEncaixeLogic('novoPacienteEncaixe', 'novoPacienteNeurodivergente', 'novoPacienteDeficienciaFisica');
                         }, 100);
-                        navegarPara('pageConsultas');
+                        navegarPara('pageLista');
                     } else {
                         localStorage.clear();
                     }
@@ -2581,7 +2421,7 @@
             });
         });
 
-        console.log('✅ Sistema completo com Listar Atendimentos, Dashboard, Confirmação, Processamento e Filtros.');
+        console.log('✅ Sistema com lista e calendário separados, e horários agrupados em manhã/tarde.');
     </script>
 </body>
 </html>
