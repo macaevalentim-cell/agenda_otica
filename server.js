@@ -67,7 +67,6 @@ function toNull(value) {
   return (value === undefined || value === '') ? null : value;
 }
 
-// Formata data para YYYY-MM-DD (sem timezone)
 function formatDateToYYYYMMDD(date) {
   if (!date) return null;
   const d = new Date(date);
@@ -225,7 +224,6 @@ async function initDatabase() {
     `);
     console.log('✅ Tabela medico_horarios ok');
 
-    // Inserir usuários padrão
     const admin = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['admin']);
     if (admin.rows.length === 0) {
       const hash = await bcrypt.hash('admin123', 10);
@@ -602,6 +600,66 @@ app.get('/api/consultas', authenticateToken, async (req, res) => {
   }
 });
 
+// ---------- FILTRAR CONSULTAS (NOVO) ----------
+app.get('/api/consultas/filtrar', authenticateToken, async (req, res) => {
+  try {
+    const { data_inicio, data_fim, medico_id, status, paciente, vendedor_id } = req.query;
+    let query = `
+      SELECT c.*, u.nome as vendedor_nome,
+             CASE WHEN c.criado_por = $1 THEN 1 ELSE 0 END as is_own
+      FROM consultas c 
+      LEFT JOIN usuarios u ON c.criado_por = u.id
+      WHERE 1=1
+    `;
+    const params = [req.user.id];
+    let paramCount = 2;
+
+    if (data_inicio) {
+      query += ` AND c.data_consulta >= $${paramCount}`;
+      params.push(data_inicio);
+      paramCount++;
+    }
+    if (data_fim) {
+      query += ` AND c.data_consulta <= $${paramCount}`;
+      params.push(data_fim);
+      paramCount++;
+    }
+    if (medico_id) {
+      query += ` AND c.medico_id = $${paramCount}`;
+      params.push(parseInt(medico_id));
+      paramCount++;
+    }
+    if (status) {
+      query += ` AND c.status = $${paramCount}`;
+      params.push(status);
+      paramCount++;
+    }
+    if (paciente) {
+      query += ` AND c.paciente_nome ILIKE $${paramCount}`;
+      params.push(`%${paciente}%`);
+      paramCount++;
+    }
+    if (vendedor_id) {
+      query += ` AND c.criado_por = $${paramCount}`;
+      params.push(parseInt(vendedor_id));
+      paramCount++;
+    }
+
+    query += ' ORDER BY c.data_consulta DESC, c.horario DESC';
+
+    const result = await pool.query(query, params);
+    const consultas = result.rows.map(c => ({
+      ...c,
+      data_consulta: formatDateToYYYYMMDD(c.data_consulta),
+      criado_em: c.criado_em ? new Date(c.criado_em).toISOString() : null
+    }));
+    res.json(consultas);
+  } catch (error) {
+    console.error('Erro ao filtrar consultas:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/consultas', authenticateToken, isAdmin, async (req, res) => {
   try {
     const { paciente_id, paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, data_consulta, horario, medico_id, medico_nome, observacoes } = req.body;
@@ -674,7 +732,6 @@ app.put('/api/consultas/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
     const { paciente_id, paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, data_consulta, horario, medico_id, medico_nome, observacoes, status } = req.body;
 
-    // Verifica se a consulta já está realizada (não pode editar)
     const consultaAtual = await pool.query('SELECT status FROM consultas WHERE id = $1', [req.params.id]);
     if (consultaAtual.rows.length === 0) {
       return res.status(404).json({ error: 'Consulta não encontrada' });
@@ -749,7 +806,6 @@ app.put('/api/consultas/:id', authenticateToken, isAdmin, async (req, res) => {
 
 app.delete('/api/consultas/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
-    // Verifica se a consulta já está realizada (não pode excluir)
     const consultaAtual = await pool.query('SELECT status FROM consultas WHERE id = $1', [req.params.id]);
     if (consultaAtual.rows.length === 0) {
       return res.status(404).json({ error: 'Consulta não encontrada' });
@@ -794,7 +850,7 @@ app.put('/api/consultas/:id/confirmar', authenticateToken, isAdmin, async (req, 
   }
 });
 
-// ---------- PROCESSAR CONSULTA (marcar como realizada) ----------
+// ---------- PROCESSAR CONSULTA ----------
 app.put('/api/consultas/:id/processar', authenticateToken, isAdmin, async (req, res) => {
   try {
     const id = req.params.id;
@@ -1069,7 +1125,6 @@ app.put('/api/lembretes/:id/enviar', authenticateToken, async (req, res) => {
 // ---------- DASHBOARD ----------
 app.get('/api/dashboard', authenticateToken, isAdmin, async (req, res) => {
   try {
-    // Total de consultas por status
     const statusResult = await pool.query(`
       SELECT status, COUNT(*) as total 
       FROM consultas 
@@ -1080,7 +1135,6 @@ app.get('/api/dashboard', authenticateToken, isAdmin, async (req, res) => {
       statusCounts[row.status || 'agendada'] = parseInt(row.total);
     });
 
-    // Consultas por vendedor
     const vendedoresResult = await pool.query(`
       SELECT 
         u.id as vendedor_id,
@@ -1105,7 +1159,6 @@ app.get('/api/dashboard', authenticateToken, isAdmin, async (req, res) => {
       realizadas: parseInt(v.realizadas || 0)
     }));
 
-    // Totais gerais
     const totalConsultas = await pool.query('SELECT COUNT(*) as total FROM consultas');
     const totalMedicos = await pool.query('SELECT COUNT(*) as total FROM medicos WHERE ativo = true');
 
