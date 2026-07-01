@@ -18,7 +18,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-hashes'"],
       scriptSrcAttr: ["'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3000'],
       fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
@@ -94,11 +94,12 @@ function isAdmin(req, res, next) {
   next();
 }
 
-// ==================== INICIALIZAÇÃO DO BANCO ====================
+// ==================== INICIALIZAÇÃO DO BANCO (com migrações) ====================
 async function initDatabase() {
   try {
-    console.log('📦 Criando tabelas...');
+    console.log('📦 Criando tabelas e verificando colunas...');
 
+    // Tabela usuarios
     await pool.query(`
       CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -112,6 +113,7 @@ async function initDatabase() {
       )
     `);
 
+    // Tabela medicos
     await pool.query(`
       CREATE TABLE IF NOT EXISTS medicos (
         id SERIAL PRIMARY KEY,
@@ -128,6 +130,7 @@ async function initDatabase() {
       )
     `);
 
+    // Tabela clientes
     await pool.query(`
       CREATE TABLE IF NOT EXISTS clientes (
         id SERIAL PRIMARY KEY,
@@ -145,6 +148,7 @@ async function initDatabase() {
       )
     `);
 
+    // Tabela consultas (com numero_pedido)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS consultas (
         id SERIAL PRIMARY KEY,
@@ -164,6 +168,18 @@ async function initDatabase() {
       )
     `);
 
+    // Verifica e adiciona coluna numero_pedido se não existir
+    const checkColumn = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name='consultas' AND column_name='numero_pedido'
+    `);
+    if (checkColumn.rows.length === 0) {
+      await pool.query('ALTER TABLE consultas ADD COLUMN numero_pedido VARCHAR(50)');
+      console.log('✅ Coluna numero_pedido adicionada à tabela consultas');
+    }
+
+    // Tabela solicitacoes_consultas (com numero_pedido)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS solicitacoes_consultas (
         id SERIAL PRIMARY KEY,
@@ -186,6 +202,17 @@ async function initDatabase() {
       )
     `);
 
+    const checkColumnSolic = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name='solicitacoes_consultas' AND column_name='numero_pedido'
+    `);
+    if (checkColumnSolic.rows.length === 0) {
+      await pool.query('ALTER TABLE solicitacoes_consultas ADD COLUMN numero_pedido VARCHAR(50)');
+      console.log('✅ Coluna numero_pedido adicionada à tabela solicitacoes_consultas');
+    }
+
+    // Tabela lembretes
     await pool.query(`
       CREATE TABLE IF NOT EXISTS lembretes (
         id SERIAL PRIMARY KEY,
@@ -202,6 +229,7 @@ async function initDatabase() {
       )
     `);
 
+    // Tabela whatsapp_config
     await pool.query(`
       CREATE TABLE IF NOT EXISTS whatsapp_config (
         id INTEGER PRIMARY KEY DEFAULT 1,
@@ -212,6 +240,7 @@ async function initDatabase() {
       )
     `);
 
+    // Tabela medico_horarios (permite múltiplos por dia)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS medico_horarios (
         id SERIAL PRIMARY KEY,
@@ -226,6 +255,7 @@ async function initDatabase() {
     `);
     console.log('✅ Tabela medico_horarios ok');
 
+    // Inserir usuários padrão
     const admin = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['admin']);
     if (admin.rows.length === 0) {
       const hash = await bcrypt.hash('admin123', 10);
@@ -391,6 +421,7 @@ app.get('/api/horarios/:id', authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
+// MODIFICADO: Remove restrição de unicidade por dia (permite múltiplos turnos)
 app.post('/api/medicos/:id/horarios', authenticateToken, isAdmin, async (req, res) => {
   try {
     const medicoId = req.params.id;
@@ -401,13 +432,8 @@ app.post('/api/medicos/:id/horarios', authenticateToken, isAdmin, async (req, re
       return res.status(404).json({ error: 'Médico não encontrado' });
     }
 
-    const exist = await pool.query(
-      'SELECT id FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2',
-      [medicoId, dia_semana]
-    );
-    if (exist.rows.length > 0) {
-      return res.status(400).json({ error: 'Já existe horário configurado para este dia da semana.' });
-    }
+    // REMOVIDA a verificação que impedia múltiplos horários para o mesmo dia
+    // Agora permite inserir quantos horários quiser para o mesmo dia
 
     const result = await pool.query(
       'INSERT INTO medico_horarios (medico_id, dia_semana, hora_inicio, hora_fim, intervalo) VALUES ($1, $2, $3, $4, $5) RETURNING id',
@@ -447,7 +473,7 @@ app.delete('/api/horarios/:id', authenticateToken, isAdmin, async (req, res) => 
   }
 });
 
-// ==================== HORÁRIOS DISPONÍVEIS ====================
+// ==================== HORÁRIOS DISPONÍVEIS (MODIFICADO para múltiplos turnos) ====================
 app.get('/api/medicos/:id/horarios/disponiveis', authenticateToken, async (req, res) => {
   try {
     const medicoId = req.params.id;
@@ -458,6 +484,7 @@ app.get('/api/medicos/:id/horarios/disponiveis', authenticateToken, async (req, 
 
     const diaSemana = new Date(data).getDay();
 
+    // Busca TODOS os horários configurados para o médico naquele dia
     const horariosConfig = await pool.query(
       `SELECT hora_inicio, hora_fim, intervalo 
        FROM medico_horarios 
@@ -469,28 +496,35 @@ app.get('/api/medicos/:id/horarios/disponiveis', authenticateToken, async (req, 
       return res.json({ error: 'Médico não possui horários configurados para este dia.' });
     }
 
-    const config = horariosConfig.rows[0];
-    const inicio = config.hora_inicio;
-    const fim = config.hora_fim;
-    const intervalo = config.intervalo || 30;
+    // Gera todos os horários possíveis para cada turno
+    const todosHorariosPossiveis = [];
+    for (const config of horariosConfig.rows) {
+      const inicio = config.hora_inicio;
+      const fim = config.hora_fim;
+      const intervalo = config.intervalo || 30;
 
-    const horariosPossiveis = [];
-    let current = new Date(`2000-01-01T${inicio}`);
-    const end = new Date(`2000-01-01T${fim}`);
-    while (current < end) {
-      const h = current.getHours().toString().padStart(2, '0');
-      const m = current.getMinutes().toString().padStart(2, '0');
-      horariosPossiveis.push(`${h}:${m}`);
-      current.setMinutes(current.getMinutes() + intervalo);
+      let current = new Date(`2000-01-01T${inicio}`);
+      const end = new Date(`2000-01-01T${fim}`);
+      while (current < end) {
+        const h = current.getHours().toString().padStart(2, '0');
+        const m = current.getMinutes().toString().padStart(2, '0');
+        todosHorariosPossiveis.push(`${h}:${m}`);
+        current.setMinutes(current.getMinutes() + intervalo);
+      }
     }
 
+    // Remove duplicatas (caso haja sobreposição de turnos)
+    const horariosUnicos = [...new Set(todosHorariosPossiveis)];
+
+    // Busca horários já ocupados (consultas não canceladas/realizadas)
     const consultasExistentes = await pool.query(
       'SELECT horario FROM consultas WHERE medico_id = $1 AND data_consulta = $2 AND status NOT IN ($3, $4)',
       [medicoId, data, 'cancelada', 'realizada']
     );
     const horariosOcupados = consultasExistentes.rows.map(r => r.horario);
 
-    const horariosDisponiveis = horariosPossiveis.filter(h => !horariosOcupados.includes(h));
+    // Filtra os horários disponíveis
+    const horariosDisponiveis = horariosUnicos.filter(h => !horariosOcupados.includes(h));
 
     res.json(horariosDisponiveis.map(h => ({ horario: h })));
   } catch (error) {
@@ -667,18 +701,32 @@ app.post('/api/consultas', authenticateToken, isAdmin, async (req, res) => {
     const { paciente_id, paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, data_consulta, horario, medico_id, medico_nome, observacoes, numero_pedido } = req.body;
 
     const diaSemana = new Date(data_consulta).getDay();
-    const horarioConfig = await pool.query(
-      'SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true',
+
+    // Verifica se o horário está dentro de algum dos turnos configurados para o médico naquele dia
+    const horariosConfig = await pool.query(
+      `SELECT hora_inicio, hora_fim 
+       FROM medico_horarios 
+       WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
       [medico_id, diaSemana]
     );
-    if (horarioConfig.rows.length === 0) {
+
+    if (horariosConfig.rows.length === 0) {
       return res.status(400).json({ error: 'Médico não atende neste dia da semana.' });
     }
-    const config = horarioConfig.rows[0];
-    if (horario < config.hora_inicio || horario >= config.hora_fim) {
+
+    // Verifica se o horário está dentro de algum intervalo configurado
+    let horarioValido = false;
+    for (const config of horariosConfig.rows) {
+      if (horario >= config.hora_inicio && horario < config.hora_fim) {
+        horarioValido = true;
+        break;
+      }
+    }
+    if (!horarioValido) {
       return res.status(400).json({ error: 'Horário fora do período de atendimento do médico.' });
     }
 
+    // Verifica conflito com outras consultas (mesmo horário)
     const conflito = await pool.query(
       'SELECT id FROM consultas WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 AND status NOT IN ($4, $5)',
       [data_consulta, horario, medico_id, 'cancelada', 'realizada']
@@ -746,15 +794,24 @@ app.put('/api/consultas/:id', authenticateToken, isAdmin, async (req, res) => {
     }
 
     const diaSemana = new Date(data_consulta).getDay();
-    const horarioConfig = await pool.query(
-      'SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true',
+    const horariosConfig = await pool.query(
+      `SELECT hora_inicio, hora_fim 
+       FROM medico_horarios 
+       WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
       [medico_id, diaSemana]
     );
-    if (horarioConfig.rows.length === 0) {
+    if (horariosConfig.rows.length === 0) {
       return res.status(400).json({ error: 'Médico não atende neste dia da semana.' });
     }
-    const config = horarioConfig.rows[0];
-    if (horario < config.hora_inicio || horario >= config.hora_fim) {
+
+    let horarioValido = false;
+    for (const config of horariosConfig.rows) {
+      if (horario >= config.hora_inicio && horario < config.hora_fim) {
+        horarioValido = true;
+        break;
+      }
+    }
+    if (!horarioValido) {
       return res.status(400).json({ error: 'Horário fora do período de atendimento do médico.' });
     }
 
@@ -920,17 +977,28 @@ app.post('/api/solicitacoes', authenticateToken, async (req, res) => {
     } = req.body;
 
     const diaSemana = new Date(data_consulta).getDay();
-    const horarioConfig = await pool.query(
-      'SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true',
+
+    // Valida horários sugeridos
+    const horariosConfig = await pool.query(
+      `SELECT hora_inicio, hora_fim 
+       FROM medico_horarios 
+       WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
       [medico_id, diaSemana]
     );
-    if (horarioConfig.rows.length === 0) {
+    if (horariosConfig.rows.length === 0) {
       return res.status(400).json({ error: 'Médico não atende neste dia da semana.' });
     }
-    const config = horarioConfig.rows[0];
+
     const horariosSugeridos = [horario1, horario2, horario3].filter(h => h);
     for (const hor of horariosSugeridos) {
-      if (hor < config.hora_inicio || hor >= config.hora_fim) {
+      let valido = false;
+      for (const config of horariosConfig.rows) {
+        if (hor >= config.hora_inicio && hor < config.hora_fim) {
+          valido = true;
+          break;
+        }
+      }
+      if (!valido) {
         return res.status(400).json({ error: `Horário ${hor} fora do período de atendimento do médico.` });
       }
     }
@@ -1007,15 +1075,24 @@ app.put('/api/solicitacoes/:id', authenticateToken, isAdmin, async (req, res) =>
       }
 
       const diaSemana = new Date(s.data_consulta).getDay();
-      const horarioConfig = await pool.query(
-        'SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true',
+      const horariosConfig = await pool.query(
+        `SELECT hora_inicio, hora_fim 
+         FROM medico_horarios 
+         WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
         [s.medico_id, diaSemana]
       );
-      if (horarioConfig.rows.length === 0) {
+      if (horariosConfig.rows.length === 0) {
         return res.status(400).json({ error: 'Médico não atende neste dia da semana.' });
       }
-      const config = horarioConfig.rows[0];
-      if (horario_escolhido < config.hora_inicio || horario_escolhido >= config.hora_fim) {
+
+      let valido = false;
+      for (const config of horariosConfig.rows) {
+        if (horario_escolhido >= config.hora_inicio && horario_escolhido < config.hora_fim) {
+          valido = true;
+          break;
+        }
+      }
+      if (!valido) {
         return res.status(400).json({ error: 'Horário fora do período de atendimento do médico.' });
       }
 
