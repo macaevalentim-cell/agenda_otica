@@ -1,1382 +1,2686 @@
-require('dotenv').config();
-const express = require('express');
-const { Pool } = require('pg');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const { body, validationResult } = require('express-validator');
-const path = require('path');
-
-const app = express();
-
-// ==================== SEGURANÇA ====================
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-hashes'"],
-      scriptSrcAttr: ["'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3000'],
-      fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
-    }
-  }
-}));
-
-const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  optionsSuccessStatus: 200
-};
-app.use(cors(corsOptions));
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100
-});
-app.use('/api/', limiter);
-
-app.use(express.json());
-app.use(express.static('public'));
-
-// ==================== CONEXÃO POSTGRESQL ====================
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT || 5432,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  max: 10,
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
-});
-
-pool.connect()
-  .then(client => {
-    console.log('✅ Conectado ao PostgreSQL!');
-    client.release();
-  })
-  .catch(err => {
-    console.error('❌ Erro ao conectar:', err.message);
-    process.exit(1);
-  });
-
-// ==================== FUNÇÕES AUXILIARES ====================
-function toNull(value) {
-  return (value === undefined || value === '') ? null : value;
-}
-
-function formatDateToYYYYMMDD(date) {
-  if (!date) return null;
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Acesso negado' });
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: 'Token inválido' });
-    req.user = user;
-    next();
-  });
-}
-
-function isAdmin(req, res, next) {
-  if (req.user.tipo !== 'admin') {
-    return res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
-  }
-  next();
-}
-
-// ==================== INICIALIZAÇÃO DO BANCO (com migrações) ====================
-async function initDatabase() {
-  try {
-    console.log('📦 Criando tabelas e verificando colunas...');
-
-    // Tabela usuarios
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS usuarios (
-        id SERIAL PRIMARY KEY,
-        nome VARCHAR(100) NOT NULL,
-        username VARCHAR(50) UNIQUE NOT NULL,
-        senha VARCHAR(255) NOT NULL,
-        telefone VARCHAR(20),
-        tipo VARCHAR(10) DEFAULT 'vendedor' CHECK (tipo IN ('admin', 'vendedor')),
-        ativo BOOLEAN DEFAULT TRUE,
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Tabela medicos
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS medicos (
-        id SERIAL PRIMARY KEY,
-        nome VARCHAR(100) NOT NULL,
-        crm VARCHAR(20) UNIQUE NOT NULL,
-        telefone VARCHAR(20),
-        email VARCHAR(100),
-        especialidade VARCHAR(100),
-        whatsapp VARCHAR(20),
-        endereco TEXT,
-        mensagem_padrao TEXT,
-        ativo BOOLEAN DEFAULT TRUE,
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Tabela clientes
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS clientes (
-        id SERIAL PRIMARY KEY,
-        nome VARCHAR(200) NOT NULL,
-        telefone VARCHAR(20) NOT NULL,
-        email VARCHAR(100),
-        cpf VARCHAR(14) UNIQUE,
-        data_nascimento DATE,
-        neurodivergente BOOLEAN DEFAULT FALSE,
-        deficiencia_fisica BOOLEAN DEFAULT FALSE,
-        encaixe BOOLEAN DEFAULT TRUE,
-        ativo BOOLEAN DEFAULT TRUE,
-        criado_por INTEGER REFERENCES usuarios(id),
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Tabela consultas (com numero_pedido)
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS consultas (
-        id SERIAL PRIMARY KEY,
-        paciente_nome VARCHAR(200) NOT NULL,
-        paciente_telefone VARCHAR(20) NOT NULL,
-        paciente_email VARCHAR(100),
-        paciente_cpf VARCHAR(14),
-        data_consulta DATE NOT NULL,
-        horario VARCHAR(5) NOT NULL,
-        medico_id INTEGER NOT NULL REFERENCES medicos(id),
-        medico_nome VARCHAR(100) NOT NULL,
-        observacoes TEXT,
-        numero_pedido VARCHAR(50),
-        status VARCHAR(20) DEFAULT 'agendada' CHECK (status IN ('agendada', 'confirmada', 'cancelada', 'realizada')),
-        criado_por INTEGER REFERENCES usuarios(id),
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Verifica e adiciona coluna numero_pedido se não existir
-    const checkColumn = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name='consultas' AND column_name='numero_pedido'
-    `);
-    if (checkColumn.rows.length === 0) {
-      await pool.query('ALTER TABLE consultas ADD COLUMN numero_pedido VARCHAR(50)');
-      console.log('✅ Coluna numero_pedido adicionada à tabela consultas');
-    }
-
-    // Tabela solicitacoes_consultas (com numero_pedido)
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS solicitacoes_consultas (
-        id SERIAL PRIMARY KEY,
-        paciente_nome VARCHAR(200) NOT NULL,
-        paciente_telefone VARCHAR(20) NOT NULL,
-        paciente_email VARCHAR(100),
-        paciente_cpf VARCHAR(14),
-        data_consulta DATE NOT NULL,
-        horario_sugerido1 VARCHAR(5) NOT NULL,
-        horario_sugerido2 VARCHAR(5),
-        horario_sugerido3 VARCHAR(5),
-        horario_escolhido VARCHAR(5),
-        medico_id INTEGER NOT NULL REFERENCES medicos(id),
-        medico_nome VARCHAR(100) NOT NULL,
-        observacoes TEXT,
-        numero_pedido VARCHAR(50),
-        status VARCHAR(20) DEFAULT 'pendente' CHECK (status IN ('pendente', 'aprovado', 'rejeitado')),
-        solicitado_por INTEGER NOT NULL REFERENCES usuarios(id),
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    const checkColumnSolic = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name='solicitacoes_consultas' AND column_name='numero_pedido'
-    `);
-    if (checkColumnSolic.rows.length === 0) {
-      await pool.query('ALTER TABLE solicitacoes_consultas ADD COLUMN numero_pedido VARCHAR(50)');
-      console.log('✅ Coluna numero_pedido adicionada à tabela solicitacoes_consultas');
-    }
-
-    // Tabela lembretes
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS lembretes (
-        id SERIAL PRIMARY KEY,
-        consulta_id INTEGER NOT NULL REFERENCES consultas(id) ON DELETE CASCADE,
-        destinatario_tipo VARCHAR(20) NOT NULL CHECK (destinatario_tipo IN ('paciente', 'vendedor', 'medico')),
-        destinatario_nome VARCHAR(200) NOT NULL,
-        destinatario_contato VARCHAR(100) NOT NULL,
-        mensagem TEXT NOT NULL,
-        tipo VARCHAR(20) DEFAULT 'whatsapp',
-        status VARCHAR(20) DEFAULT 'pendente' CHECK (status IN ('pendente', 'enviado', 'falha')),
-        data_envio_programada TIMESTAMP NOT NULL,
-        enviado_em TIMESTAMP,
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Tabela whatsapp_config
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS whatsapp_config (
-        id INTEGER PRIMARY KEY DEFAULT 1,
-        numero VARCHAR(20) DEFAULT '(22) 99764-0112',
-        endereco_otica TEXT,
-        atualizado_por INTEGER REFERENCES usuarios(id),
-        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Tabela medico_horarios (permite múltiplos por dia)
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS medico_horarios (
-        id SERIAL PRIMARY KEY,
-        medico_id INTEGER NOT NULL REFERENCES medicos(id) ON DELETE CASCADE,
-        dia_semana INTEGER NOT NULL CHECK (dia_semana >= 0 AND dia_semana <= 6),
-        hora_inicio TIME NOT NULL,
-        hora_fim TIME NOT NULL,
-        intervalo INTEGER DEFAULT 30,
-        ativo BOOLEAN DEFAULT TRUE,
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    console.log('✅ Tabela medico_horarios ok');
-
-    // Inserir usuários padrão
-    const admin = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['admin']);
-    if (admin.rows.length === 0) {
-      const hash = await bcrypt.hash('admin123', 10);
-      await pool.query(
-        'INSERT INTO usuarios (nome, username, senha, tipo, ativo) VALUES ($1, $2, $3, $4, $5)',
-        ['Administrador', 'admin', hash, 'admin', true]
-      );
-      console.log('✅ Usuário admin criado');
-    }
-
-    const vendedor = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['vendedor']);
-    if (vendedor.rows.length === 0) {
-      const hash = await bcrypt.hash('vender123', 10);
-      await pool.query(
-        'INSERT INTO usuarios (nome, username, senha, tipo, ativo) VALUES ($1, $2, $3, $4, $5)',
-        ['Vendedor', 'vendedor', hash, 'vendedor', true]
-      );
-      console.log('✅ Usuário vendedor criado');
-    }
-
-    const config = await pool.query('SELECT id FROM whatsapp_config WHERE id = 1');
-    if (config.rows.length === 0) {
-      await pool.query(
-        'INSERT INTO whatsapp_config (id, numero, endereco_otica) VALUES ($1, $2, $3)',
-        [1, '(22) 99764-0112', 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ']
-      );
-      console.log('✅ Configuração WhatsApp criada');
-    }
-
-    console.log('✅ Banco de dados inicializado com sucesso!');
-  } catch (error) {
-    console.error('❌ Erro ao inicializar banco:', error.message);
-    console.error(error.stack);
-  }
-}
-initDatabase();
-
-// ==================== ROTAS ====================
-
-// ---------- LOGIN ----------
-app.post('/api/login',
-  [
-    body('username').notEmpty().trim().escape(),
-    body('password').notEmpty()
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ error: 'Dados inválidos', details: errors.array() });
-    }
-    try {
-      const { username, password } = req.body;
-      const result = await pool.query(
-        'SELECT id, nome, username, senha, tipo, telefone FROM usuarios WHERE username = $1 AND ativo = true',
-        [username]
-      );
-      if (result.rows.length === 0) {
-        return res.status(401).json({ error: 'Usuário ou senha inválidos' });
-      }
-      const user = result.rows[0];
-      const valid = await bcrypt.compare(password, user.senha);
-      if (!valid) {
-        return res.status(401).json({ error: 'Usuário ou senha inválidos' });
-      }
-      const token = jwt.sign(
-        { id: user.id, nome: user.nome, username: user.username, tipo: user.tipo },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-      res.json({ token, user: { id: user.id, nome: user.nome, username: user.username, tipo: user.tipo, telefone: user.telefone } });
-    } catch (error) {
-      console.error('❌ Erro no login:', error);
-      res.status(500).json({ error: 'Erro interno: ' + error.message });
-    }
-  }
-);
-
-app.get('/api/verify', authenticateToken, (req, res) => {
-  res.json({ valid: true, user: req.user });
-});
-
-// ---------- MÉDICOS ----------
-app.get('/api/medicos', authenticateToken, async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT id, nome, crm, telefone, email, especialidade, whatsapp, endereco, mensagem_padrao FROM medicos WHERE ativo = true ORDER BY nome'
-    );
-    res.json(result.rows);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/medicos', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const { nome, crm, telefone, email, especialidade, whatsapp, endereco, mensagem_padrao } = req.body;
-    if (crm) {
-      const exist = await pool.query('SELECT id FROM medicos WHERE crm = $1', [crm]);
-      if (exist.rows.length > 0) {
-        return res.status(400).json({ error: 'CRM já cadastrado.' });
-      }
-    }
-    const result = await pool.query(
-      'INSERT INTO medicos (nome, crm, telefone, email, especialidade, whatsapp, endereco, mensagem_padrao) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-      [nome, crm, toNull(telefone), toNull(email), especialidade, toNull(whatsapp), toNull(endereco), toNull(mensagem_padrao)]
-    );
-    res.status(201).json({ id: result.rows[0].id });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.put('/api/medicos/:id', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const { nome, crm, telefone, email, especialidade, whatsapp, endereco, mensagem_padrao } = req.body;
-    if (crm) {
-      const exist = await pool.query('SELECT id FROM medicos WHERE crm = $1 AND id != $2', [crm, req.params.id]);
-      if (exist.rows.length > 0) {
-        return res.status(400).json({ error: 'CRM já cadastrado.' });
-      }
-    }
-    await pool.query(
-      'UPDATE medicos SET nome=$1, crm=$2, telefone=$3, email=$4, especialidade=$5, whatsapp=$6, endereco=$7, mensagem_padrao=$8 WHERE id=$9',
-      [nome, crm, toNull(telefone), toNull(email), especialidade, toNull(whatsapp), toNull(endereco), toNull(mensagem_padrao), req.params.id]
-    );
-    res.json({ message: 'Atualizado' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.delete('/api/medicos/:id', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    await pool.query('UPDATE medicos SET ativo = false WHERE id = $1', [req.params.id]);
-    res.json({ message: 'Excluído' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ---------- HORÁRIOS DOS MÉDICOS ----------
-app.get('/api/medicos/:id/horarios', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT * FROM medico_horarios WHERE medico_id = $1 ORDER BY dia_semana, hora_inicio',
-      [req.params.id]
-    );
-    res.json(result.rows);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/horarios/:id', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM medico_horarios WHERE id = $1', [req.params.id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Horário não encontrado' });
-    }
-    res.json(result.rows[0]);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// MODIFICADO: Remove restrição de unicidade por dia (permite múltiplos turnos)
-app.post('/api/medicos/:id/horarios', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const medicoId = req.params.id;
-    const { dia_semana, hora_inicio, hora_fim, intervalo } = req.body;
-
-    const medico = await pool.query('SELECT id FROM medicos WHERE id = $1', [medicoId]);
-    if (medico.rows.length === 0) {
-      return res.status(404).json({ error: 'Médico não encontrado' });
-    }
-
-    // REMOVIDA a verificação que impedia múltiplos horários para o mesmo dia
-    // Agora permite inserir quantos horários quiser para o mesmo dia
-
-    const result = await pool.query(
-      'INSERT INTO medico_horarios (medico_id, dia_semana, hora_inicio, hora_fim, intervalo) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-      [medicoId, dia_semana, hora_inicio, hora_fim, intervalo || 30]
-    );
-    res.status(201).json({ id: result.rows[0].id });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.put('/api/horarios/:id', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const { dia_semana, hora_inicio, hora_fim, intervalo, ativo } = req.body;
-    const result = await pool.query(
-      'UPDATE medico_horarios SET dia_semana=$1, hora_inicio=$2, hora_fim=$3, intervalo=$4, ativo=$5 WHERE id=$6 RETURNING id',
-      [dia_semana, hora_inicio, hora_fim, intervalo || 30, ativo !== undefined ? ativo : true, req.params.id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Horário não encontrado' });
-    }
-    res.json({ message: 'Horário atualizado' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.delete('/api/horarios/:id', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const result = await pool.query('DELETE FROM medico_horarios WHERE id = $1 RETURNING id', [req.params.id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Horário não encontrado' });
-    }
-    res.json({ message: 'Horário excluído' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ==================== HORÁRIOS DISPONÍVEIS (MODIFICADO para múltiplos turnos) ====================
-app.get('/api/medicos/:id/horarios/disponiveis', authenticateToken, async (req, res) => {
-  try {
-    const medicoId = req.params.id;
-    const { data } = req.query;
-    if (!data) {
-      return res.status(400).json({ error: 'Data é obrigatória' });
-    }
-
-    const diaSemana = new Date(data).getDay();
-
-    // Busca TODOS os horários configurados para o médico naquele dia
-    const horariosConfig = await pool.query(
-      `SELECT hora_inicio, hora_fim, intervalo 
-       FROM medico_horarios 
-       WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
-      [medicoId, diaSemana]
-    );
-
-    if (horariosConfig.rows.length === 0) {
-      return res.json({ error: 'Médico não possui horários configurados para este dia.' });
-    }
-
-    // Gera todos os horários possíveis para cada turno
-    const todosHorariosPossiveis = [];
-    for (const config of horariosConfig.rows) {
-      const inicio = config.hora_inicio;
-      const fim = config.hora_fim;
-      const intervalo = config.intervalo || 30;
-
-      let current = new Date(`2000-01-01T${inicio}`);
-      const end = new Date(`2000-01-01T${fim}`);
-      while (current < end) {
-        const h = current.getHours().toString().padStart(2, '0');
-        const m = current.getMinutes().toString().padStart(2, '0');
-        todosHorariosPossiveis.push(`${h}:${m}`);
-        current.setMinutes(current.getMinutes() + intervalo);
-      }
-    }
-
-    // Remove duplicatas (caso haja sobreposição de turnos)
-    const horariosUnicos = [...new Set(todosHorariosPossiveis)];
-
-    // Busca horários já ocupados (consultas não canceladas/realizadas)
-    const consultasExistentes = await pool.query(
-      'SELECT horario FROM consultas WHERE medico_id = $1 AND data_consulta = $2 AND status NOT IN ($3, $4)',
-      [medicoId, data, 'cancelada', 'realizada']
-    );
-    const horariosOcupados = consultasExistentes.rows.map(r => r.horario);
-
-    // Filtra os horários disponíveis
-    const horariosDisponiveis = horariosUnicos.filter(h => !horariosOcupados.includes(h));
-
-    res.json(horariosDisponiveis.map(h => ({ horario: h })));
-  } catch (error) {
-    console.error('Erro ao buscar horários disponíveis:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ---------- CLIENTES ----------
-app.get('/api/clientes', authenticateToken, async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT id, nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe FROM clientes WHERE ativo = true ORDER BY nome'
-    );
-    const clientes = result.rows.map(c => ({
-      ...c,
-      data_nascimento: formatDateToYYYYMMDD(c.data_nascimento)
-    }));
-    res.json(clientes);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/clientes/buscar', authenticateToken, async (req, res) => {
-  try {
-    const { cpf } = req.query;
-    if (!cpf) return res.json(null);
-    const result = await pool.query(
-      'SELECT id, nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe FROM clientes WHERE cpf = $1 AND ativo = true',
-      [cpf]
-    );
-    if (result.rows.length === 0) return res.json(null);
-    const cliente = result.rows[0];
-    cliente.data_nascimento = formatDateToYYYYMMDD(cliente.data_nascimento);
-    res.json(cliente);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/clientes', authenticateToken, async (req, res) => {
-  try {
-    const { nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe } = req.body;
-    if (cpf) {
-      const exist = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [cpf]);
-      if (exist.rows.length > 0) {
-        return res.status(400).json({ error: 'CPF já cadastrado.' });
-      }
-    }
-    const result = await pool.query(
-      `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-      [nome, telefone, toNull(email), toNull(cpf), toNull(data_nascimento), neurodivergente ? 1 : 0, deficiencia_fisica ? 1 : 0, encaixe ? 1 : 0, req.user.id]
-    );
-    res.status(201).json({ id: result.rows[0].id });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.put('/api/clientes/:id', authenticateToken, async (req, res) => {
-  try {
-    const { nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe } = req.body;
-    if (cpf) {
-      const exist = await pool.query('SELECT id FROM clientes WHERE cpf = $1 AND id != $2', [cpf, req.params.id]);
-      if (exist.rows.length > 0) {
-        return res.status(400).json({ error: 'CPF já cadastrado.' });
-      }
-    }
-    await pool.query(
-      `UPDATE clientes SET nome=$1, telefone=$2, email=$3, cpf=$4, data_nascimento=$5, neurodivergente=$6, deficiencia_fisica=$7, encaixe=$8 WHERE id=$9`,
-      [nome, telefone, toNull(email), toNull(cpf), toNull(data_nascimento), neurodivergente ? 1 : 0, deficiencia_fisica ? 1 : 0, encaixe ? 1 : 0, req.params.id]
-    );
-    res.json({ message: 'Atualizado' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.delete('/api/clientes/:id', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    await pool.query('UPDATE clientes SET ativo = false WHERE id = $1', [req.params.id]);
-    res.json({ message: 'Excluído' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ---------- CONSULTAS ----------
-app.get('/api/consultas', authenticateToken, async (req, res) => {
-  try {
-    const query = `
-      SELECT c.*, u.nome as vendedor_nome,
-             CASE WHEN c.criado_por = $1 THEN 1 ELSE 0 END as is_own
-      FROM consultas c 
-      LEFT JOIN usuarios u ON c.criado_por = u.id
-      ORDER BY c.data_consulta ASC, c.horario ASC
-    `;
-    const result = await pool.query(query, [req.user.id]);
-    const consultas = result.rows.map(c => ({
-      ...c,
-      data_consulta: formatDateToYYYYMMDD(c.data_consulta),
-      criado_em: c.criado_em ? new Date(c.criado_em).toISOString() : null
-    }));
-    res.json(consultas);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ---------- FILTRAR CONSULTAS ----------
-app.get('/api/consultas/filtrar', authenticateToken, async (req, res) => {
-  try {
-    const { data_inicio, data_fim, medico_id, status, paciente, vendedor_id } = req.query;
-    let query = `
-      SELECT c.*, u.nome as vendedor_nome,
-             CASE WHEN c.criado_por = $1 THEN 1 ELSE 0 END as is_own
-      FROM consultas c 
-      LEFT JOIN usuarios u ON c.criado_por = u.id
-      WHERE 1=1
-    `;
-    const params = [req.user.id];
-    let paramCount = 2;
-
-    if (data_inicio) {
-      query += ` AND c.data_consulta >= $${paramCount}`;
-      params.push(data_inicio);
-      paramCount++;
-    }
-    if (data_fim) {
-      query += ` AND c.data_consulta <= $${paramCount}`;
-      params.push(data_fim);
-      paramCount++;
-    }
-    if (medico_id) {
-      query += ` AND c.medico_id = $${paramCount}`;
-      params.push(parseInt(medico_id));
-      paramCount++;
-    }
-    if (status) {
-      query += ` AND c.status = $${paramCount}`;
-      params.push(status);
-      paramCount++;
-    }
-    if (paciente) {
-      query += ` AND c.paciente_nome ILIKE $${paramCount}`;
-      params.push(`%${paciente}%`);
-      paramCount++;
-    }
-    if (vendedor_id) {
-      query += ` AND c.criado_por = $${paramCount}`;
-      params.push(parseInt(vendedor_id));
-      paramCount++;
-    }
-
-    query += ' ORDER BY c.data_consulta DESC, c.horario DESC';
-
-    const result = await pool.query(query, params);
-    const consultas = result.rows.map(c => ({
-      ...c,
-      data_consulta: formatDateToYYYYMMDD(c.data_consulta),
-      criado_em: c.criado_em ? new Date(c.criado_em).toISOString() : null
-    }));
-    res.json(consultas);
-  } catch (error) {
-    console.error('Erro ao filtrar consultas:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/consultas', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const { paciente_id, paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, data_consulta, horario, medico_id, medico_nome, observacoes, numero_pedido } = req.body;
-
-    const diaSemana = new Date(data_consulta).getDay();
-
-    // Verifica se o horário está dentro de algum dos turnos configurados para o médico naquele dia
-    const horariosConfig = await pool.query(
-      `SELECT hora_inicio, hora_fim 
-       FROM medico_horarios 
-       WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
-      [medico_id, diaSemana]
-    );
-
-    if (horariosConfig.rows.length === 0) {
-      return res.status(400).json({ error: 'Médico não atende neste dia da semana.' });
-    }
-
-    // Verifica se o horário está dentro de algum intervalo configurado
-    let horarioValido = false;
-    for (const config of horariosConfig.rows) {
-      if (horario >= config.hora_inicio && horario < config.hora_fim) {
-        horarioValido = true;
-        break;
-      }
-    }
-    if (!horarioValido) {
-      return res.status(400).json({ error: 'Horário fora do período de atendimento do médico.' });
-    }
-
-    // Verifica conflito com outras consultas (mesmo horário)
-    const conflito = await pool.query(
-      'SELECT id FROM consultas WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 AND status NOT IN ($4, $5)',
-      [data_consulta, horario, medico_id, 'cancelada', 'realizada']
-    );
-    if (conflito.rows.length > 0) {
-      return res.status(400).json({ error: 'Horário já ocupado para este médico.' });
-    }
-
-    let pacienteId = paciente_id;
-    if (!pacienteId && paciente_cpf) {
-      const existente = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [paciente_cpf]);
-      if (existente.rows.length > 0) {
-        pacienteId = existente.rows[0].id;
-      } else {
-        const result = await pool.query(
-          `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-          [paciente_nome, paciente_telefone, toNull(paciente_email), paciente_cpf, toNull(data_nascimento), neurodivergente ? 1 : 0, deficiencia_fisica ? 1 : 0, encaixe ? 1 : 0, req.user.id]
-        );
-        pacienteId = result.rows[0].id;
-      }
-    }
-
-    let nome = paciente_nome, telefone = paciente_telefone, email = paciente_email, cpf = paciente_cpf;
-    if (pacienteId) {
-      const cliente = await pool.query(
-        'SELECT nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe FROM clientes WHERE id = $1',
-        [pacienteId]
-      );
-      if (cliente.rows.length > 0) {
-        nome = cliente.rows[0].nome;
-        telefone = cliente.rows[0].telefone;
-        email = cliente.rows[0].email;
-        cpf = cliente.rows[0].cpf;
-      }
-    }
-
-    const result = await pool.query(
-      `INSERT INTO consultas (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta, horario, medico_id, medico_nome, observacoes, numero_pedido, criado_por) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-      [nome, telefone, toNull(email), toNull(cpf), data_consulta, horario, medico_id, medico_nome, toNull(observacoes), toNull(numero_pedido), req.user.id]
-    );
-    const consultaId = result.rows[0].id;
-    await agendarLembrete(consultaId, nome, telefone, data_consulta, horario, medico_nome, medico_id, req.user.id, numero_pedido);
-    res.status(201).json({ id: consultaId });
-  } catch (error) {
-    console.error('Erro ao criar consulta:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.put('/api/consultas/:id', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const { paciente_id, paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, data_consulta, horario, medico_id, medico_nome, observacoes, numero_pedido, status } = req.body;
-
-    const consultaAtual = await pool.query('SELECT status FROM consultas WHERE id = $1', [req.params.id]);
-    if (consultaAtual.rows.length === 0) {
-      return res.status(404).json({ error: 'Consulta não encontrada' });
-    }
-    if (consultaAtual.rows[0].status === 'realizada') {
-      return res.status(400).json({ error: 'Consulta já realizada. Não é possível editar.' });
-    }
-    if (consultaAtual.rows[0].status === 'cancelada') {
-      return res.status(400).json({ error: 'Consulta cancelada. Não é possível editar.' });
-    }
-
-    const diaSemana = new Date(data_consulta).getDay();
-    const horariosConfig = await pool.query(
-      `SELECT hora_inicio, hora_fim 
-       FROM medico_horarios 
-       WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
-      [medico_id, diaSemana]
-    );
-    if (horariosConfig.rows.length === 0) {
-      return res.status(400).json({ error: 'Médico não atende neste dia da semana.' });
-    }
-
-    let horarioValido = false;
-    for (const config of horariosConfig.rows) {
-      if (horario >= config.hora_inicio && horario < config.hora_fim) {
-        horarioValido = true;
-        break;
-      }
-    }
-    if (!horarioValido) {
-      return res.status(400).json({ error: 'Horário fora do período de atendimento do médico.' });
-    }
-
-    const conflito = await pool.query(
-      'SELECT id FROM consultas WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 AND id != $4 AND status NOT IN ($5, $6)',
-      [data_consulta, horario, medico_id, req.params.id, 'cancelada', 'realizada']
-    );
-    if (conflito.rows.length > 0) {
-      return res.status(400).json({ error: 'Horário já ocupado para este médico.' });
-    }
-
-    let pacienteId = paciente_id;
-    if (!pacienteId && paciente_cpf) {
-      const existente = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [paciente_cpf]);
-      if (existente.rows.length > 0) {
-        pacienteId = existente.rows[0].id;
-      } else {
-        const result = await pool.query(
-          `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-          [paciente_nome, paciente_telefone, toNull(paciente_email), paciente_cpf, toNull(data_nascimento), neurodivergente ? 1 : 0, deficiencia_fisica ? 1 : 0, encaixe ? 1 : 0, req.user.id]
-        );
-        pacienteId = result.rows[0].id;
-      }
-    }
-
-    let nome = paciente_nome, telefone = paciente_telefone, email = paciente_email, cpf = paciente_cpf;
-    if (pacienteId) {
-      const cliente = await pool.query(
-        'SELECT nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe FROM clientes WHERE id = $1',
-        [pacienteId]
-      );
-      if (cliente.rows.length > 0) {
-        nome = cliente.rows[0].nome;
-        telefone = cliente.rows[0].telefone;
-        email = cliente.rows[0].email;
-        cpf = cliente.rows[0].cpf;
-      }
-    }
-
-    await pool.query(
-      `UPDATE consultas SET paciente_nome=$1, paciente_telefone=$2, paciente_email=$3, paciente_cpf=$4, data_consulta=$5, horario=$6, medico_id=$7, medico_nome=$8, observacoes=$9, numero_pedido=$10, status=$11 WHERE id=$12`,
-      [nome, telefone, toNull(email), toNull(cpf), data_consulta, horario, medico_id, medico_nome, toNull(observacoes), toNull(numero_pedido), status || 'agendada', req.params.id]
-    );
-    res.json({ message: 'Atualizado' });
-  } catch (error) {
-    console.error('Erro ao atualizar consulta:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.delete('/api/consultas/:id', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const consultaAtual = await pool.query('SELECT status FROM consultas WHERE id = $1', [req.params.id]);
-    if (consultaAtual.rows.length === 0) {
-      return res.status(404).json({ error: 'Consulta não encontrada' });
-    }
-    if (consultaAtual.rows[0].status === 'realizada') {
-      return res.status(400).json({ error: 'Consulta já realizada. Não é possível excluir.' });
-    }
-    await pool.query('DELETE FROM consultas WHERE id = $1', [req.params.id]);
-    res.json({ message: 'Excluído' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ---------- CONFIRMAR CONSULTA ----------
-app.put('/api/consultas/:id/confirmar', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const id = req.params.id;
-    const consulta = await pool.query(
-      'SELECT status FROM consultas WHERE id = $1',
-      [id]
-    );
-    if (consulta.rows.length === 0) {
-      return res.status(404).json({ error: 'Consulta não encontrada' });
-    }
-    if (consulta.rows[0].status === 'cancelada') {
-      return res.status(400).json({ error: 'Não é possível confirmar uma consulta cancelada.' });
-    }
-    if (consulta.rows[0].status === 'realizada') {
-      return res.status(400).json({ error: 'Consulta já foi realizada.' });
-    }
-    if (consulta.rows[0].status === 'confirmada') {
-      return res.status(400).json({ error: 'Consulta já está confirmada.' });
-    }
-    await pool.query(
-      'UPDATE consultas SET status = $1 WHERE id = $2',
-      ['confirmada', id]
-    );
-    res.json({ message: 'Consulta confirmada com sucesso!' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ---------- PROCESSAR CONSULTA ----------
-app.put('/api/consultas/:id/processar', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const id = req.params.id;
-    const consulta = await pool.query(
-      'SELECT status FROM consultas WHERE id = $1',
-      [id]
-    );
-    if (consulta.rows.length === 0) {
-      return res.status(404).json({ error: 'Consulta não encontrada' });
-    }
-    if (consulta.rows[0].status === 'cancelada') {
-      return res.status(400).json({ error: 'Não é possível processar uma consulta cancelada.' });
-    }
-    if (consulta.rows[0].status === 'realizada') {
-      return res.status(400).json({ error: 'Consulta já foi processada.' });
-    }
-    await pool.query(
-      'UPDATE consultas SET status = $1 WHERE id = $2',
-      ['realizada', id]
-    );
-    res.json({ message: 'Consulta processada (realizada) com sucesso!' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ---------- SOLICITAÇÕES ----------
-app.get('/api/solicitacoes', authenticateToken, async (req, res) => {
-  try {
-    let query = 'SELECT s.*, u.nome as solicitante_nome FROM solicitacoes_consultas s JOIN usuarios u ON s.solicitado_por = u.id';
-    const params = [];
-    if (req.user.tipo !== 'admin') {
-      query += ' WHERE s.solicitado_por = $1';
-      params.push(req.user.id);
-    }
-    query += ' ORDER BY s.criado_em DESC';
-    const result = await pool.query(query, params);
-    const solicitacoes = result.rows.map(s => ({
-      ...s,
-      data_consulta: formatDateToYYYYMMDD(s.data_consulta),
-      criado_em: s.criado_em ? new Date(s.criado_em).toISOString() : null
-    }));
-    res.json(solicitacoes);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/solicitacoes/pendentes/count', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT COUNT(*) as total FROM solicitacoes_consultas WHERE status = $1', ['pendente']);
-    res.json({ total: parseInt(result.rows[0].total) });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/solicitacoes', authenticateToken, async (req, res) => {
-  try {
-    const {
-      paciente_nome, paciente_telefone, paciente_email, paciente_cpf,
-      data_nascimento, neurodivergente, deficiencia_fisica, encaixe,
-      data_consulta, horario1, horario2, horario3,
-      medico_id, medico_nome, observacoes, numero_pedido
-    } = req.body;
-
-    const diaSemana = new Date(data_consulta).getDay();
-
-    // Valida horários sugeridos
-    const horariosConfig = await pool.query(
-      `SELECT hora_inicio, hora_fim 
-       FROM medico_horarios 
-       WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
-      [medico_id, diaSemana]
-    );
-    if (horariosConfig.rows.length === 0) {
-      return res.status(400).json({ error: 'Médico não atende neste dia da semana.' });
-    }
-
-    const horariosSugeridos = [horario1, horario2, horario3].filter(h => h);
-    for (const hor of horariosSugeridos) {
-      let valido = false;
-      for (const config of horariosConfig.rows) {
-        if (hor >= config.hora_inicio && hor < config.hora_fim) {
-          valido = true;
-          break;
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ótica Macaé - Agenda Médica</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* ======= RESET ======= */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; }
+        .login-box { max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .login-box input, .login-box button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; }
+        .login-box button { background: #667eea; color: white; border: none; cursor: pointer; }
+        .login-box button:hover { background: #764ba2; }
+        .dashboard { display: none; max-width: 1400px; margin: 0 auto; }
+
+        .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .hamburger { font-size: 28px; cursor: pointer; background: none; border: none; color: #333; }
+        .hamburger:hover { color: #667eea; }
+        .header-title h2 { font-size: 20px; color: #2d3748; }
+        .header-right { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .header-right span { font-weight: 500; }
+        .badge { background: red; color: white; border-radius: 50%; padding: 2px 8px; font-size: 12px; margin-left: 5px; }
+        .btn-sair { background: #f56565; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; }
+        .btn-sair:hover { background: #e53e3e; }
+
+        .side-menu { position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background: #2d3748; color: white; padding: 20px; transition: left 0.3s; z-index: 1000; overflow-y: auto; }
+        .side-menu.open { left: 0; }
+        .side-menu .close-menu { background: none; border: none; color: white; font-size: 28px; float: right; cursor: pointer; }
+        .side-menu .user-info { margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .side-menu .user-info span { display: block; }
+        .side-menu .user-info .nome { font-weight: 600; font-size: 16px; }
+        .side-menu .user-info .tipo { font-size: 12px; opacity: 0.7; }
+        .side-menu .menu-item { display: block; width: 100%; background: transparent; border: none; color: #cbd5e0; padding: 12px 15px; margin: 5px 0; text-align: left; font-size: 16px; border-radius: 8px; cursor: pointer; transition: 0.3s; }
+        .side-menu .menu-item:hover { background: rgba(255,255,255,0.1); color: white; }
+        .side-menu .menu-item.active { background: #667eea; color: white; }
+        .side-menu .menu-item i { margin-right: 12px; width: 20px; }
+        .menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; z-index: 999; }
+        .menu-overlay.show { display: block; }
+
+        .page-section { display: none; background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .page-section.active { display: block; }
+        .page-section h3 { margin-bottom: 20px; color: #2d3748; }
+        .sub-page { display: none; }
+        .sub-page.active { display: block; }
+
+        .form-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+        .form-row input, .form-row select, .form-row textarea { flex: 1; min-width: 150px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        .form-row textarea { min-height: 60px; }
+        button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; background: #667eea; color: white; }
+        button:hover { background: #764ba2; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: #667eea; }
+        .btn-primary:hover { background: #764ba2; }
+        .btn-success { background: #48bb78; }
+        .btn-success:hover { background: #38a169; }
+        .btn-danger { background: #f56565; }
+        .btn-danger:hover { background: #e53e3e; }
+        .btn-warning { background: #ed8936; }
+        .btn-warning:hover { background: #dd6b20; }
+        .btn-whatsapp { background: #25D366; }
+        .btn-whatsapp:hover { background: #128C7E; }
+        .btn-medico { background: #1da1f2; }
+        .btn-medico:hover { background: #0d8bcf; }
+        .btn-process { background: #9b59b6; }
+        .btn-process:hover { background: #8e44ad; }
+        .btn-print { background: #4a5568; }
+        .btn-print:hover { background: #2d3748; }
+
+        .consulta-card { border-bottom: 1px solid #ddd; padding: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .consulta-card .info { flex: 1; }
+        .consulta-card.other-vendor { background: #f7fafc; border-left: 4px solid #a0aec0; }
+        .status-cancelada { color: red; font-weight: bold; }
+        .status-agendada { color: #ed8936; }
+        .status-confirmada { color: #48bb78; }
+        .status-realizada { color: #2b6cb0; font-weight: bold; }
+        .consulta-realizada { background: #e2e8f0 !important; opacity: 0.7; }
+        .no-data { color: #999; text-align: center; padding: 20px; }
+
+        .toast { position: fixed; bottom: 20px; right: 20px; background: #48bb78; color: white; padding: 12px 24px; border-radius: 8px; z-index: 3000; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .toast.error { background: #f56565; }
+        .toast.show { display: block; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        .view-buttons { display: flex; flex-wrap: wrap; gap: 10px; margin: 15px 0; }
+        .view-buttons button { background: #718096; }
+        .view-buttons button.active { background: #667eea; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; }
+        th { background: #667eea; color: white; }
+        .consulta-item { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 5px 8px; margin: 3px 0; border-radius: 5px; font-size: 12px; cursor: pointer; }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
+        .modal-overlay.show { display: flex; }
+        .modal-box { background: white; border-radius: 10px; max-width: 650px; width: 90%; padding: 25px; max-height: 80vh; overflow-y: auto; }
+
+        .horario-radio-group label { margin-right: 15px; cursor: pointer; }
+        .horario-radio-group input[type="radio"] { margin-right: 4px; }
+
+        #horariosMedico { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; }
+        #horariosMedico h4 { margin-bottom: 15px; color: #2d3748; }
+        .horario-item { border-bottom: 1px solid #e2e8f0; padding: 10px 0; display: flex; justify-content: space-between; align-items: center; }
+        .horario-item:last-child { border-bottom: none; }
+
+        .msg-horarios { margin: 5px 0 10px 0; padding: 10px; border-radius: 5px; background: #fff3cd; border: 1px solid #ffeeba; color: #856404; }
+        .msg-horarios a { color: #0056b3; text-decoration: underline; cursor: pointer; }
+
+        .calendario-titulo {
+            font-size: 22px;
+            font-weight: 600;
+            color: #2d3748;
+            margin: 10px 0 15px 0;
+            text-align: center;
         }
-      }
-      if (!valido) {
-        return res.status(400).json({ error: `Horário ${hor} fora do período de atendimento do médico.` });
-      }
-    }
 
-    let pacienteId = null;
-    if (paciente_cpf) {
-      const existente = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [paciente_cpf]);
-      if (existente.rows.length > 0) {
-        pacienteId = existente.rows[0].id;
-      } else {
-        const neuro = neurodivergente ? 1 : 0;
-        const defFis = deficiencia_fisica ? 1 : 0;
-        const enc = encaixe ? 1 : 0;
-        const result = await pool.query(
-          `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-          [paciente_nome, paciente_telefone, toNull(paciente_email), toNull(paciente_cpf), toNull(data_nascimento), neuro, defFis, enc, req.user.id]
-        );
-        pacienteId = result.rows[0].id;
-      }
-    }
+        .dashboard-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; }
+        .dashboard-card .numero { font-size: 32px; font-weight: bold; display: block; }
+        .dashboard-card .label { font-size: 14px; color: #718096; }
 
-    for (const hor of horariosSugeridos) {
-      const conflito = await pool.query(
-        `SELECT id FROM solicitacoes_consultas 
-         WHERE data_consulta = $1 AND medico_id = $2 AND status = $3 
-         AND (horario_sugerido1 = $4 OR horario_sugerido2 = $5 OR horario_sugerido3 = $6)`,
-        [data_consulta, medico_id, 'pendente', hor, hor, hor]
-      );
-      if (conflito.rows.length > 0) {
-        return res.status(400).json({ error: `Horário ${hor} já possui solicitação pendente para este médico.` });
-      }
-    }
-
-    const result = await pool.query(
-      `INSERT INTO solicitacoes_consultas 
-       (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta, 
-        horario_sugerido1, horario_sugerido2, horario_sugerido3, 
-        medico_id, medico_nome, observacoes, numero_pedido, solicitado_por) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
-      [
-        paciente_nome, paciente_telefone, toNull(paciente_email), toNull(paciente_cpf),
-        data_consulta, horario1, toNull(horario2), toNull(horario3),
-        medico_id, medico_nome, toNull(observacoes), toNull(numero_pedido), req.user.id
-      ]
-    );
-    res.status(201).json({ id: result.rows[0].id });
-  } catch (error) {
-    console.error('Erro ao criar solicitação:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.put('/api/solicitacoes/:id', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const { status, horario_escolhido } = req.body;
-    if (!['aprovado', 'rejeitado'].includes(status)) {
-      return res.status(400).json({ error: 'Status inválido' });
-    }
-
-    const solic = await pool.query('SELECT * FROM solicitacoes_consultas WHERE id = $1', [req.params.id]);
-    if (solic.rows.length === 0) {
-      return res.status(404).json({ error: 'Solicitação não encontrada' });
-    }
-    const s = solic.rows[0];
-
-    if (status === 'aprovado') {
-      if (!horario_escolhido) {
-        return res.status(400).json({ error: 'Selecione um horário para aprovar.' });
-      }
-      const horarios = [s.horario_sugerido1, s.horario_sugerido2, s.horario_sugerido3].filter(h => h);
-      if (!horarios.includes(horario_escolhido)) {
-        return res.status(400).json({ error: 'Horário escolhido não está entre os sugeridos.' });
-      }
-
-      const diaSemana = new Date(s.data_consulta).getDay();
-      const horariosConfig = await pool.query(
-        `SELECT hora_inicio, hora_fim 
-         FROM medico_horarios 
-         WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
-        [s.medico_id, diaSemana]
-      );
-      if (horariosConfig.rows.length === 0) {
-        return res.status(400).json({ error: 'Médico não atende neste dia da semana.' });
-      }
-
-      let valido = false;
-      for (const config of horariosConfig.rows) {
-        if (horario_escolhido >= config.hora_inicio && horario_escolhido < config.hora_fim) {
-          valido = true;
-          break;
+        .filtros-box {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
         }
-      }
-      if (!valido) {
-        return res.status(400).json({ error: 'Horário fora do período de atendimento do médico.' });
-      }
+        .filtros-box .form-row { margin-bottom: 5px; }
 
-      const conflito = await pool.query(
-        'SELECT id FROM consultas WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 AND status NOT IN ($4, $5)',
-        [s.data_consulta, horario_escolhido, s.medico_id, 'cancelada', 'realizada']
-      );
-      if (conflito.rows.length > 0) {
-        return res.status(400).json({ error: 'Horário já ocupado para este médico.' });
-      }
+        .horario-periodo {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f0f4f8;
+            border-radius: 6px;
+        }
+        .horario-periodo h5 {
+            color: #2d3748;
+            margin-bottom: 8px;
+            border-bottom: 2px solid #cbd5e0;
+            padding-bottom: 4px;
+        }
 
-      const result = await pool.query(
-        `INSERT INTO consultas 
-         (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta, horario, medico_id, medico_nome, observacoes, numero_pedido, criado_por) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-        [s.paciente_nome, s.paciente_telefone, s.paciente_email, s.paciente_cpf, s.data_consulta, horario_escolhido, s.medico_id, s.medico_nome, s.observacoes, s.numero_pedido, s.solicitado_por]
-      );
-      const consultaId = result.rows[0].id;
-      await agendarLembrete(consultaId, s.paciente_nome, s.paciente_telefone, s.data_consulta, horario_escolhido, s.medico_nome, s.medico_id, s.solicitado_por, s.numero_pedido);
-      await pool.query('UPDATE solicitacoes_consultas SET horario_escolhido = $1 WHERE id = $2', [horario_escolhido, req.params.id]);
-    }
+        /* ======= ESTILOS PARA IMPRESSÃO ======= */
+        /* Estilos base do comprovante */
+        .comprovante-container {
+            background: white;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin: 0 auto;
+            font-family: 'Courier New', monospace;
+        }
+        .comprovante-container h2 {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        .comprovante-container .detalhe {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px dashed #ccc;
+        }
+        .comprovante-container .detalhe .label {
+            font-weight: bold;
+        }
+        .comprovante-container .rodape {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+        }
 
-    await pool.query('UPDATE solicitacoes_consultas SET status = $1 WHERE id = $2', [status, req.params.id]);
-    res.json({ message: `Solicitação ${status} com sucesso` });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+        /* Estilos para bobina (80mm) */
+        .comprovante-bobina {
+            width: 80mm;
+            padding: 10px;
+            font-size: 12px;
+            border: none;
+            margin: 0 auto;
+        }
+        .comprovante-bobina .detalhe {
+            padding: 4px 0;
+            font-size: 11px;
+        }
+        .comprovante-bobina h2 {
+            font-size: 16px;
+        }
+        .comprovante-bobina .rodape {
+            font-size: 10px;
+        }
+        @media print {
+            .comprovante-bobina {
+                width: 80mm;
+                margin: 0 auto;
+                border: none;
+                padding: 5mm;
+            }
+            body * { visibility: hidden; }
+            .comprovante-bobina, .comprovante-bobina * { visibility: visible; }
+            .comprovante-bobina { position: fixed; left: 0; top: 0; width: 80mm; }
+            .no-print { display: none; }
+        }
 
-// ---------- LEMBRETES ----------
-async function agendarLembrete(consultaId, pacienteNome, pacienteTelefone, dataConsulta, horario, medicoNome, medicoId, vendedorId, numeroPedido) {
-  try {
-    const medico = await pool.query('SELECT whatsapp, mensagem_padrao FROM medicos WHERE id = $1', [medicoId]);
-    const medicoWhatsapp = medico.rows.length ? medico.rows[0].whatsapp : null;
-    const mensagemPadrao = medico.rows.length ? medico.rows[0].mensagem_padrao : '';
+        /* Estilos para A4 */
+        .comprovante-a4 {
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 20mm;
+            font-size: 14px;
+        }
+        @media print {
+            .comprovante-a4 {
+                max-width: 210mm;
+                padding: 20mm;
+            }
+            body * { visibility: hidden; }
+            .comprovante-a4, .comprovante-a4 * { visibility: visible; }
+            .comprovante-a4 { position: fixed; left: 0; top: 0; width: 100%; }
+            .no-print { display: none; }
+        }
 
-    const paciente = await pool.query(
-      'SELECT neurodivergente, deficiencia_fisica, encaixe FROM clientes WHERE nome = $1 AND telefone = $2',
-      [pacienteNome, pacienteTelefone]
-    );
-    let condicao = 'Encaixe';
-    if (paciente.rows.length) {
-      const p = paciente.rows[0];
-      if (p.neurodivergente && p.deficiencia_fisica) condicao = 'Neurodivergente e Def. Física';
-      else if (p.neurodivergente) condicao = 'Neurodivergente';
-      else if (p.deficiencia_fisica) condicao = 'Deficiência Física';
-      else if (p.encaixe) condicao = 'Encaixe';
-      else condicao = 'Encaixe';
-    }
+        /* Estilos para PDF (similar ao A4, mas com sugestão de salvar) */
+        .comprovante-pdf {
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 15mm;
+            font-size: 14px;
+        }
+        @media print {
+            .comprovante-pdf {
+                max-width: 210mm;
+                padding: 15mm;
+            }
+            body * { visibility: hidden; }
+            .comprovante-pdf, .comprovante-pdf * { visibility: visible; }
+            .comprovante-pdf { position: fixed; left: 0; top: 0; width: 100%; }
+            .no-print { display: none; }
+        }
 
-    const endereco = 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ';
-    const dataLembrete = new Date(dataConsulta);
-    dataLembrete.setDate(dataLembrete.getDate() - 1);
-    dataLembrete.setHours(8, 0, 0, 0);
+        /* Botões no modal de impressão */
+        .btn-tipo-impressao {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 15px 0;
+        }
+        .btn-tipo-impressao button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: none;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .btn-tipo-impressao button:hover {
+            transform: scale(1.05);
+        }
+        .btn-tipo-impressao .btn-bobina { background: #2d3748; color: white; }
+        .btn-tipo-impressao .btn-a4 { background: #667eea; color: white; }
+        .btn-tipo-impressao .btn-pdf { background: #e53e3e; color: white; }
 
-    const pedidoStr = numeroPedido ? `\nNº Pedido: ${numeroPedido}` : '';
-    const msgPaciente = `🏥 *ÓTICA MACAÉ - GUIA DE CONSULTA*\n\nPaciente: ${pacienteNome}\nData: ${dataConsulta}\nHorário: ${horario}\nMédico: Dr. ${medicoNome}\nLocal: ${endereco}\nCondição: ${condicao}${pedidoStr}\n\n${mensagemPadrao ? '*Mensagem do médico:*\n' + mensagemPadrao : ''}`;
-    const msgMedico = `📋 *Nova consulta agendada*\n\nPaciente: ${pacienteNome}\nData: ${dataConsulta}\nHorário: ${horario}\nTelefone: ${pacienteTelefone}\nLocal: ${endereco}\nCondição: ${condicao}${pedidoStr}`;
+        @media (max-width: 768px) {
+            .header-title h2 { font-size: 16px; }
+            .side-menu { width: 240px; left: -240px; }
+            .btn-tipo-impressao { flex-direction: column; align-items: center; }
+            .btn-tipo-impressao button { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <!-- LOGIN -->
+    <div id="loginDiv" class="login-box">
+        <h2 style="text-align:center;">Ótica Macaé</h2>
+        <p style="text-align:center;">Sistema de Agenda Médica</p>
+        <input type="text" id="username" placeholder="Usuário" value="admin">
+        <input type="password" id="password" placeholder="Senha" value="admin123">
+        <button onclick="fazerLogin()">Entrar</button>
+        <p style="text-align:center; font-size:12px; margin-top:15px;">Admin: admin / admin123 | Vendedor: vendedor / vender123</p>
+        <div id="loginMsg"></div>
+    </div>
 
-    await pool.query(
-      `INSERT INTO lembretes (consulta_id, destinatario_tipo, destinatario_nome, destinatario_contato, mensagem, tipo, data_envio_programada) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [consultaId, 'paciente', pacienteNome, pacienteTelefone, msgPaciente, 'whatsapp', dataLembrete]
-    );
+    <!-- DASHBOARD -->
+    <div id="dashboardDiv" class="dashboard">
+        <div class="header">
+            <div class="header-left">
+                <button class="hamburger" id="hamburgerBtn">☰</button>
+                <div class="header-title"><h2>📅 Agenda Médica</h2></div>
+            </div>
+            <div class="header-right">
+                <span id="userName"></span>
+                <button onclick="abrirModalLembretes()" style="background:transparent; border:none; font-size:20px; position:relative; color:#2d3748;">
+                    <i class="fas fa-bell"></i>
+                    <span id="badgeLembretes" class="badge" style="display:none;">0</span>
+                </button>
+                <button class="btn-sair" onclick="logout()">Sair</button>
+            </div>
+        </div>
 
-    if (medicoWhatsapp) {
-      await pool.query(
-        `INSERT INTO lembretes (consulta_id, destinatario_tipo, destinatario_nome, destinatario_contato, mensagem, tipo, data_envio_programada) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [consultaId, 'medico', medicoNome, medicoWhatsapp, msgMedico, 'whatsapp', dataLembrete]
-      );
-    } else {
-      await pool.query(
-        `INSERT INTO lembretes (consulta_id, destinatario_tipo, destinatario_nome, destinatario_contato, mensagem, tipo, data_envio_programada) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [consultaId, 'medico', medicoNome, 'sistema', msgMedico, 'sistema', dataLembrete]
-      );
-    }
-    console.log('✅ Lembrete agendado para:', pacienteNome);
-  } catch (error) {
-    console.error('Erro ao agendar lembrete:', error);
-  }
-}
+        <div class="menu-overlay" id="menuOverlay"></div>
+        <div class="side-menu" id="sideMenu">
+            <button class="close-menu" id="closeMenuBtn">&times;</button>
+            <div class="user-info">
+                <span class="nome" id="menuUserName">Usuário</span>
+                <span class="tipo" id="menuUserTipo">tipo</span>
+            </div>
+            <hr style="border-color: #4a5568; margin: 10px 0;">
+            <button class="menu-item active" data-page="pageLista">📋 Lista de Consultas</button>
+            <button class="menu-item" data-page="pageCalendario">📅 Calendário</button>
+            <button class="menu-item" data-page="pageAgendar" id="menuAgendar">📝 Agendar</button>
+            <button class="menu-item" data-page="pageSolicitar" style="background:#48bb78; color:white;">📝 Solicitar</button>
+            <button class="menu-item" data-page="pageDashboard" id="menuDashboard">📊 Dashboard</button>
+            <button class="menu-item" data-page="pageAdmin" id="menuAdmin">⚙️ Admin</button>
+            <hr style="border-color: #4a5568; margin: 10px 0;">
+            <button class="menu-item" data-page="pageAdmin" data-sub="medicos">👨‍⚕️ Médicos</button>
+            <button class="menu-item" data-page="pageAdmin" data-sub="usuarios">👥 Usuários</button>
+            <button class="menu-item" data-page="pageAdmin" data-sub="pacientes">🧑‍⚕️ Pacientes</button>
+            <button class="menu-item" data-page="pageAdmin" data-sub="solicitacoes">📩 Solicitações <span id="badgeSolicitacoesMenu" class="badge" style="display:none;">0</span></button>
+            <button class="menu-item" data-page="pageAdmin" data-sub="whatsapp">📱 WhatsApp</button>
+        </div>
 
-app.get('/api/lembretes', authenticateToken, async (req, res) => {
-  try {
-    let query = 'SELECT * FROM lembretes WHERE status = $1';
-    const params = ['pendente'];
-    if (req.user.tipo !== 'admin') {
-      query += ' AND destinatario_tipo = $2 AND destinatario_nome = $3';
-      params.push('vendedor', req.user.nome);
-    }
-    query += ' ORDER BY data_envio_programada ASC';
-    const result = await pool.query(query, params);
-    res.json(result.rows);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+        <!-- PÁGINA LISTA DE CONSULTAS -->
+        <div id="pageLista" class="page-section active">
+            <h3>📋 Lista de Consultas</h3>
+            <div id="consultasListMain"></div>
+        </div>
 
-app.put('/api/lembretes/:id/enviar', authenticateToken, async (req, res) => {
-  try {
-    await pool.query('UPDATE lembretes SET status = $1, enviado_em = NOW() WHERE id = $2', ['enviado', req.params.id]);
-    res.json({ message: 'Lembrete marcado como enviado' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+        <!-- PÁGINA CALENDÁRIO -->
+        <div id="pageCalendario" class="page-section">
+            <h3>📅 Calendário de Consultas</h3>
+            <div style="margin-bottom:20px;">
+                <div class="view-buttons">
+                    <button onclick="mudarView('month')">📅 Mês</button>
+                    <button onclick="mudarView('week')" class="active">📆 Semana</button>
+                    <button onclick="mudarView('day')">📋 Dia</button>
+                    <button onclick="hoje()">Hoje</button>
+                    <button onclick="anterior()">◀</button>
+                    <button onclick="proximo()">▶</button>
+                </div>
+                <div id="tituloCalendario" class="calendario-titulo"></div>
+                <div id="calendarioContainer"></div>
+            </div>
+        </div>
 
-// ---------- DASHBOARD ----------
-app.get('/api/dashboard', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const statusResult = await pool.query(`
-      SELECT status, COUNT(*) as total 
-      FROM consultas 
-      GROUP BY status
-    `);
-    const statusCounts = {};
-    statusResult.rows.forEach(row => {
-      statusCounts[row.status || 'agendada'] = parseInt(row.total);
-    });
+        <!-- PÁGINA AGENDAR -->
+        <div id="pageAgendar" class="page-section">
+            <h3>📝 Agendar Consulta (Admin)</h3>
+            <div class="admin-panel">
+                <div class="form-row">
+                    <div style="flex:1; display:flex; gap:5px;">
+                        <input type="text" id="buscarCpf" placeholder="Buscar paciente por CPF" style="flex:1;">
+                        <button onclick="buscarPacientePorCpf()" style="background:#48bb78;">🔍</button>
+                    </div>
+                    <button onclick="limparBuscaPaciente()" style="background:#f56565;">Limpar</button>
+                </div>
+                <div class="form-row">
+                    <div style="flex:2; display:flex; gap:5px; align-items:center;">
+                        <select id="pacienteSelect" style="flex:1;">
+                            <option value="">Selecione um paciente</option>
+                        </select>
+                        <button onclick="abrirModalCadastroPaciente()" style="background:#48bb78; padding:10px 15px;">+</button>
+                    </div>
+                    <input type="text" id="pacienteNome" placeholder="Nome *" style="flex:1;">
+                    <input type="text" id="pacienteTelefone" placeholder="Telefone *" style="flex:1;">
+                </div>
+                <div class="form-row">
+                    <input type="email" id="pacienteEmail" placeholder="E-mail">
+                    <input type="text" id="pacienteCpf" placeholder="CPF">
+                    <input type="date" id="pacienteDataNasc" placeholder="Data Nascimento">
+                </div>
+                <div class="form-row">
+                    <label><input type="checkbox" id="pacienteEncaixe" checked> Encaixe</label>
+                    <label><input type="checkbox" id="pacienteNeurodivergente" disabled> Neurodivergente</label>
+                    <label><input type="checkbox" id="pacienteDeficienciaFisica" disabled> Deficiência Física</label>
+                    <span id="idadeDisplay" style="font-size:14px; padding:10px; background:#f7fafc; border-radius:5px;"></span>
+                </div>
+                <div class="form-row">
+                    <input type="date" id="dataConsulta">
+                    <select id="horarioSelect">
+                        <option value="">Selecione médico e data</option>
+                    </select>
+                </div>
+                <div id="msgHorarios" class="msg-horarios" style="display:none;"></div>
+                <div class="form-row">
+                    <select id="medicoSelect"></select>
+                    <input type="text" id="observacoes" placeholder="Observações">
+                </div>
+                <div class="form-row">
+                    <input type="text" id="numeroPedido" placeholder="Número do Pedido (opcional)" style="flex:1;">
+                </div>
+                <input type="hidden" id="editConsultaId">
+                <button onclick="salvarConsulta()">💾 Salvar</button>
+                <button id="cancelEditBtn" onclick="cancelarEdicao()" style="display:none;">Cancelar</button>
+            </div>
+        </div>
 
-    const vendedoresResult = await pool.query(`
-      SELECT 
-        u.id as vendedor_id,
-        u.nome as vendedor_nome,
-        COUNT(c.id) as total,
-        COUNT(CASE WHEN c.status = 'agendada' THEN 1 END) as agendadas,
-        COUNT(CASE WHEN c.status = 'confirmada' THEN 1 END) as confirmadas,
-        COUNT(CASE WHEN c.status = 'cancelada' THEN 1 END) as canceladas,
-        COUNT(CASE WHEN c.status = 'realizada' THEN 1 END) as realizadas
-      FROM usuarios u
-      LEFT JOIN consultas c ON c.criado_por = u.id
-      WHERE u.tipo IN ('vendedor', 'admin')
-      GROUP BY u.id, u.nome
-      ORDER BY u.nome
-    `);
-    const vendedores = vendedoresResult.rows.map(v => ({
-      ...v,
-      total: parseInt(v.total),
-      agendadas: parseInt(v.agendadas || 0),
-      confirmadas: parseInt(v.confirmadas || 0),
-      canceladas: parseInt(v.canceladas || 0),
-      realizadas: parseInt(v.realizadas || 0)
-    }));
+        <!-- PÁGINA DASHBOARD -->
+        <div id="pageDashboard" class="page-section">
+            <h3>📊 Dashboard de Métricas</h3>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:15px; margin-bottom:25px;">
+                <div class="dashboard-card" style="background:#667eea; color:white;">
+                    <span class="numero" id="totalConsultas">0</span>
+                    <span class="label" style="color:rgba(255,255,255,0.8);">Total Consultas</span>
+                </div>
+                <div class="dashboard-card" style="background:#48bb78; color:white;">
+                    <span class="numero" id="totalMedicos">0</span>
+                    <span class="label" style="color:rgba(255,255,255,0.8);">Médicos</span>
+                </div>
+                <div class="dashboard-card" style="background:#ed8936; color:white;">
+                    <span class="numero" id="totalAgendadas">0</span>
+                    <span class="label" style="color:rgba(255,255,255,0.8);">Agendadas</span>
+                </div>
+                <div class="dashboard-card" style="background:#38a169; color:white;">
+                    <span class="numero" id="totalConfirmadas">0</span>
+                    <span class="label" style="color:rgba(255,255,255,0.8);">Confirmadas</span>
+                </div>
+                <div class="dashboard-card" style="background:#9b59b6; color:white;">
+                    <span class="numero" id="totalRealizadas">0</span>
+                    <span class="label" style="color:rgba(255,255,255,0.8);">Realizadas</span>
+                </div>
+                <div class="dashboard-card" style="background:#f56565; color:white;">
+                    <span class="numero" id="totalCanceladas">0</span>
+                    <span class="label" style="color:rgba(255,255,255,0.8);">Canceladas</span>
+                </div>
+            </div>
+            <h4>📋 Consultas por Vendedor</h4>
+            <div id="vendedoresRelatorio"></div>
+        </div>
 
-    const totalConsultas = await pool.query('SELECT COUNT(*) as total FROM consultas');
-    const totalMedicos = await pool.query('SELECT COUNT(*) as total FROM medicos WHERE ativo = true');
+        <!-- PÁGINA ADMIN -->
+        <div id="pageAdmin" class="page-section">
+            <h3>⚙️ Painel Administrativo</h3>
+            <div id="subMedicos" class="sub-page active">
+                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
+                    <h3>Cadastrar Médico</h3>
+                    <div class="form-row">
+                        <input type="text" id="medicoNome" placeholder="Nome *">
+                        <input type="text" id="medicoCrm" placeholder="CRM *">
+                    </div>
+                    <div class="form-row">
+                        <input type="text" id="medicoTelefone" placeholder="Telefone">
+                        <input type="email" id="medicoEmail" placeholder="E-mail">
+                        <input type="text" id="medicoWhatsapp" placeholder="WhatsApp">
+                    </div>
+                    <div class="form-row">
+                        <input type="text" id="medicoEspecialidade" placeholder="Especialidade *" style="flex:1;">
+                    </div>
+                    <div class="form-row">
+                        <textarea id="medicoEndereco" placeholder="Endereço" rows="2" style="flex:1;"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <textarea id="medicoMensagemPadrao" placeholder="Mensagem padrão para paciente" rows="3" style="flex:1;"></textarea>
+                    </div>
+                    <input type="hidden" id="editMedicoId">
+                    <button onclick="salvarMedico()">Salvar</button>
+                    <button id="cancelMedicoBtn" onclick="cancelarEdicaoMedico()" style="display:none;">Cancelar</button>
+                </div>
+                <div style="background:white; padding:20px; border-radius:10px;">
+                    <h3>Médicos Cadastrados</h3>
+                    <div id="medicosList"></div>
+                </div>
+                <div id="horariosMedico" style="display:none; background:#f8f9fa; padding:20px; border-radius:10px; margin-top:20px;">
+                    <h4>Gerenciar Horários de Atendimento</h4>
+                    <div id="horariosList"></div>
+                    <div style="margin-top:15px; display:flex; flex-wrap:wrap; gap:10px;">
+                        <select id="horarioDiaSemana" style="flex:1; min-width:120px;">
+                            <option value="0">Domingo</option>
+                            <option value="1">Segunda</option>
+                            <option value="2">Terça</option>
+                            <option value="3">Quarta</option>
+                            <option value="4">Quinta</option>
+                            <option value="5">Sexta</option>
+                            <option value="6">Sábado</option>
+                        </select>
+                        <input type="time" id="horarioInicio" value="08:00" style="flex:1;">
+                        <input type="time" id="horarioFim" value="17:00" style="flex:1;">
+                        <input type="number" id="horarioIntervalo" value="30" min="10" max="60" step="5" style="width:80px;">
+                        <button onclick="adicionarHorarioMedico()" class="btn-success">Adicionar</button>
+                        <button onclick="cancelarEdicaoHorario()" id="cancelHorarioBtn" style="display:none;">Cancelar</button>
+                    </div>
+                    <input type="hidden" id="editHorarioId">
+                </div>
+            </div>
 
-    res.json({
-      total_consultas: parseInt(totalConsultas.rows[0].total),
-      total_medicos: parseInt(totalMedicos.rows[0].total),
-      por_status: statusCounts,
-      por_vendedor: vendedores
-    });
-  } catch (error) {
-    console.error('Erro no dashboard:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+            <div id="subUsuarios" class="sub-page">
+                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
+                    <h3>Cadastrar Usuário</h3>
+                    <div class="form-row">
+                        <input type="text" id="usuarioNome" placeholder="Nome *">
+                        <input type="text" id="usuarioUsername" placeholder="Username *">
+                    </div>
+                    <div class="form-row">
+                        <input type="password" id="usuarioSenha" placeholder="Senha *">
+                        <input type="text" id="usuarioTelefone" placeholder="Telefone * (obrigatório p/ vendedor)">
+                    </div>
+                    <select id="usuarioTipo"><option value="vendedor">Vendedor</option><option value="admin">Admin</option></select>
+                    <input type="hidden" id="editUsuarioId">
+                    <button onclick="salvarUsuario()">Salvar</button>
+                    <button id="cancelUsuarioBtn" onclick="cancelarEdicaoUsuario()" style="display:none;">Cancelar</button>
+                </div>
+                <div style="background:white; padding:20px; border-radius:10px;">
+                    <h3>Usuários Cadastrados</h3>
+                    <div id="usuariosList"></div>
+                </div>
+            </div>
 
-// ---------- WHATSAPP CONFIG ----------
-app.get('/api/whatsapp/config', authenticateToken, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT numero, endereco_otica FROM whatsapp_config WHERE id = 1');
-    if (result.rows.length === 0) {
-      return res.json({ numero: '(22) 99764-0112', endereco_otica: 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ' });
-    }
-    res.json(result.rows[0]);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+            <div id="subPacientes" class="sub-page">
+                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
+                    <h3>Cadastrar Paciente</h3>
+                    <div class="form-row">
+                        <input type="text" id="pacienteCadNome" placeholder="Nome *">
+                        <input type="text" id="pacienteCadTelefone" placeholder="Telefone *">
+                    </div>
+                    <div class="form-row">
+                        <input type="email" id="pacienteCadEmail" placeholder="E-mail">
+                        <input type="text" id="pacienteCadCpf" placeholder="CPF">
+                        <input type="date" id="pacienteCadDataNasc" placeholder="Data Nascimento">
+                    </div>
+                    <div class="form-row">
+                        <label><input type="checkbox" id="pacienteCadEncaixe" checked> Encaixe</label>
+                        <label><input type="checkbox" id="pacienteCadNeurodivergente" disabled> Neurodivergente</label>
+                        <label><input type="checkbox" id="pacienteCadDeficienciaFisica" disabled> Deficiência Física</label>
+                    </div>
+                    <input type="hidden" id="editPacienteId">
+                    <button onclick="salvarPaciente()">Salvar</button>
+                    <button id="cancelPacienteBtn" onclick="cancelarEdicaoPaciente()" style="display:none;">Cancelar</button>
+                </div>
+                <div style="background:white; padding:20px; border-radius:10px;">
+                    <h3>Pacientes Cadastrados</h3>
+                    <div id="pacientesList"></div>
+                </div>
+            </div>
 
-app.put('/api/whatsapp/config', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const { numero, endereco_otica } = req.body;
-    await pool.query(
-      `INSERT INTO whatsapp_config (id, numero, endereco_otica, atualizado_por) 
-       VALUES (1, $1, $2, $3) 
-       ON CONFLICT (id) DO UPDATE 
-       SET numero = EXCLUDED.numero, 
-           endereco_otica = EXCLUDED.endereco_otica, 
-           atualizado_por = EXCLUDED.atualizado_por`,
-      [numero, endereco_otica, req.user.id]
-    );
-    res.json({ message: 'Configurações salvas' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+            <div id="subSolicitacoes" class="sub-page">
+                <div style="background:white; padding:20px; border-radius:10px;">
+                    <h3>Solicitações de Consulta</h3>
+                    <div id="solicitacoesList"></div>
+                </div>
+            </div>
 
-// ---------- USUÁRIOS ----------
-app.get('/api/usuarios', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT id, nome, username, telefone, tipo, ativo FROM usuarios ORDER BY id');
-    res.json(result.rows);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+            <div id="subWhatsapp" class="sub-page">
+                <div style="background:white; padding:20px; border-radius:10px;">
+                    <h3>Configurar WhatsApp</h3>
+                    <div class="form-row">
+                        <input type="text" id="whatsappNumero" placeholder="Número da Ótica">
+                        <input type="text" id="whatsappEndereco" placeholder="Endereço">
+                    </div>
+                    <button onclick="salvarConfigWhatsapp()">Salvar</button>
+                </div>
+            </div>
+        </div>
 
-app.post('/api/usuarios', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const { nome, username, senha, telefone, tipo } = req.body;
-    if (tipo === 'vendedor' && !telefone) {
-      return res.status(400).json({ error: 'Telefone obrigatório para vendedor.' });
-    }
-    const hashed = await bcrypt.hash(senha, 10);
-    const result = await pool.query(
-      'INSERT INTO usuarios (nome, username, senha, telefone, tipo) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-      [nome, username, hashed, toNull(telefone), tipo]
-    );
-    res.status(201).json({ id: result.rows[0].id });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+        <!-- PÁGINA SOLICITAR CONSULTA -->
+        <div id="pageSolicitar" class="page-section">
+            <h3>📝 Solicitar Consulta</h3>
+            <p style="font-size:13px; color:#666;">Preencha os dados. Se o CPF não estiver cadastrado, o paciente será criado automaticamente.</p>
+            <div class="form-row">
+                <div style="flex:1; display:flex; gap:5px;">
+                    <input type="text" id="solBuscarCpf" placeholder="Buscar por CPF" style="flex:1;">
+                    <button onclick="buscarPacienteSol()" style="background:#48bb78;">🔍</button>
+                </div>
+            </div>
+            <div class="form-row">
+                <input type="text" id="solPacienteNome" placeholder="Nome *">
+                <input type="text" id="solPacienteTelefone" placeholder="Telefone *">
+            </div>
+            <div class="form-row">
+                <input type="email" id="solPacienteEmail" placeholder="E-mail">
+                <input type="text" id="solPacienteCpf" placeholder="CPF">
+                <input type="date" id="solPacienteDataNasc" placeholder="Data Nascimento">
+            </div>
+            <div class="form-row">
+                <label><input type="checkbox" id="solEncaixe" checked> Encaixe</label>
+                <label><input type="checkbox" id="solNeurodivergente" disabled> Neurodivergente</label>
+                <label><input type="checkbox" id="solDeficienciaFisica" disabled> Deficiência Física</label>
+                <span id="solIdadeDisplay" style="font-size:14px; padding:10px; background:#f7fafc; border-radius:5px;"></span>
+            </div>
+            <div class="form-row">
+                <input type="date" id="solDataConsulta">
+                <select id="solHorario1" style="flex:1;">
+                    <option value="">1º Horário *</option>
+                </select>
+                <select id="solHorario2" style="flex:1;">
+                    <option value="">2º Horário (opcional)</option>
+                </select>
+                <select id="solHorario3" style="flex:1;">
+                    <option value="">3º Horário (opcional)</option>
+                </select>
+            </div>
+            <div id="solMsgHorarios" class="msg-horarios" style="display:none;"></div>
+            <div class="form-row">
+                <select id="solMedicoSelect"></select>
+                <input type="text" id="solObservacoes" placeholder="Observações">
+            </div>
+            <div class="form-row">
+                <input type="text" id="solNumeroPedido" placeholder="Número do Pedido (opcional)" style="flex:1;">
+            </div>
+            <button onclick="enviarSolicitacao()" class="btn-success">Enviar Solicitação</button>
+            <div id="solMsg" style="margin-top:10px;"></div>
+        </div>
 
-app.put('/api/usuarios/:id', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const { nome, username, senha, telefone, tipo, ativo } = req.body;
-    if (tipo === 'vendedor' && !telefone) {
-      return res.status(400).json({ error: 'Telefone obrigatório para vendedor.' });
-    }
-    if (senha) {
-      const hashed = await bcrypt.hash(senha, 10);
-      await pool.query(
-        `UPDATE usuarios SET nome=$1, username=$2, senha=$3, telefone=$4, tipo=$5, ativo=$6 WHERE id=$7`,
-        [nome, username, hashed, toNull(telefone), tipo, ativo !== undefined ? ativo : true, req.params.id]
-      );
-    } else {
-      await pool.query(
-        `UPDATE usuarios SET nome=$1, username=$2, telefone=$3, tipo=$4, ativo=$5 WHERE id=$6`,
-        [nome, username, toNull(telefone), tipo, ativo !== undefined ? ativo : true, req.params.id]
-      );
-    }
-    res.json({ message: 'Atualizado' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+        <!-- MODAIS -->
+        <div id="modalLembretes" class="modal-overlay">
+            <div class="modal-box">
+                <h3><i class="fas fa-bell"></i> Lembretes</h3>
+                <div id="lembretesList"></div>
+                <button onclick="fecharModalLembretes()" style="margin-top:10px;">Fechar</button>
+            </div>
+        </div>
 
-app.delete('/api/usuarios/:id', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    await pool.query('DELETE FROM usuarios WHERE id = $1', [req.params.id]);
-    res.json({ message: 'Excluído' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+        <div id="modalDetalhes" class="modal-overlay">
+            <div class="modal-box">
+                <h3>Detalhes da Consulta</h3>
+                <div id="detalhesBody"></div>
+                <button onclick="fecharModalDetalhes()" style="margin-top:10px;">Fechar</button>
+            </div>
+        </div>
 
-// ==================== JOB DE LEMBRETES ====================
-setInterval(async () => {
-  try {
-    const agora = new Date();
-    const result = await pool.query(
-      'SELECT * FROM lembretes WHERE status = $1 AND data_envio_programada <= $2',
-      ['pendente', agora]
-    );
-    for (const lembrete of result.rows) {
-      console.log(`📨 Enviando lembrete para ${lembrete.destinatario_nome} (${lembrete.destinatario_contato}):\n${lembrete.mensagem}`);
-      await pool.query('UPDATE lembretes SET status = $1, enviado_em = NOW() WHERE id = $2', ['enviado', lembrete.id]);
-    }
-  } catch (error) {
-    console.error('Erro no job de lembretes:', error);
-  }
-}, 3600000);
+        <div id="modalCadastroPaciente" class="modal-overlay">
+            <div class="modal-box">
+                <h3>Novo Paciente</h3>
+                <div class="form-row">
+                    <input type="text" id="novoPacienteNome" placeholder="Nome *">
+                    <input type="text" id="novoPacienteTelefone" placeholder="Telefone *">
+                </div>
+                <div class="form-row">
+                    <input type="email" id="novoPacienteEmail" placeholder="E-mail">
+                    <input type="text" id="novoPacienteCpf" placeholder="CPF">
+                    <input type="date" id="novoPacienteDataNasc" placeholder="Data Nascimento">
+                </div>
+                <div class="form-row">
+                    <label><input type="checkbox" id="novoPacienteEncaixe" checked> Encaixe</label>
+                    <label><input type="checkbox" id="novoPacienteNeurodivergente" disabled> Neurodivergente</label>
+                    <label><input type="checkbox" id="novoPacienteDeficienciaFisica" disabled> Deficiência Física</label>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:15px;">
+                    <button onclick="salvarNovoPaciente()" class="btn-success" style="flex:1;">Salvar e Usar</button>
+                    <button onclick="fecharModalCadastroPaciente()" style="flex:1; background:#ccc;">Cancelar</button>
+                </div>
+                <div id="novoPacienteMsg"></div>
+            </div>
+        </div>
 
-// ==================== MIDDLEWARE DE ERRO ====================
-app.use((err, req, res, next) => {
-  console.error('❌ Erro não tratado:', err.stack);
-  res.status(500).json({ error: 'Erro interno do servidor' });
-});
+        <!-- MODAL DE SELEÇÃO DE TIPO DE IMPRESSÃO -->
+        <div id="modalImpressao" class="modal-overlay">
+            <div class="modal-box">
+                <h3>🖨️ Escolha o tipo de impressão</h3>
+                <p style="margin-bottom:10px; color:#555;">Selecione o formato desejado para o comprovante:</p>
+                <div class="btn-tipo-impressao">
+                    <button class="btn-bobina" onclick="imprimirComprovanteSelecionado('bobina')">🧾 Bobina (80mm)</button>
+                    <button class="btn-a4" onclick="imprimirComprovanteSelecionado('a4')">📄 A4</button>
+                    <button class="btn-pdf" onclick="imprimirComprovanteSelecionado('pdf')">📁 PDF</button>
+                </div>
+                <button onclick="fecharModalImpressao()" style="display:block; margin:10px auto; background:#ccc; color:#333; padding:8px 20px;">Cancelar</button>
+            </div>
+        </div>
 
-// ==================== FRONTEND ====================
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+        <div id="toast" class="toast"></div>
+    </div>
 
-// ==================== INICIALIZAÇÃO ====================
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`\n🚀 Servidor rodando em http://localhost:${PORT}`);
-  console.log(`👑 Admin: admin / admin123`);
-  console.log(`📋 Vendedor: vendedor / vender123`);
-});
+    <!-- COMPROVANTE (escondido, usado para impressão) -->
+    <div id="comprovante" style="display:none;"></div>
+
+    <script>
+        // ========================================================================
+        // CONFIGURAÇÕES E VARIÁVEIS
+        // ========================================================================
+        const API_URL = window.location.origin + '/api';
+        let token = null;
+        let user = null;
+        let consultas = [];
+        let medicos = [];
+        let usuarios = [];
+        let clientes = [];
+        let currentView = 'week';
+        let currentDate = new Date();
+        let editandoId = null;
+        let medicoSelecionadoId = null;
+        let consultaParaImprimir = null; // guarda o ID da consulta a imprimir
+
+        // ========================================================================
+        // UTILITÁRIOS
+        // ========================================================================
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = 'toast' + (isError ? ' error' : '');
+            toast.classList.add('show');
+            clearTimeout(toast._timeout);
+            toast._timeout = setTimeout(() => toast.classList.remove('show'), 4000);
+        }
+
+        function formatDate(date) {
+            let d = new Date(date);
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        }
+
+        function formatDisplay(dateStr) {
+            if (!dateStr) return '';
+            let parts = dateStr.split('-');
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            let div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function calcularIdade(dataNasc) {
+            if (!dataNasc) return null;
+            const hoje = new Date();
+            const nasc = new Date(dataNasc);
+            let idade = hoje.getFullYear() - nasc.getFullYear();
+            const mes = hoje.getMonth() - nasc.getMonth();
+            if (mes < 0 || (mes === 0 && hoje.getDate() < nasc.getDate())) idade--;
+            return idade;
+        }
+
+        function isDataPassada(dataStr) {
+            if (!dataStr) return false;
+            const hoje = new Date();
+            hoje.setHours(0,0,0,0);
+            const data = new Date(dataStr + 'T00:00:00');
+            return data < hoje;
+        }
+
+        function validarDataNaoPassada(dataStr, campoNome = 'Data') {
+            if (isDataPassada(dataStr)) {
+                showToast(`${campoNome} não pode ser no passado. Escolha hoje ou uma data futura.`, true);
+                return false;
+            }
+            return true;
+        }
+
+        function atualizarIdadeDisplay() {
+            const dataNasc = document.getElementById('pacienteDataNasc').value;
+            const idade = calcularIdade(dataNasc);
+            document.getElementById('idadeDisplay').innerHTML = idade !== null ? `Idade: ${idade} anos` : '';
+        }
+        document.getElementById('pacienteDataNasc').addEventListener('change', atualizarIdadeDisplay);
+
+        function atualizarIdadeSol() {
+            const dataNasc = document.getElementById('solPacienteDataNasc').value;
+            const idade = calcularIdade(dataNasc);
+            document.getElementById('solIdadeDisplay').innerHTML = idade !== null ? `Idade: ${idade} anos` : '';
+        }
+        document.getElementById('solPacienteDataNasc').addEventListener('change', atualizarIdadeSol);
+
+        // ========================================================================
+        // LÓGICA DO CHECKBOX "ENCAIXE"
+        // ========================================================================
+        function setupEncaixeLogic(encaixeId, neuroId, defId) {
+            const encaixe = document.getElementById(encaixeId);
+            const neuro = document.getElementById(neuroId);
+            const def = document.getElementById(defId);
+            if (!encaixe || !neuro || !def) return;
+
+            function update() {
+                if (encaixe.checked) {
+                    neuro.checked = false;
+                    def.checked = false;
+                    neuro.disabled = true;
+                    def.disabled = true;
+                } else {
+                    neuro.disabled = false;
+                    def.disabled = false;
+                }
+            }
+
+            encaixe.addEventListener('change', update);
+            neuro.addEventListener('change', function() {
+                if (this.checked) {
+                    encaixe.checked = false;
+                    def.disabled = false;
+                }
+            });
+            def.addEventListener('change', function() {
+                if (this.checked) {
+                    encaixe.checked = false;
+                    neuro.disabled = false;
+                }
+            });
+
+            update();
+        }
+
+        // ========================================================================
+        // LOGIN
+        // ========================================================================
+        async function fazerLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            try {
+                const res = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Erro no login');
+                token = data.token;
+                user = data.user;
+                localStorage.setItem('token', token);
+                localStorage.setItem('user', JSON.stringify(user));
+                document.getElementById('loginDiv').style.display = 'none';
+                document.getElementById('dashboardDiv').style.display = 'block';
+                document.getElementById('userName').innerHTML = `👤 ${user.nome} (${user.tipo === 'admin' ? 'Admin' : 'Vendedor'})`;
+                document.getElementById('menuUserName').textContent = user.nome;
+                document.getElementById('menuUserTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+
+                if (user.tipo === 'admin') {
+                    document.getElementById('menuAgendar').style.display = 'block';
+                    document.getElementById('menuAdmin').style.display = 'block';
+                    document.getElementById('menuDashboard').style.display = 'block';
+                } else {
+                    document.getElementById('menuAgendar').style.display = 'none';
+                    document.getElementById('menuAdmin').style.display = 'none';
+                    document.getElementById('menuDashboard').style.display = 'none';
+                }
+
+                await carregarDados();
+                renderizarLista();
+                iniciarPollingLembretes();
+                if (user.tipo === 'admin') iniciarPollingSolicitacoes();
+                fecharMenu();
+                navegarPara('pageLista');
+
+                setTimeout(() => {
+                    setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
+                    setupEncaixeLogic('pacienteCadEncaixe', 'pacienteCadNeurodivergente', 'pacienteCadDeficienciaFisica');
+                    setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
+                    setupEncaixeLogic('novoPacienteEncaixe', 'novoPacienteNeurodivergente', 'novoPacienteDeficienciaFisica');
+                }, 100);
+            } catch (err) {
+                document.getElementById('loginMsg').innerHTML = `<p style="color:red;">${err.message}</p>`;
+                console.error(err);
+            }
+        }
+
+        // ========================================================================
+        // CARREGAR DADOS
+        // ========================================================================
+        async function carregarDados() {
+            try {
+                const resConsultas = await fetch(`${API_URL}/consultas`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                let data = await resConsultas.json();
+                consultas = data.map(c => ({ ...c, data_consulta: c.data_consulta || null, is_own: c.is_own === 1 }));
+                console.log('Consultas carregadas:', consultas.length);
+
+                const resMedicos = await fetch(`${API_URL}/medicos`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                medicos = await resMedicos.json();
+                preencherSelectMedico();
+                preencherSelectMedicoSol();
+
+                const resClientes = await fetch(`${API_URL}/clientes`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                clientes = await resClientes.json();
+                preencherSelectPacientes();
+
+                renderizarLista();
+                if (user.tipo === 'admin') {
+                    const resUsuarios = await fetch(`${API_URL}/usuarios`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    usuarios = await resUsuarios.json();
+                    renderUsuarios();
+                    renderMedicos();
+                    renderPacientes();
+                    atualizarBadgeSolicitacoes();
+                    carregarConfigWhatsapp();
+                    carregarDashboard();
+                }
+            } catch (err) {
+                console.error('Erro ao carregar dados:', err);
+                showToast('Erro ao carregar dados', true);
+            }
+        }
+
+        // ========================================================================
+        // PREENCHER SELECTS
+        // ========================================================================
+        function preencherSelectMedico() {
+            const select = document.getElementById('medicoSelect');
+            if (select) {
+                select.innerHTML = '<option value="">Selecione um médico</option>' +
+                    medicos.map(m => `<option value="${m.id}">${m.nome} - ${m.especialidade}</option>`).join('');
+            }
+        }
+
+        function preencherSelectMedicoSol() {
+            const select = document.getElementById('solMedicoSelect');
+            if (select) {
+                select.innerHTML = '<option value="">Selecione um médico</option>' +
+                    medicos.map(m => `<option value="${m.id}">${m.nome} - ${m.especialidade}</option>`).join('');
+            }
+        }
+
+        function preencherSelectPacientes() {
+            const select = document.getElementById('pacienteSelect');
+            if (select) {
+                select.innerHTML = '<option value="">Selecione um paciente</option>' +
+                    clientes.map(p => `<option value="${p.id}">${p.nome} - ${p.telefone}</option>`).join('');
+            }
+        }
+
+        // ========================================================================
+        // BUSCAR PACIENTE POR CPF
+        // ========================================================================
+        async function buscarPacientePorCpf() {
+            const cpf = document.getElementById('buscarCpf').value.trim();
+            if (!cpf) { showToast('Digite um CPF', true); return; }
+            try {
+                const res = await fetch(`${API_URL}/clientes/buscar?cpf=${cpf}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const paciente = await res.json();
+                if (!paciente) { showToast('Não encontrado', true); return; }
+                document.getElementById('pacienteNome').value = paciente.nome;
+                document.getElementById('pacienteTelefone').value = paciente.telefone;
+                document.getElementById('pacienteEmail').value = paciente.email || '';
+                document.getElementById('pacienteCpf').value = paciente.cpf || '';
+                document.getElementById('pacienteDataNasc').value = paciente.data_nascimento || '';
+                document.getElementById('pacienteNeurodivergente').checked = paciente.neurodivergente === 1;
+                document.getElementById('pacienteDeficienciaFisica').checked = paciente.deficiencia_fisica === 1;
+                document.getElementById('pacienteEncaixe').checked = paciente.encaixe === 1;
+                document.getElementById('pacienteSelect').value = paciente.id;
+                atualizarIdadeDisplay();
+                setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
+                showToast('Paciente encontrado!');
+            } catch (err) {
+                showToast('Erro: ' + err.message, true);
+            }
+        }
+
+        function limparBuscaPaciente() {
+            document.getElementById('buscarCpf').value = '';
+            document.getElementById('pacienteNome').value = '';
+            document.getElementById('pacienteTelefone').value = '';
+            document.getElementById('pacienteEmail').value = '';
+            document.getElementById('pacienteCpf').value = '';
+            document.getElementById('pacienteDataNasc').value = '';
+            document.getElementById('pacienteNeurodivergente').checked = false;
+            document.getElementById('pacienteDeficienciaFisica').checked = false;
+            document.getElementById('pacienteEncaixe').checked = true;
+            document.getElementById('pacienteSelect').value = '';
+            document.getElementById('idadeDisplay').innerHTML = '';
+            setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
+        }
+
+        async function buscarPacienteSol() {
+            const cpf = document.getElementById('solBuscarCpf').value.trim();
+            if (!cpf) { showToast('Digite um CPF', true); return; }
+            try {
+                const res = await fetch(`${API_URL}/clientes/buscar?cpf=${cpf}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const paciente = await res.json();
+                if (!paciente) { showToast('Não encontrado', true); return; }
+                document.getElementById('solPacienteNome').value = paciente.nome;
+                document.getElementById('solPacienteTelefone').value = paciente.telefone;
+                document.getElementById('solPacienteEmail').value = paciente.email || '';
+                document.getElementById('solPacienteCpf').value = paciente.cpf || '';
+                document.getElementById('solPacienteDataNasc').value = paciente.data_nascimento || '';
+                document.getElementById('solNeurodivergente').checked = paciente.neurodivergente === 1;
+                document.getElementById('solDeficienciaFisica').checked = paciente.deficiencia_fisica === 1;
+                document.getElementById('solEncaixe').checked = paciente.encaixe === 1;
+                atualizarIdadeSol();
+                setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
+                showToast('Paciente encontrado!');
+            } catch (err) {
+                showToast('Erro: ' + err.message, true);
+            }
+        }
+
+        // ========================================================================
+        // CRUD DE PACIENTES
+        // ========================================================================
+        async function salvarPaciente() {
+            const data = {
+                nome: document.getElementById('pacienteCadNome').value,
+                telefone: document.getElementById('pacienteCadTelefone').value,
+                email: document.getElementById('pacienteCadEmail').value,
+                cpf: document.getElementById('pacienteCadCpf').value,
+                data_nascimento: document.getElementById('pacienteCadDataNasc').value,
+                neurodivergente: document.getElementById('pacienteCadNeurodivergente').checked ? 1 : 0,
+                deficiencia_fisica: document.getElementById('pacienteCadDeficienciaFisica').checked ? 1 : 0,
+                encaixe: document.getElementById('pacienteCadEncaixe').checked ? 1 : 0
+            };
+            const editId = document.getElementById('editPacienteId').value;
+            const url = editId ? `${API_URL}/clientes/${editId}` : `${API_URL}/clientes`;
+            const method = editId ? 'PUT' : 'POST';
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) throw new Error('Erro');
+                showToast(editId ? 'Atualizado!' : 'Cadastrado!');
+                cancelarEdicaoPaciente();
+                await carregarDados();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        function renderPacientes() {
+            const container = document.getElementById('pacientesList');
+            if (!container) return;
+            if (clientes.length === 0) { container.innerHTML = '<p class="no-data">Nenhum paciente</p>'; return; }
+            container.innerHTML = clientes.map(p => {
+                const idade = calcularIdade(p.data_nascimento);
+                let condicao = 'Encaixe';
+                if (p.neurodivergente && p.deficiencia_fisica) condicao = 'Neurodivergente + Def. Física';
+                else if (p.neurodivergente) condicao = 'Neurodivergente';
+                else if (p.deficiencia_fisica) condicao = 'Deficiência Física';
+                else if (p.encaixe) condicao = 'Encaixe';
+                return `<div style="border-bottom:1px solid #ddd; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+                    <div><strong>${escapeHtml(p.nome)}</strong> ${idade !== null ? `(${idade} anos)` : ''}<br>${p.telefone} ${p.email ? '| ' + p.email : ''} | ${condicao}</div>
+                    <div><button onclick="editarPaciente(${p.id})">✏️</button><button onclick="excluirPaciente(${p.id})">🗑️</button></div>
+                </div>`;
+            }).join('');
+        }
+
+        function editarPaciente(id) {
+            const p = clientes.find(c => c.id === id);
+            if (!p) return;
+            document.getElementById('editPacienteId').value = p.id;
+            document.getElementById('pacienteCadNome').value = p.nome;
+            document.getElementById('pacienteCadTelefone').value = p.telefone;
+            document.getElementById('pacienteCadEmail').value = p.email || '';
+            document.getElementById('pacienteCadCpf').value = p.cpf || '';
+            document.getElementById('pacienteCadDataNasc').value = p.data_nascimento || '';
+            document.getElementById('pacienteCadNeurodivergente').checked = p.neurodivergente === 1;
+            document.getElementById('pacienteCadDeficienciaFisica').checked = p.deficiencia_fisica === 1;
+            document.getElementById('pacienteCadEncaixe').checked = p.encaixe === 1;
+            document.getElementById('cancelPacienteBtn').style.display = 'inline-block';
+            setupEncaixeLogic('pacienteCadEncaixe', 'pacienteCadNeurodivergente', 'pacienteCadDeficienciaFisica');
+            mostrarSubPage('pacientes');
+        }
+
+        function cancelarEdicaoPaciente() {
+            document.getElementById('editPacienteId').value = '';
+            document.getElementById('cancelPacienteBtn').style.display = 'none';
+            document.getElementById('pacienteCadNome').value = '';
+            document.getElementById('pacienteCadTelefone').value = '';
+            document.getElementById('pacienteCadEmail').value = '';
+            document.getElementById('pacienteCadCpf').value = '';
+            document.getElementById('pacienteCadDataNasc').value = '';
+            document.getElementById('pacienteCadNeurodivergente').checked = false;
+            document.getElementById('pacienteCadDeficienciaFisica').checked = false;
+            document.getElementById('pacienteCadEncaixe').checked = true;
+            setupEncaixeLogic('pacienteCadEncaixe', 'pacienteCadNeurodivergente', 'pacienteCadDeficienciaFisica');
+        }
+
+        async function excluirPaciente(id) {
+            if (!confirm('Excluir?')) return;
+            try {
+                await fetch(`${API_URL}/clientes/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+                showToast('Excluído');
+                await carregarDados();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        function abrirModalCadastroPaciente() {
+            document.getElementById('modalCadastroPaciente').classList.add('show');
+            document.getElementById('novoPacienteNome').value = '';
+            document.getElementById('novoPacienteTelefone').value = '';
+            document.getElementById('novoPacienteEmail').value = '';
+            document.getElementById('novoPacienteCpf').value = '';
+            document.getElementById('novoPacienteDataNasc').value = '';
+            document.getElementById('novoPacienteNeurodivergente').checked = false;
+            document.getElementById('novoPacienteDeficienciaFisica').checked = false;
+            document.getElementById('novoPacienteEncaixe').checked = true;
+            document.getElementById('novoPacienteMsg').innerHTML = '';
+            setupEncaixeLogic('novoPacienteEncaixe', 'novoPacienteNeurodivergente', 'novoPacienteDeficienciaFisica');
+        }
+        function fecharModalCadastroPaciente() {
+            document.getElementById('modalCadastroPaciente').classList.remove('show');
+        }
+
+        async function salvarNovoPaciente() {
+            const data = {
+                nome: document.getElementById('novoPacienteNome').value,
+                telefone: document.getElementById('novoPacienteTelefone').value,
+                email: document.getElementById('novoPacienteEmail').value,
+                cpf: document.getElementById('novoPacienteCpf').value,
+                data_nascimento: document.getElementById('novoPacienteDataNasc').value,
+                neurodivergente: document.getElementById('novoPacienteNeurodivergente').checked ? 1 : 0,
+                deficiencia_fisica: document.getElementById('novoPacienteDeficienciaFisica').checked ? 1 : 0,
+                encaixe: document.getElementById('novoPacienteEncaixe').checked ? 1 : 0
+            };
+            if (!data.nome || !data.telefone) {
+                document.getElementById('novoPacienteMsg').innerHTML = '<p style="color:red;">Nome e telefone obrigatórios.</p>';
+                return;
+            }
+            try {
+                const res = await fetch(`${API_URL}/clientes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) throw new Error('Erro');
+                showToast('Paciente cadastrado!');
+                fecharModalCadastroPaciente();
+                await carregarDados();
+                const select = document.getElementById('pacienteSelect');
+                if (select) {
+                    await preencherSelectPacientes();
+                    const novo = clientes[clientes.length - 1];
+                    if (novo) {
+                        select.value = novo.id;
+                        document.getElementById('pacienteNome').value = novo.nome;
+                        document.getElementById('pacienteTelefone').value = novo.telefone;
+                        document.getElementById('pacienteEmail').value = novo.email || '';
+                        document.getElementById('pacienteCpf').value = novo.cpf || '';
+                        document.getElementById('pacienteDataNasc').value = novo.data_nascimento || '';
+                        document.getElementById('pacienteNeurodivergente').checked = novo.neurodivergente === 1;
+                        document.getElementById('pacienteDeficienciaFisica').checked = novo.deficiencia_fisica === 1;
+                        document.getElementById('pacienteEncaixe').checked = novo.encaixe === 1;
+                        atualizarIdadeDisplay();
+                        setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
+                    }
+                }
+            } catch (err) {
+                document.getElementById('novoPacienteMsg').innerHTML = `<p style="color:red;">${err.message}</p>`;
+            }
+        }
+
+        // ========================================================================
+        // MÉDICOS
+        // ========================================================================
+        async function salvarMedico() {
+            const data = {
+                nome: document.getElementById('medicoNome').value,
+                crm: document.getElementById('medicoCrm').value,
+                telefone: document.getElementById('medicoTelefone').value,
+                email: document.getElementById('medicoEmail').value,
+                whatsapp: document.getElementById('medicoWhatsapp').value,
+                endereco: document.getElementById('medicoEndereco').value,
+                mensagem_padrao: document.getElementById('medicoMensagemPadrao').value,
+                especialidade: document.getElementById('medicoEspecialidade').value
+            };
+            const editId = document.getElementById('editMedicoId').value;
+            const url = editId ? `${API_URL}/medicos/${editId}` : `${API_URL}/medicos`;
+            const method = editId ? 'PUT' : 'POST';
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) throw new Error('Erro');
+                showToast(editId ? 'Atualizado' : 'Cadastrado');
+                cancelarEdicaoMedico();
+                await carregarDados();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        function renderMedicos() {
+            const container = document.getElementById('medicosList');
+            if (!container) return;
+            if (medicos.length === 0) { container.innerHTML = '<p class="no-data">Nenhum médico</p>'; return; }
+            container.innerHTML = medicos.map(m => `
+                <div style="border-bottom:1px solid #ddd; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <strong>Dr. ${escapeHtml(m.nome)}</strong><br>
+                        ${m.crm} | ${m.especialidade}<br>
+                        ${m.whatsapp ? '📱 ' + m.whatsapp : ''}
+                        ${m.endereco ? '<br>📍 ' + escapeHtml(m.endereco) : ''}
+                        ${m.mensagem_padrao ? '<br><small>📝 ' + escapeHtml(m.mensagem_padrao.substring(0,50)) + '...</small>' : ''}
+                    </div>
+                    <div>
+                        <button onclick="editarMedico(${m.id})">✏️</button>
+                        <button onclick="excluirMedico(${m.id})">🗑️</button>
+                        <button onclick="gerenciarHorarios(${m.id})" class="btn-primary" style="background:#48bb78;">🕐 Horários</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function editarMedico(id) {
+            const m = medicos.find(m => m.id === id);
+            if (!m) return;
+            document.getElementById('editMedicoId').value = m.id;
+            document.getElementById('medicoNome').value = m.nome;
+            document.getElementById('medicoCrm').value = m.crm;
+            document.getElementById('medicoTelefone').value = m.telefone || '';
+            document.getElementById('medicoEmail').value = m.email || '';
+            document.getElementById('medicoWhatsapp').value = m.whatsapp || '';
+            document.getElementById('medicoEndereco').value = m.endereco || '';
+            document.getElementById('medicoMensagemPadrao').value = m.mensagem_padrao || '';
+            document.getElementById('medicoEspecialidade').value = m.especialidade || '';
+            document.getElementById('cancelMedicoBtn').style.display = 'inline-block';
+            mostrarSubPage('medicos');
+        }
+
+        function cancelarEdicaoMedico() {
+            document.getElementById('editMedicoId').value = '';
+            document.getElementById('cancelMedicoBtn').style.display = 'none';
+            document.getElementById('medicoNome').value = '';
+            document.getElementById('medicoCrm').value = '';
+            document.getElementById('medicoTelefone').value = '';
+            document.getElementById('medicoEmail').value = '';
+            document.getElementById('medicoWhatsapp').value = '';
+            document.getElementById('medicoEndereco').value = '';
+            document.getElementById('medicoMensagemPadrao').value = '';
+            document.getElementById('medicoEspecialidade').value = '';
+        }
+
+        async function excluirMedico(id) {
+            if (!confirm('Excluir este médico?')) return;
+            try {
+                await fetch(`${API_URL}/medicos/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+                showToast('Excluído');
+                await carregarDados();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        // ========================================================================
+        // HORÁRIOS DOS MÉDICOS
+        // ========================================================================
+        function gerenciarHorarios(medicoId) {
+            medicoSelecionadoId = medicoId;
+            document.getElementById('horariosMedico').style.display = 'block';
+            carregarHorarios(medicoId);
+            document.getElementById('horariosMedico').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function carregarHorarios(medicoId) {
+            try {
+                const res = await fetch(`${API_URL}/medicos/${medicoId}/horarios`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const horarios = await res.json();
+                const container = document.getElementById('horariosList');
+                if (!container) return;
+                if (horarios.length === 0) {
+                    container.innerHTML = '<p>Nenhum horário configurado.</p>';
+                    return;
+                }
+
+                const manha = horarios.filter(h => h.hora_inicio < '12:00');
+                const tarde = horarios.filter(h => h.hora_inicio >= '13:00');
+
+                const dias = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+                let html = '';
+
+                const renderGrupo = (lista, titulo) => {
+                    if (lista.length === 0) return '';
+                    let grupoHtml = `<div class="horario-periodo"><h5>${titulo}</h5>`;
+                    lista.forEach(h => {
+                        grupoHtml += `
+                            <div class="horario-item">
+                                <div>
+                                    <strong>${dias[h.dia_semana]}</strong> 
+                                    ${h.hora_inicio} - ${h.hora_fim} 
+                                    (intervalo ${h.intervalo} min)
+                                    ${!h.ativo ? ' <span style="color:red;">(inativo)</span>' : ''}
+                                </div>
+                                <div>
+                                    <button onclick="editarHorario(${h.id})" class="btn-warning">✏️</button>
+                                    <button onclick="excluirHorario(${h.id})" class="btn-danger">🗑️</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    grupoHtml += `</div>`;
+                    return grupoHtml;
+                };
+
+                html += renderGrupo(manha, '🌅 Manhã');
+                html += renderGrupo(tarde, '🌆 Tarde');
+
+                container.innerHTML = html;
+            } catch (err) {
+                showToast('Erro ao carregar horários', true);
+            }
+        }
+
+        async function adicionarHorarioMedico() {
+            if (!medicoSelecionadoId) return;
+            const data = {
+                dia_semana: parseInt(document.getElementById('horarioDiaSemana').value),
+                hora_inicio: document.getElementById('horarioInicio').value,
+                hora_fim: document.getElementById('horarioFim').value,
+                intervalo: parseInt(document.getElementById('horarioIntervalo').value) || 30
+            };
+            if (data.hora_inicio >= data.hora_fim) {
+                showToast('Hora de início deve ser menor que hora de fim', true);
+                return;
+            }
+            const editId = document.getElementById('editHorarioId').value;
+            const url = editId ? `${API_URL}/horarios/${editId}` : `${API_URL}/medicos/${medicoSelecionadoId}/horarios`;
+            const method = editId ? 'PUT' : 'POST';
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Erro'); }
+                showToast(editId ? 'Horário atualizado!' : 'Horário adicionado!');
+                cancelarEdicaoHorario();
+                carregarHorarios(medicoSelecionadoId);
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        async function editarHorario(id) {
+            try {
+                const res = await fetch(`${API_URL}/horarios/${id}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.id) {
+                    document.getElementById('editHorarioId').value = data.id;
+                    document.getElementById('horarioDiaSemana').value = data.dia_semana;
+                    document.getElementById('horarioInicio').value = data.hora_inicio;
+                    document.getElementById('horarioFim').value = data.hora_fim;
+                    document.getElementById('horarioIntervalo').value = data.intervalo || 30;
+                    document.getElementById('cancelHorarioBtn').style.display = 'inline-block';
+                }
+            } catch (err) {
+                showToast('Erro ao carregar horário', true);
+            }
+        }
+
+        function cancelarEdicaoHorario() {
+            document.getElementById('editHorarioId').value = '';
+            document.getElementById('cancelHorarioBtn').style.display = 'none';
+            document.getElementById('horarioDiaSemana').value = '1';
+            document.getElementById('horarioInicio').value = '08:00';
+            document.getElementById('horarioFim').value = '17:00';
+            document.getElementById('horarioIntervalo').value = '30';
+        }
+
+        async function excluirHorario(id) {
+            if (!confirm('Excluir este horário?')) return;
+            try {
+                const res = await fetch(`${API_URL}/horarios/${id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Erro');
+                showToast('Horário excluído');
+                carregarHorarios(medicoSelecionadoId);
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        // ========================================================================
+        // CARREGAR HORÁRIOS DISPONÍVEIS (ADMIN)
+        // ========================================================================
+        async function carregarHorariosDisponiveis() {
+            const medicoId = document.getElementById('medicoSelect').value;
+            const data = document.getElementById('dataConsulta').value;
+            const select = document.getElementById('horarioSelect');
+            const msgDiv = document.getElementById('msgHorarios');
+
+            msgDiv.style.display = 'none';
+            msgDiv.innerHTML = '';
+
+            if (!medicoId || !data) {
+                select.innerHTML = '<option value="">Selecione médico e data</option>';
+                return;
+            }
+
+            if (isDataPassada(data)) {
+                select.innerHTML = '<option value="">Data inválida (passado)</option>';
+                msgDiv.style.display = 'block';
+                msgDiv.innerHTML = '⚠️ Não é permitido agendar em datas passadas. Escolha hoje ou uma data futura.';
+                return;
+            }
+
+            select.innerHTML = '<option value="">Carregando...</option>';
+
+            try {
+                const res = await fetch(`${API_URL}/medicos/${medicoId}/horarios/disponiveis?data=${data}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const result = await res.json();
+
+                if (result && typeof result === 'object' && result.error) {
+                    select.innerHTML = '<option value="">Nenhum horário disponível</option>';
+                    msgDiv.style.display = 'block';
+                    msgDiv.innerHTML = `⚠️ ${result.error}. <a href="#" onclick="navegarPara('pageAdmin'); mostrarSubPage('medicos');">Clique aqui para configurar horários.</a>`;
+                    return;
+                }
+
+                if (!Array.isArray(result) || result.length === 0) {
+                    select.innerHTML = '<option value="">Nenhum horário disponível</option>';
+                    msgDiv.style.display = 'block';
+                    msgDiv.innerHTML = `⚠️ Nenhum horário disponível para esta data. <a href="#" onclick="navegarPara('pageAdmin'); mostrarSubPage('medicos');">Gerenciar horários do médico.</a>`;
+                    return;
+                }
+
+                select.innerHTML = '<option value="">Selecione um horário</option>';
+                result.forEach(h => {
+                    const opt = document.createElement('option');
+                    opt.value = h.horario;
+                    opt.textContent = h.horario;
+                    select.appendChild(opt);
+                });
+
+                msgDiv.style.display = 'none';
+                msgDiv.innerHTML = '';
+            } catch (err) {
+                showToast('Erro ao carregar horários disponíveis', true);
+                select.innerHTML = '<option value="">Erro ao carregar</option>';
+            }
+        }
+
+        document.getElementById('medicoSelect').addEventListener('change', carregarHorariosDisponiveis);
+        document.getElementById('dataConsulta').addEventListener('change', carregarHorariosDisponiveis);
+
+        // ========================================================================
+        // CARREGAR HORÁRIOS DISPONÍVEIS PARA SOLICITAÇÃO
+        // ========================================================================
+        async function carregarHorariosDisponiveisSol() {
+            const medicoId = document.getElementById('solMedicoSelect').value;
+            const data = document.getElementById('solDataConsulta').value;
+            const selects = [
+                document.getElementById('solHorario1'),
+                document.getElementById('solHorario2'),
+                document.getElementById('solHorario3')
+            ];
+            const msgDiv = document.getElementById('solMsgHorarios');
+
+            msgDiv.style.display = 'none';
+            msgDiv.innerHTML = '';
+
+            selects.forEach(sel => {
+                sel.innerHTML = '<option value="">Carregando...</option>';
+            });
+
+            if (!medicoId || !data) {
+                selects.forEach(sel => {
+                    sel.innerHTML = '<option value="">Selecione médico e data</option>';
+                });
+                return;
+            }
+
+            if (isDataPassada(data)) {
+                selects.forEach(sel => {
+                    sel.innerHTML = '<option value="">Data inválida (passado)</option>';
+                });
+                msgDiv.style.display = 'block';
+                msgDiv.innerHTML = '⚠️ Não é permitido solicitar consulta em datas passadas. Escolha hoje ou uma data futura.';
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/medicos/${medicoId}/horarios/disponiveis?data=${data}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const result = await res.json();
+
+                if (result && typeof result === 'object' && result.error) {
+                    selects.forEach(sel => {
+                        sel.innerHTML = '<option value="">Nenhum horário disponível</option>';
+                    });
+                    msgDiv.style.display = 'block';
+                    msgDiv.innerHTML = `⚠️ ${result.error}. Entre em contato com o administrador.`;
+                    return;
+                }
+
+                if (!Array.isArray(result) || result.length === 0) {
+                    selects.forEach(sel => {
+                        sel.innerHTML = '<option value="">Nenhum horário disponível</option>';
+                    });
+                    msgDiv.style.display = 'block';
+                    msgDiv.innerHTML = '⚠️ Nenhum horário disponível para esta data. Escolha outra data.';
+                    return;
+                }
+
+                const optionsHtml = result.map(h => `<option value="${h.horario}">${h.horario}</option>`).join('');
+                selects.forEach((sel, index) => {
+                    const label = index === 0 ? '1º Horário *' : (index === 1 ? '2º Horário (opcional)' : '3º Horário (opcional)');
+                    sel.innerHTML = `<option value="">${label}</option>` + optionsHtml;
+                });
+
+                msgDiv.style.display = 'none';
+                msgDiv.innerHTML = '';
+            } catch (err) {
+                showToast('Erro ao carregar horários disponíveis', true);
+                selects.forEach(sel => {
+                    sel.innerHTML = '<option value="">Erro ao carregar</option>';
+                });
+            }
+        }
+
+        document.getElementById('solMedicoSelect').addEventListener('change', carregarHorariosDisponiveisSol);
+        document.getElementById('solDataConsulta').addEventListener('change', carregarHorariosDisponiveisSol);
+
+        // ========================================================================
+        // CONSULTAS
+        // ========================================================================
+        async function salvarConsulta() {
+            if (user.tipo !== 'admin') { showToast('Apenas administradores podem agendar.', true); return; }
+            const pacienteId = document.getElementById('pacienteSelect').value;
+            const pacienteNome = document.getElementById('pacienteNome').value;
+            const pacienteTelefone = document.getElementById('pacienteTelefone').value;
+            const dataConsulta = document.getElementById('dataConsulta').value;
+            const horario = document.getElementById('horarioSelect').value;
+            const medicoId = document.getElementById('medicoSelect').value;
+            const medicoNome = medicos.find(m => m.id == medicoId)?.nome;
+            const numeroPedido = document.getElementById('numeroPedido').value.trim() || null;
+
+            if (!pacienteNome || !pacienteTelefone || !dataConsulta || !horario || !medicoId) {
+                showToast('Preencha todos os campos obrigatórios!', true);
+                return;
+            }
+
+            if (!validarDataNaoPassada(dataConsulta, 'Data da consulta')) return;
+
+            const dados = {
+                paciente_id: pacienteId || null,
+                paciente_nome: pacienteNome,
+                paciente_telefone: pacienteTelefone,
+                paciente_email: document.getElementById('pacienteEmail').value,
+                paciente_cpf: document.getElementById('pacienteCpf').value,
+                data_nascimento: document.getElementById('pacienteDataNasc').value,
+                neurodivergente: document.getElementById('pacienteNeurodivergente').checked ? 1 : 0,
+                deficiencia_fisica: document.getElementById('pacienteDeficienciaFisica').checked ? 1 : 0,
+                encaixe: document.getElementById('pacienteEncaixe').checked ? 1 : 0,
+                data_consulta: dataConsulta,
+                horario: horario,
+                medico_id: parseInt(medicoId),
+                medico_nome: medicoNome,
+                observacoes: document.getElementById('observacoes').value,
+                numero_pedido: numeroPedido
+            };
+            const url = editandoId ? `${API_URL}/consultas/${editandoId}` : `${API_URL}/consultas`;
+            const method = editandoId ? 'PUT' : 'POST';
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(dados)
+                });
+                if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Erro'); }
+                showToast(editandoId ? 'Atualizada!' : 'Agendada!');
+                cancelarEdicao();
+                await carregarDados();
+                renderizarCalendario();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        // ========================================================================
+        // RENDERIZAR LISTA DE CONSULTAS
+        // ========================================================================
+        function renderizarLista() {
+            const container = document.getElementById('consultasListMain');
+            if (!container) return;
+            if (consultas.length === 0) {
+                container.innerHTML = '<p class="no-data">Nenhuma consulta agendada.</p>';
+                return;
+            }
+            const isAdmin = user.tipo === 'admin';
+            container.innerHTML = consultas.map(c => {
+                const isOwn = c.is_own;
+                const status = c.status || 'agendada';
+                let statusClass = 'status-agendada';
+                if (status === 'cancelada') statusClass = 'status-cancelada';
+                else if (status === 'confirmada') statusClass = 'status-confirmada';
+                else if (status === 'realizada') statusClass = 'status-realizada';
+
+                const isRealizada = status === 'realizada';
+                const podeEditar = isAdmin && !isRealizada && status !== 'cancelada';
+
+                let actions = '';
+                let extraClass = '';
+                let infoHtml = '';
+                const hasPedido = c.numero_pedido ? `<br><small>📦 Pedido: ${escapeHtml(c.numero_pedido)}</small>` : '';
+
+                if (isAdmin) {
+                    actions = `
+                        <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                            ${podeEditar ? `<button onclick="editarConsulta(${c.id})" class="btn-warning">✏️</button>` : ''}
+                            ${podeEditar ? `<button onclick="cancelarConsulta(${c.id})" class="btn-danger">🚫</button>` : ''}
+                            ${podeEditar ? `<button onclick="excluirConsulta(${c.id})" class="btn-danger">🗑️</button>` : ''}
+                            ${podeEditar && status !== 'cancelada' && status !== 'realizada' && status !== 'confirmada' ? 
+                                `<button onclick="confirmarConsulta(${c.id})" class="btn-success">✅ Confirmar</button>` : ''}
+                            ${podeEditar && status !== 'cancelada' && status !== 'realizada' ? 
+                                `<button onclick="processarConsulta(${c.id})" class="btn-process">🔄 Processar</button>` : ''}
+                            <button onclick="enviarWhatsAppPaciente(${c.id})" class="btn-whatsapp">📱 WhatsApp</button>
+                            <button onclick="enviarWhatsAppMedico(${c.id})" class="btn-medico">📱 Médico</button>
+                            ${c.status === 'confirmada' ? `<button onclick="abrirModalImpressao(${c.id})" class="btn-print">🖨️ Imprimir Comprovante</button>` : ''}
+                        </div>
+                    `;
+                    infoHtml = `
+                        <strong>${escapeHtml(c.paciente_nome)}</strong>
+                        <span class="${statusClass}">${status}</span><br>
+                        ${formatDisplay(c.data_consulta)} ${c.horario} | Dr. ${escapeHtml(c.medico_nome)}
+                        ${hasPedido}
+                        ${c.observacoes ? `<br><small>📝 ${escapeHtml(c.observacoes)}</small>` : ''}
+                        <br><small>👤 Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
+                    `;
+                } else {
+                    if (isOwn) {
+                        actions = `
+                            <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                                <button onclick="mostrarDetalhes(${c.id})" class="btn-primary">👁️ Ver</button>
+                            </div>
+                        `;
+                        infoHtml = `
+                            <strong>${escapeHtml(c.paciente_nome)}</strong>
+                            <span class="${statusClass}">${status}</span><br>
+                            ${formatDisplay(c.data_consulta)} ${c.horario} | Dr. ${escapeHtml(c.medico_nome)}
+                            ${hasPedido}
+                            ${c.observacoes ? `<br><small>📝 ${escapeHtml(c.observacoes)}</small>` : ''}
+                            <br><small>👤 Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
+                        `;
+                    } else {
+                        extraClass = 'other-vendor';
+                        infoHtml = `
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span style="font-weight:bold; color:#a0aec0;">⏰ Horário já agendado</span>
+                                <span style="font-size:12px; color:#718096;">(${formatDisplay(c.data_consulta)} ${c.horario})</span>
+                            </div>
+                            <small style="color:#a0aec0;">Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
+                        `;
+                    }
+                }
+
+                const isRealizadaClass = isRealizada ? 'consulta-realizada' : '';
+
+                return `<div class="consulta-card ${extraClass} ${isRealizadaClass}" ${!isAdmin && !isOwn ? '' : `onclick="mostrarDetalhes(${c.id})"`} style="${!isAdmin && !isOwn ? 'cursor:default;' : 'cursor:pointer;'}">
+                    <div class="info">
+                        ${infoHtml}
+                    </div>
+                    ${actions}
+                </div>`;
+            }).join('');
+        }
+
+        // ========================================================================
+        // IMPRESSÃO COM SELEÇÃO DE TIPO
+        // ========================================================================
+        function abrirModalImpressao(id) {
+            consultaParaImprimir = id;
+            document.getElementById('modalImpressao').classList.add('show');
+        }
+
+        function fecharModalImpressao() {
+            document.getElementById('modalImpressao').classList.remove('show');
+            consultaParaImprimir = null;
+        }
+
+        function imprimirComprovanteSelecionado(tipo) {
+            fecharModalImpressao();
+            if (consultaParaImprimir) {
+                gerarComprovante(consultaParaImprimir, tipo);
+            } else {
+                showToast('Erro: nenhuma consulta selecionada.', true);
+            }
+        }
+
+        function gerarComprovante(id, tipo) {
+            const c = consultas.find(cons => cons.id === id);
+            if (!c) {
+                showToast('Consulta não encontrada.', true);
+                return;
+            }
+
+            const dataFormatada = formatDisplay(c.data_consulta);
+            const status = c.status || 'agendada';
+            const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+            const pedido = c.numero_pedido || 'Não informado';
+
+            // Define a classe CSS conforme o tipo
+            let classeComprovante = '';
+            let tituloAcao = '';
+            switch (tipo) {
+                case 'bobina':
+                    classeComprovante = 'comprovante-bobina';
+                    tituloAcao = 'Bobina (80mm)';
+                    break;
+                case 'pdf':
+                    classeComprovante = 'comprovante-pdf';
+                    tituloAcao = 'PDF (salvar como)';
+                    break;
+                case 'a4':
+                default:
+                    classeComprovante = 'comprovante-a4';
+                    tituloAcao = 'A4';
+                    break;
+            }
+
+            const comprovanteDiv = document.getElementById('comprovante');
+            comprovanteDiv.innerHTML = `
+                <div class="comprovante-container ${classeComprovante}">
+                    <h2>🏥 ÓTICA MACAÉ</h2>
+                    <h3 style="text-align:center; color:#2d3748;">Comprovante de Consulta</h3>
+                    <p style="text-align:center; font-size:12px; color:#888;">Formato: ${tituloAcao}</p>
+                    <hr style="margin: 15px 0;">
+                    <div class="detalhe"><span class="label">Paciente:</span> <span>${escapeHtml(c.paciente_nome)}</span></div>
+                    <div class="detalhe"><span class="label">Data:</span> <span>${dataFormatada}</span></div>
+                    <div class="detalhe"><span class="label">Horário:</span> <span>${c.horario}</span></div>
+                    <div class="detalhe"><span class="label">Médico:</span> <span>Dr. ${escapeHtml(c.medico_nome)}</span></div>
+                    <div class="detalhe"><span class="label">Status:</span> <span>${statusLabel}</span></div>
+                    <div class="detalhe"><span class="label">Nº Pedido:</span> <span>${pedido}</span></div>
+                    ${c.observacoes ? `<div class="detalhe"><span class="label">Observações:</span> <span>${escapeHtml(c.observacoes)}</span></div>` : ''}
+                    <hr style="margin: 15px 0;">
+                    <div class="rodape">
+                        Rua Marechal Deodoro, 185 - Centro - Macae/RJ<br>
+                        Telefone: (22) 99764-0112<br>
+                        <em>Este comprovante é válido como confirmação de agendamento.</em>
+                    </div>
+                    <button onclick="fecharComprovante()" class="no-print" style="display:block; margin:20px auto; padding:8px 20px; background:#e53e3e; color:white; border:none; border-radius:5px; cursor:pointer;">Fechar</button>
+                </div>
+            `;
+            comprovanteDiv.style.display = 'block';
+
+            // Aguarda a renderização e chama a impressão
+            setTimeout(() => {
+                window.print();
+            }, 300);
+        }
+
+        function fecharComprovante() {
+            document.getElementById('comprovante').style.display = 'none';
+            document.getElementById('comprovante').innerHTML = '';
+        }
+
+        // ========================================================================
+        // CALENDÁRIO
+        // ========================================================================
+        function renderizarCalendario() {
+            const container = document.getElementById('calendarioContainer');
+            if (!container) return;
+
+            const titulo = document.getElementById('tituloCalendario');
+            const nomeMes = currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            titulo.textContent = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+
+            if (currentView === 'week') renderizarSemana(container);
+            else if (currentView === 'month') renderizarMes(container);
+            else renderizarDia(container);
+
+            document.querySelectorAll('.view-buttons button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll(`.view-buttons button[onclick*="${currentView}"]`).forEach(btn => btn.classList.add('active'));
+        }
+
+        function renderizarSemana(container) {
+            let start = new Date(currentDate);
+            start.setDate(currentDate.getDate() - currentDate.getDay());
+            let days = [];
+            for (let i = 0; i < 7; i++) {
+                let d = new Date(start);
+                d.setDate(start.getDate() + i);
+                days.push(d);
+            }
+            let hours = ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00'];
+            let html = `<table><thead><tr><th>Horário</th>`;
+            days.forEach(day => {
+                let dateStr = formatDate(day);
+                let dayEvents = consultas.filter(c => c.data_consulta === dateStr);
+                html += `<th>${day.toLocaleDateString('pt-BR', { weekday: 'short' })}<br>${day.getDate()}<br><small>${dayEvents.length}</small></th>`;
+            });
+            html += `</tr></thead><tbody>`;
+            hours.forEach(hour => {
+                html += `<tr><td class="horario-label">${hour}</td>`;
+                days.forEach(day => {
+                    let dateStr = formatDate(day);
+                    let hourEvents = consultas.filter(c => c.data_consulta === dateStr && c.horario === hour);
+                    html += `<td style="background: ${hourEvents.length > 0 ? '#e8f0fe' : 'white'};">`;
+                    hourEvents.forEach(e => {
+                        html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})">
+                            <strong>${escapeHtml(e.paciente_nome)}</strong><br>
+                            <small>${e.medico_nome}</small>
+                        </div>`;
+                    });
+                    html += `</td>`;
+                });
+                html += `</tr>`;
+            });
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+        }
+
+        function renderizarMes(container) {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const startDay = firstDay.getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const today = formatDate(new Date());
+            let html = `<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:5px;">`;
+            ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d => html += `<div style="font-weight:bold; padding:5px; background:#f7fafc; text-align:center;">${d}</div>`);
+            for (let i = 0; i < startDay; i++) html += `<div></div>`;
+            for (let d = 1; d <= daysInMonth; d++) {
+                let dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                let isToday = dateStr === today;
+                let dayEvents = consultas.filter(c => c.data_consulta === dateStr);
+                html += `<div style="border:1px solid #ddd; border-radius:8px; padding:8px; min-height:100px; background:${isToday ? '#e8f0fe' : 'white'}">
+                    <strong>${d}</strong><br>`;
+                dayEvents.slice(0, 3).forEach(e => {
+                    html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})" style="font-size:10px;">${e.horario} ${escapeHtml(e.paciente_nome.substring(0,15))}</div>`;
+                });
+                if (dayEvents.length > 3) html += `<small>+${dayEvents.length-3}</small>`;
+                html += `</div>`;
+            }
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        function renderizarDia(container) {
+            let dateStr = formatDate(currentDate);
+            let dayEvents = consultas.filter(c => c.data_consulta === dateStr).sort((a,b) => a.horario.localeCompare(b.horario));
+            let html = `<div style="background:linear-gradient(135deg,#667eea,#764ba2); color:white; padding:20px; text-align:center; border-radius:10px; margin-bottom:20px;">
+                <h2>${currentDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</h2>
+                <p>${currentDate.toLocaleDateString('pt-BR', { weekday: 'long' })}</p>
+                <p>${dayEvents.length} consulta(s)</p>
+            </div>`;
+            if (dayEvents.length === 0) {
+                html += `<div class="no-data">Nenhuma consulta</div>`;
+            } else {
+                dayEvents.forEach(e => {
+                    html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})" style="margin-bottom:10px; padding:15px;">
+                        <strong>🕐 ${e.horario}</strong><br>
+                        <strong>${escapeHtml(e.paciente_nome)}</strong><br>
+                        👨‍⚕️ Dr. ${escapeHtml(e.medico_nome)}<br>
+                        📞 ${e.paciente_telefone}
+                        ${e.observacoes ? `<br>📝 ${escapeHtml(e.observacoes)}` : ''}
+                    </div>`;
+                });
+            }
+            container.innerHTML = html;
+        }
+
+        // ========================================================================
+        // CONFIRMAR, PROCESSAR, CANCELAR, EXCLUIR CONSULTAS
+        // ========================================================================
+        async function confirmarConsulta(id) {
+            if (user.tipo !== 'admin') { showToast('Apenas administradores podem confirmar.', true); return; }
+            const c = consultas.find(cons => cons.id === id);
+            if (c && c.status === 'realizada') {
+                showToast('Consulta já realizada.', true);
+                return;
+            }
+            if (!confirm('Confirmar esta consulta?')) return;
+            try {
+                const res = await fetch(`${API_URL}/consultas/${id}/confirmar`, {
+                    method: 'PUT',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Erro'); }
+                showToast('Consulta confirmada!');
+                await carregarDados();
+                renderizarCalendario();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        async function processarConsulta(id) {
+            if (user.tipo !== 'admin') { showToast('Apenas administradores podem processar.', true); return; }
+            const c = consultas.find(cons => cons.id === id);
+            if (c && c.status === 'realizada') {
+                showToast('Consulta já foi processada.', true);
+                return;
+            }
+            if (!confirm('Marcar esta consulta como REALIZADA? Esta ação é irreversível.')) return;
+            try {
+                const res = await fetch(`${API_URL}/consultas/${id}/processar`, {
+                    method: 'PUT',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Erro'); }
+                showToast('Consulta processada (realizada)!');
+                await carregarDados();
+                renderizarCalendario();
+                if (user.tipo === 'admin') carregarDashboard();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        async function cancelarConsulta(id) {
+            if (user.tipo !== 'admin') { showToast('Apenas administradores podem cancelar.', true); return; }
+            const c = consultas.find(cons => cons.id === id);
+            if (c && c.status === 'realizada') {
+                showToast('Consulta já realizada. Não pode ser cancelada.', true);
+                return;
+            }
+            if (!confirm('Cancelar esta consulta?')) return;
+            try {
+                const c = consultas.find(c => c.id === id);
+                if (!c) return;
+                const dados = { ...c, status: 'cancelada' };
+                const res = await fetch(`${API_URL}/consultas/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(dados)
+                });
+                if (!res.ok) throw new Error('Erro ao cancelar');
+                showToast('Consulta cancelada!');
+                await carregarDados();
+                renderizarCalendario();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        async function excluirConsulta(id) {
+            if (user.tipo !== 'admin') { showToast('Apenas administradores podem excluir.', true); return; }
+            const c = consultas.find(cons => cons.id === id);
+            if (c && c.status === 'realizada') {
+                showToast('Consulta já realizada. Não pode ser excluída.', true);
+                return;
+            }
+            if (!confirm('Excluir permanentemente?')) return;
+            try {
+                await fetch(`${API_URL}/consultas/${id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                showToast('Excluída!');
+                await carregarDados();
+                renderizarCalendario();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        function editarConsulta(id) {
+            if (user.tipo !== 'admin') { showToast('Apenas administradores podem editar.', true); return; }
+            const c = consultas.find(c => c.id === id);
+            if (!c) return;
+            if (c.status === 'realizada') {
+                showToast('Consulta já realizada. Não é possível editar.', true);
+                return;
+            }
+            if (c.status === 'cancelada') {
+                showToast('Consulta cancelada. Não é possível editar.', true);
+                return;
+            }
+            editandoId = id;
+            document.getElementById('pacienteNome').value = c.paciente_nome;
+            document.getElementById('pacienteTelefone').value = c.paciente_telefone;
+            document.getElementById('pacienteEmail').value = c.paciente_email || '';
+            document.getElementById('pacienteCpf').value = c.paciente_cpf || '';
+            document.getElementById('dataConsulta').value = c.data_consulta;
+            document.getElementById('horarioSelect').value = c.horario;
+            document.getElementById('medicoSelect').value = c.medico_id;
+            document.getElementById('observacoes').value = c.observacoes || '';
+            document.getElementById('numeroPedido').value = c.numero_pedido || '';
+            document.getElementById('cancelEditBtn').style.display = 'inline-block';
+            const paciente = clientes.find(p => p.nome === c.paciente_nome && p.telefone === c.paciente_telefone);
+            if (paciente) {
+                document.getElementById('pacienteDataNasc').value = paciente.data_nascimento || '';
+                document.getElementById('pacienteNeurodivergente').checked = paciente.neurodivergente === 1;
+                document.getElementById('pacienteDeficienciaFisica').checked = paciente.deficiencia_fisica === 1;
+                document.getElementById('pacienteEncaixe').checked = paciente.encaixe === 1;
+                document.getElementById('pacienteSelect').value = paciente.id;
+                atualizarIdadeDisplay();
+                setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
+            }
+            carregarHorariosDisponiveis();
+            navegarPara('pageAgendar');
+        }
+
+        function cancelarEdicao() {
+            editandoId = null;
+            document.getElementById('pacienteSelect').value = '';
+            document.getElementById('pacienteNome').value = '';
+            document.getElementById('pacienteTelefone').value = '';
+            document.getElementById('pacienteEmail').value = '';
+            document.getElementById('pacienteCpf').value = '';
+            document.getElementById('pacienteDataNasc').value = '';
+            document.getElementById('pacienteNeurodivergente').checked = false;
+            document.getElementById('pacienteDeficienciaFisica').checked = false;
+            document.getElementById('pacienteEncaixe').checked = true;
+            document.getElementById('dataConsulta').value = '';
+            document.getElementById('horarioSelect').value = '';
+            document.getElementById('medicoSelect').value = '';
+            document.getElementById('observacoes').value = '';
+            document.getElementById('numeroPedido').value = '';
+            document.getElementById('cancelEditBtn').style.display = 'none';
+            document.getElementById('idadeDisplay').innerHTML = '';
+            document.getElementById('buscarCpf').value = '';
+            const msgDiv = document.getElementById('msgHorarios');
+            msgDiv.style.display = 'none';
+            msgDiv.innerHTML = '';
+            setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
+        }
+
+        // ========================================================================
+        // DASHBOARD
+        // ========================================================================
+        async function carregarDashboard() {
+            if (user.tipo !== 'admin') return;
+            try {
+                const res = await fetch(`${API_URL}/dashboard`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Erro');
+
+                document.getElementById('totalConsultas').textContent = data.total_consultas || 0;
+                document.getElementById('totalMedicos').textContent = data.total_medicos || 0;
+                document.getElementById('totalAgendadas').textContent = data.por_status?.agendada || 0;
+                document.getElementById('totalConfirmadas').textContent = data.por_status?.confirmada || 0;
+                document.getElementById('totalRealizadas').textContent = data.por_status?.realizada || 0;
+                document.getElementById('totalCanceladas').textContent = data.por_status?.cancelada || 0;
+
+                const container = document.getElementById('vendedoresRelatorio');
+                if (!data.por_vendedor || data.por_vendedor.length === 0) {
+                    container.innerHTML = '<p>Nenhum vendedor com consultas.</p>';
+                    return;
+                }
+
+                let html = `<table>
+                    <thead>
+                        <tr>
+                            <th>Vendedor</th>
+                            <th>Total</th>
+                            <th>Agendadas</th>
+                            <th>Confirmadas</th>
+                            <th>Realizadas</th>
+                            <th>Canceladas</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+                data.por_vendedor.forEach(v => {
+                    html += `<tr>
+                        <td>${escapeHtml(v.vendedor_nome)}</td>
+                        <td>${v.total}</td>
+                        <td>${v.agendadas}</td>
+                        <td>${v.confirmadas}</td>
+                        <td>${v.realizadas}</td>
+                        <td>${v.canceladas}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table>`;
+                container.innerHTML = html;
+
+            } catch (err) {
+                console.error(err);
+                showToast('Erro ao carregar dashboard', true);
+            }
+        }
+
+        // ========================================================================
+        // ENVIO DE WHATSAPP
+        // ========================================================================
+        async function enviarWhatsAppPaciente(id) {
+            if (user.tipo !== 'admin') { showToast('Apenas administradores podem enviar.', true); return; }
+            const e = consultas.find(c => c.id === id);
+            if (!e) return;
+            const medico = medicos.find(m => m.id === e.medico_id);
+            const mensagemPadrao = medico ? medico.mensagem_padrao : '';
+            const endereco = 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ';
+            const paciente = clientes.find(p => p.nome === e.paciente_nome && p.telefone === e.paciente_telefone);
+            let condicao = 'Encaixe';
+            if (paciente) {
+                if (paciente.neurodivergente && paciente.deficiencia_fisica) condicao = 'Neurodivergente e Def. Física';
+                else if (paciente.neurodivergente) condicao = 'Neurodivergente';
+                else if (paciente.deficiencia_fisica) condicao = 'Deficiência Física';
+                else if (paciente.encaixe) condicao = 'Encaixe';
+            }
+            let msg = `🏥 *ÓTICA MACAÉ - GUIA DE CONSULTA*\n\nPaciente: ${e.paciente_nome}\nData: ${formatDisplay(e.data_consulta)}\nHorário: ${e.horario}\nMédico: Dr. ${e.medico_nome}\nLocal: ${endereco}\nCondição: ${condicao}`;
+            if (mensagemPadrao) msg += `\n\n${mensagemPadrao}`;
+            if (e.numero_pedido) msg += `\nNº Pedido: ${e.numero_pedido}`;
+            const phone = e.paciente_telefone.replace(/\D/g, '');
+            if (phone) window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+            else showToast('Número do paciente não disponível', true);
+        }
+
+        async function enviarWhatsAppMedico(id) {
+            if (user.tipo !== 'admin') { showToast('Apenas administradores podem enviar.', true); return; }
+            const e = consultas.find(c => c.id === id);
+            if (!e) return;
+            const medico = medicos.find(m => m.id === e.medico_id);
+            if (!medico || !medico.whatsapp) {
+                showToast('Médico não possui WhatsApp cadastrado.', true);
+                return;
+            }
+            const paciente = clientes.find(p => p.nome === e.paciente_nome && p.telefone === e.paciente_telefone);
+            let condicao = 'Encaixe';
+            if (paciente) {
+                if (paciente.neurodivergente && paciente.deficiencia_fisica) condicao = 'Neurodivergente e Def. Física';
+                else if (paciente.neurodivergente) condicao = 'Neurodivergente';
+                else if (paciente.deficiencia_fisica) condicao = 'Deficiência Física';
+                else if (paciente.encaixe) condicao = 'Encaixe';
+            }
+            const endereco = 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ';
+            const msg = `📋 *Nova consulta agendada*\n\nPaciente: ${e.paciente_nome}\nData: ${formatDisplay(e.data_consulta)}\nHorário: ${e.horario}\nTelefone: ${e.paciente_telefone}\nLocal: ${endereco}\nCondição: ${condicao}`;
+            if (e.numero_pedido) msg += `\nNº Pedido: ${e.numero_pedido}`;
+            const phone = medico.whatsapp.replace(/\D/g, '');
+            if (phone) window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+            else showToast('WhatsApp do médico inválido', true);
+        }
+
+        // ========================================================================
+        // USUÁRIOS
+        // ========================================================================
+        async function salvarUsuario() {
+            const tipo = document.getElementById('usuarioTipo').value;
+            const telefone = document.getElementById('usuarioTelefone').value;
+            if (tipo === 'vendedor' && !telefone) {
+                showToast('Telefone obrigatório para vendedor', true);
+                return;
+            }
+            const data = {
+                nome: document.getElementById('usuarioNome').value,
+                username: document.getElementById('usuarioUsername').value,
+                senha: document.getElementById('usuarioSenha').value,
+                telefone: telefone,
+                tipo: tipo
+            };
+            const editId = document.getElementById('editUsuarioId').value;
+            const url = editId ? `${API_URL}/usuarios/${editId}` : `${API_URL}/usuarios`;
+            const method = editId ? 'PUT' : 'POST';
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Erro'); }
+                showToast(editId ? 'Atualizado' : 'Criado');
+                cancelarEdicaoUsuario();
+                await carregarDados();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        function renderUsuarios() {
+            const container = document.getElementById('usuariosList');
+            if (!container) return;
+            if (usuarios.length === 0) { container.innerHTML = '<p class="no-data">Nenhum usuário</p>'; return; }
+            container.innerHTML = usuarios.map(u => `
+                <div style="border-bottom:1px solid #ddd; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+                    <div><strong>${escapeHtml(u.nome)}</strong><br>@${u.username} | ${u.tipo} ${u.telefone ? '📞 ' + u.telefone : ''}</div>
+                    <div><button onclick="editarUsuario(${u.id})">✏️</button>${u.username !== 'admin' ? `<button onclick="excluirUsuario(${u.id})">🗑️</button>` : ''}</div>
+                </div>
+            `).join('');
+        }
+
+        function editarUsuario(id) {
+            const u = usuarios.find(u => u.id === id);
+            if (!u) return;
+            document.getElementById('editUsuarioId').value = u.id;
+            document.getElementById('usuarioNome').value = u.nome;
+            document.getElementById('usuarioUsername').value = u.username;
+            document.getElementById('usuarioSenha').value = '';
+            document.getElementById('usuarioTelefone').value = u.telefone || '';
+            document.getElementById('usuarioTipo').value = u.tipo;
+            document.getElementById('cancelUsuarioBtn').style.display = 'inline-block';
+            mostrarSubPage('usuarios');
+        }
+
+        function cancelarEdicaoUsuario() {
+            document.getElementById('editUsuarioId').value = '';
+            document.getElementById('cancelUsuarioBtn').style.display = 'none';
+        }
+
+        async function excluirUsuario(id) {
+            if (!confirm('Excluir?')) return;
+            try {
+                await fetch(`${API_URL}/usuarios/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+                showToast('Excluído');
+                await carregarDados();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        // ========================================================================
+        // SOLICITAÇÕES
+        // ========================================================================
+        async function enviarSolicitacao() {
+            const dataConsulta = document.getElementById('solDataConsulta').value;
+            if (!validarDataNaoPassada(dataConsulta, 'Data da consulta')) {
+                return;
+            }
+
+            const data = {
+                paciente_nome: document.getElementById('solPacienteNome').value,
+                paciente_telefone: document.getElementById('solPacienteTelefone').value,
+                paciente_email: document.getElementById('solPacienteEmail').value,
+                paciente_cpf: document.getElementById('solPacienteCpf').value,
+                data_nascimento: document.getElementById('solPacienteDataNasc').value,
+                neurodivergente: document.getElementById('solNeurodivergente').checked ? 1 : 0,
+                deficiencia_fisica: document.getElementById('solDeficienciaFisica').checked ? 1 : 0,
+                encaixe: document.getElementById('solEncaixe').checked ? 1 : 0,
+                data_consulta: dataConsulta,
+                horario1: document.getElementById('solHorario1').value,
+                horario2: document.getElementById('solHorario2').value,
+                horario3: document.getElementById('solHorario3').value,
+                medico_id: parseInt(document.getElementById('solMedicoSelect').value),
+                medico_nome: medicos.find(m => m.id == document.getElementById('solMedicoSelect').value)?.nome,
+                observacoes: document.getElementById('solObservacoes').value,
+                numero_pedido: document.getElementById('solNumeroPedido').value.trim() || null
+            };
+
+            if (!data.paciente_nome || !data.paciente_telefone || !data.data_consulta || !data.horario1 || !data.medico_id) {
+                document.getElementById('solMsg').innerHTML = '<p style="color:red;">Preencha todos os campos obrigatórios (pelo menos o 1º horário).</p>';
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/solicitacoes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || 'Erro');
+                document.getElementById('solMsg').innerHTML = '<p style="color:green;">Solicitação enviada! Aguarde aprovação.</p>';
+                setTimeout(() => {
+                    document.getElementById('solMsg').innerHTML = '';
+                    document.getElementById('solPacienteNome').value = '';
+                    document.getElementById('solPacienteTelefone').value = '';
+                    document.getElementById('solPacienteEmail').value = '';
+                    document.getElementById('solPacienteCpf').value = '';
+                    document.getElementById('solPacienteDataNasc').value = '';
+                    document.getElementById('solNeurodivergente').checked = false;
+                    document.getElementById('solDeficienciaFisica').checked = false;
+                    document.getElementById('solEncaixe').checked = true;
+                    document.getElementById('solHorario1').value = '';
+                    document.getElementById('solHorario2').value = '';
+                    document.getElementById('solHorario3').value = '';
+                    document.getElementById('solObservacoes').value = '';
+                    document.getElementById('solNumeroPedido').value = '';
+                    document.getElementById('solIdadeDisplay').innerHTML = '';
+                    setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
+                }, 3000);
+            } catch (err) {
+                document.getElementById('solMsg').innerHTML = `<p style="color:red;">${err.message}</p>`;
+            }
+        }
+
+        async function carregarSolicitacoes() {
+            if (user.tipo !== 'admin') return;
+            try {
+                const res = await fetch(`${API_URL}/solicitacoes`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const lista = await res.json();
+                const container = document.getElementById('solicitacoesList');
+                if (!container) return;
+                if (lista.length === 0) {
+                    container.innerHTML = '<p class="no-data">Nenhuma solicitação.</p>';
+                    return;
+                }
+                container.innerHTML = lista.map(s => {
+                    const horarios = [s.horario_sugerido1, s.horario_sugerido2, s.horario_sugerido3].filter(h => h);
+                    let horariosHtml = '';
+                    if (s.status === 'pendente') {
+                        horariosHtml = horarios.map(h => `
+                            <label style="margin-right:10px;">
+                                <input type="radio" name="horario_${s.id}" value="${h}" ${s.horario_escolhido === h ? 'checked' : ''}>
+                                ${h}
+                            </label>
+                        `).join('');
+                    }
+
+                    let actionsHtml = '';
+                    if (s.status === 'pendente') {
+                        actionsHtml = `
+                            <div class="horario-radio-group">
+                                ${horariosHtml}
+                                <button onclick="aprovarSolicitacao(${s.id})" class="btn-success" style="margin-top:5px;">✅ Aprovar (selecionado)</button>
+                                <button onclick="rejeitarSolicitacao(${s.id})" class="btn-danger" style="margin-top:5px;">❌ Rejeitar</button>
+                            </div>
+                        `;
+                    }
+
+                    const hasPedido = s.numero_pedido ? `<br><small>📦 Pedido: ${escapeHtml(s.numero_pedido)}</small>` : '';
+
+                    return `
+                        <div style="border-bottom:1px solid #ddd; padding:10px; ${s.status === 'pendente' ? 'background:#fffbe6;' : ''}">
+                            <div>
+                                <strong>${escapeHtml(s.paciente_nome)}</strong> ${hasPedido}<br>
+                                ${formatDisplay(s.data_consulta)} | Médico: ${s.medico_nome}<br>
+                                <span style="font-size:12px; color:${s.status === 'pendente' ? 'orange' : s.status === 'aprovado' ? 'green' : 'red'};">Status: ${s.status}</span>
+                                ${s.status === 'pendente' ? `<span style="font-size:11px; color:#999;"> | Solicitado por: ${escapeHtml(s.solicitante_nome)}</span>` : ''}
+                                ${s.horario_escolhido ? `<br><strong>Horário escolhido: ${s.horario_escolhido}</strong>` : ''}
+                            </div>
+                            ${actionsHtml}
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error(err);
+                document.getElementById('solicitacoesList').innerHTML = `<p style="color:red;">Erro: ${err.message}</p>`;
+            }
+        }
+
+        async function aprovarSolicitacao(id) {
+            if (!confirm('Aprovar esta solicitação?')) return;
+            const radio = document.querySelector(`input[name="horario_${id}"]:checked`);
+            if (!radio) {
+                showToast('Selecione um horário para aprovar.', true);
+                return;
+            }
+            const horario_escolhido = radio.value;
+            try {
+                const res = await fetch(`${API_URL}/solicitacoes/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ status: 'aprovado', horario_escolhido })
+                });
+                if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Erro'); }
+                showToast('Solicitação aprovada!');
+                await carregarSolicitacoes();
+                await carregarDados();
+                renderizarCalendario();
+                atualizarBadgeSolicitacoes();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        async function rejeitarSolicitacao(id) {
+            if (!confirm('Rejeitar esta solicitação?')) return;
+            try {
+                const res = await fetch(`${API_URL}/solicitacoes/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ status: 'rejeitado' })
+                });
+                if (!res.ok) throw new Error('Erro');
+                showToast('Solicitação rejeitada.');
+                await carregarSolicitacoes();
+                atualizarBadgeSolicitacoes();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        async function atualizarBadgeSolicitacoes() {
+            if (user.tipo !== 'admin') return;
+            try {
+                const res = await fetch(`${API_URL}/solicitacoes/pendentes/count`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const badge1 = document.getElementById('badgeSolicitacoes');
+                const badge2 = document.getElementById('badgeSolicitacoesMenu');
+                [badge1, badge2].forEach(b => {
+                    if (b) {
+                        b.textContent = data.total;
+                        b.style.display = data.total > 0 ? 'inline' : 'none';
+                    }
+                });
+                if (window._ultimoContadorSolic === undefined) window._ultimoContadorSolic = 0;
+                if (data.total > window._ultimoContadorSolic && data.total > 0) {
+                    showToast(`📩 ${data.total} nova(s) solicitação(ões)`);
+                }
+                window._ultimoContadorSolic = data.total;
+            } catch (err) { console.error(err); }
+        }
+
+        function iniciarPollingSolicitacoes() {
+            if (user.tipo !== 'admin') return;
+            atualizarBadgeSolicitacoes();
+            setInterval(atualizarBadgeSolicitacoes, 30000);
+        }
+
+        // ========================================================================
+        // LEMBRETES
+        // ========================================================================
+        let _ultimoContadorLembretes = 0;
+
+        async function carregarLembretes() {
+            try {
+                const res = await fetch(`${API_URL}/lembretes`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const lista = await res.json();
+                const container = document.getElementById('lembretesList');
+                if (!container) return;
+                if (lista.length === 0) { container.innerHTML = '<p>Nenhum lembrete pendente.</p>'; return; }
+                container.innerHTML = lista.map(l => `
+                    <div style="border-bottom:1px solid #ddd; padding:10px;">
+                        <strong>${escapeHtml(l.destinatario_nome)}</strong> (${l.destinatario_tipo})<br>
+                        <span style="font-size:13px;">${escapeHtml(l.mensagem)}</span><br>
+                        <small>Enviar em: ${new Date(l.data_envio_programada).toLocaleString()}</small>
+                        <button onclick="marcarLembreteEnviado(${l.id})" class="btn-success" style="margin-left:10px;">✅ Simular envio</button>
+                    </div>
+                `).join('');
+                const badge = document.getElementById('badgeLembretes');
+                if (badge) {
+                    badge.textContent = lista.length;
+                    badge.style.display = lista.length > 0 ? 'inline' : 'none';
+                }
+                if (lista.length > _ultimoContadorLembretes && lista.length > 0) {
+                    showToast(`🔔 ${lista.length} lembrete(s) pendente(s)`);
+                }
+                _ultimoContadorLembretes = lista.length;
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function abrirModalLembretes() {
+            document.getElementById('modalLembretes').classList.add('show');
+            carregarLembretes();
+        }
+
+        function fecharModalLembretes() {
+            document.getElementById('modalLembretes').classList.remove('show');
+        }
+
+        async function marcarLembreteEnviado(id) {
+            try {
+                await fetch(`${API_URL}/lembretes/${id}/enviar`, {
+                    method: 'PUT',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                showToast('Lembrete enviado!');
+                carregarLembretes();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        function iniciarPollingLembretes() {
+            carregarLembretes();
+            setInterval(carregarLembretes, 60000);
+        }
+
+        // ========================================================================
+        // WHATSAPP CONFIG
+        // ========================================================================
+        async function carregarConfigWhatsapp() {
+            try {
+                const res = await fetch(`${API_URL}/whatsapp/config`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                document.getElementById('whatsappNumero').value = data.numero || '';
+                document.getElementById('whatsappEndereco').value = data.endereco_otica || '';
+            } catch (err) { console.error(err); }
+        }
+
+        async function salvarConfigWhatsapp() {
+            const data = {
+                numero: document.getElementById('whatsappNumero').value,
+                endereco_otica: document.getElementById('whatsappEndereco').value
+            };
+            try {
+                const res = await fetch(`${API_URL}/whatsapp/config`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) throw new Error('Erro');
+                showToast('Configurações salvas!');
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        // ========================================================================
+        // NAVEGAÇÃO
+        // ========================================================================
+        function navegarPara(pageId) {
+            document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
+            const target = document.getElementById(pageId);
+            if (target) target.classList.add('active');
+            document.querySelectorAll('.side-menu .menu-item').forEach(btn => btn.classList.remove('active'));
+            const menuBtn = document.querySelector(`.side-menu .menu-item[data-page="${pageId}"]`);
+            if (menuBtn) menuBtn.classList.add('active');
+
+            if (pageId === 'pageLista') renderizarLista();
+            else if (pageId === 'pageCalendario') renderizarCalendario();
+            else if (pageId === 'pageDashboard' && user.tipo === 'admin') carregarDashboard();
+
+            fecharMenu();
+        }
+
+        function mostrarSubPage(subId) {
+            document.querySelectorAll('#pageAdmin .sub-page').forEach(el => el.classList.remove('active'));
+            const target = document.getElementById('sub' + subId.charAt(0).toUpperCase() + subId.slice(1));
+            if (target) target.classList.add('active');
+            if (subId === 'solicitacoes') carregarSolicitacoes();
+            if (subId === 'whatsapp') carregarConfigWhatsapp();
+            navegarPara('pageAdmin');
+        }
+
+        // ========================================================================
+        // NAVEGAÇÃO DO CALENDÁRIO
+        // ========================================================================
+        function mudarView(view) { currentView = view; renderizarCalendario(); }
+        function hoje() { currentDate = new Date(); renderizarCalendario(); }
+        function anterior() {
+            if (currentView === 'month') currentDate.setMonth(currentDate.getMonth() - 1);
+            else if (currentView === 'week') currentDate.setDate(currentDate.getDate() - 7);
+            else currentDate.setDate(currentDate.getDate() - 1);
+            renderizarCalendario();
+        }
+        function proximo() {
+            if (currentView === 'month') currentDate.setMonth(currentDate.getMonth() + 1);
+            else if (currentView === 'week') currentDate.setDate(currentDate.getDate() + 7);
+            else currentDate.setDate(currentDate.getDate() + 1);
+            renderizarCalendario();
+        }
+
+        // ========================================================================
+        // MENU
+        // ========================================================================
+        function abrirMenu() {
+            document.getElementById('sideMenu').classList.add('open');
+            document.getElementById('menuOverlay').classList.add('show');
+        }
+        function fecharMenu() {
+            document.getElementById('sideMenu').classList.remove('open');
+            document.getElementById('menuOverlay').classList.remove('show');
+        }
+        document.getElementById('hamburgerBtn').addEventListener('click', abrirMenu);
+        document.getElementById('closeMenuBtn').addEventListener('click', fecharMenu);
+        document.getElementById('menuOverlay').addEventListener('click', fecharMenu);
+
+        document.querySelectorAll('.side-menu .menu-item').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const page = this.getAttribute('data-page');
+                const sub = this.getAttribute('data-sub');
+                if (sub) {
+                    mostrarSubPage(sub);
+                } else if (page) {
+                    navegarPara(page);
+                }
+            });
+        });
+
+        // ========================================================================
+        // MODAL DE DETALHES
+        // ========================================================================
+        function mostrarDetalhes(id) {
+            const e = consultas.find(c => c.id === id);
+            if (!e) return;
+
+            if (user.tipo !== 'admin' && !e.is_own) {
+                showToast('Esta consulta foi agendada por outro vendedor. Você não pode visualizar os detalhes.', true);
+                return;
+            }
+
+            const modal = document.getElementById('modalDetalhes');
+            const body = document.getElementById('detalhesBody');
+
+            const status = e.status || 'agendada';
+            let statusHtml = '';
+            if (status === 'cancelada') statusHtml = ' <span style="color:red;">(Cancelada)</span>';
+            else if (status === 'confirmada') statusHtml = ' <span style="color:green;">(Confirmada)</span>';
+            else if (status === 'realizada') statusHtml = ' <span style="color:blue;">(Realizada)</span>';
+
+            const vendedor = e.vendedor_nome || 'Não informado';
+            const isRealizada = status === 'realizada';
+            const podeEditar = user.tipo === 'admin' && !isRealizada && status !== 'cancelada';
+
+            let adminActions = '';
+            if (user.tipo === 'admin') {
+                adminActions = `
+                    ${podeEditar ? `<button onclick="editarConsulta(${e.id}); fecharModalDetalhes();" class="btn-warning" style="width:100%; margin-top:5px;">✏️ Editar</button>` : ''}
+                    ${podeEditar && status !== 'cancelada' && status !== 'realizada' && status !== 'confirmada' ? 
+                        `<button onclick="confirmarConsulta(${e.id}); fecharModalDetalhes();" class="btn-success" style="width:100%; margin-top:5px;">✅ Confirmar</button>` : ''}
+                    ${podeEditar && status !== 'cancelada' && status !== 'realizada' ? 
+                        `<button onclick="processarConsulta(${e.id}); fecharModalDetalhes();" class="btn-process" style="width:100%; margin-top:5px;">🔄 Processar</button>` : ''}
+                    ${podeEditar ? `<button onclick="cancelarConsulta(${e.id}); fecharModalDetalhes();" class="btn-danger" style="width:100%; margin-top:5px;">🚫 Cancelar</button>` : ''}
+                    ${!isRealizada ? `<button onclick="enviarWhatsAppPaciente(${e.id})" class="btn-whatsapp" style="width:100%; margin-top:5px;">📱 WhatsApp Paciente</button>` : ''}
+                    ${!isRealizada ? `<button onclick="enviarWhatsAppMedico(${e.id})" class="btn-medico" style="width:100%; margin-top:5px;">📱 WhatsApp Médico</button>` : ''}
+                    ${e.status === 'confirmada' ? `<button onclick="abrirModalImpressao(${e.id}); fecharModalDetalhes();" class="btn-print" style="width:100%; margin-top:5px;">🖨️ Imprimir Comprovante</button>` : ''}
+                    ${isRealizada ? '<p style="color:#2b6cb0; font-weight:bold; margin-top:10px;">✅ Consulta já realizada. Nenhuma ação disponível.</p>' : ''}
+                `;
+            }
+
+            const hasPedido = e.numero_pedido ? `<div><strong>Nº Pedido:</strong> ${escapeHtml(e.numero_pedido)}</div>` : '';
+
+            body.innerHTML = `
+                <div><strong>Paciente:</strong> ${escapeHtml(e.paciente_nome)}</div>
+                <div><strong>Data/Hora:</strong> ${formatDisplay(e.data_consulta)} ${e.horario}</div>
+                <div><strong>Médico:</strong> Dr. ${escapeHtml(e.medico_nome)}</div>
+                <div><strong>Telefone:</strong> ${e.paciente_telefone}</div>
+                ${e.paciente_email ? `<div><strong>E-mail:</strong> ${escapeHtml(e.paciente_email)}</div>` : ''}
+                ${hasPedido}
+                ${e.observacoes ? `<div><strong>Observações:</strong> ${escapeHtml(e.observacoes)}</div>` : ''}
+                <div><strong>Status:</strong> ${status}${statusHtml}</div>
+                <div><strong>Vendedor:</strong> ${escapeHtml(vendedor)}</div>
+                <div style="margin-top:15px; display:flex; flex-direction:column; gap:5px;">
+                    ${adminActions}
+                </div>
+            `;
+            modal.classList.add('show');
+        }
+
+        function fecharModalDetalhes() {
+            document.getElementById('modalDetalhes').classList.remove('show');
+        }
+
+        // ========================================================================
+        // LOGOUT
+        // ========================================================================
+        function logout() {
+            localStorage.clear();
+            window.location.reload();
+        }
+
+        // ========================================================================
+        // AUTO LOGIN
+        // ========================================================================
+        (async () => {
+            const savedToken = localStorage.getItem('token');
+            const savedUser = localStorage.getItem('user');
+            if (savedToken && savedUser) {
+                token = savedToken;
+                user = JSON.parse(savedUser);
+                try {
+                    const res = await fetch(`${API_URL}/verify`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        document.getElementById('loginDiv').style.display = 'none';
+                        document.getElementById('dashboardDiv').style.display = 'block';
+                        document.getElementById('userName').innerHTML = `👤 ${user.nome} (${user.tipo === 'admin' ? 'Admin' : 'Vendedor'})`;
+                        document.getElementById('menuUserName').textContent = user.nome;
+                        document.getElementById('menuUserTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+                        if (user.tipo === 'admin') {
+                            document.getElementById('menuAgendar').style.display = 'block';
+                            document.getElementById('menuAdmin').style.display = 'block';
+                            document.getElementById('menuDashboard').style.display = 'block';
+                        } else {
+                            document.getElementById('menuAgendar').style.display = 'none';
+                            document.getElementById('menuAdmin').style.display = 'none';
+                            document.getElementById('menuDashboard').style.display = 'none';
+                        }
+                        await carregarDados();
+                        renderizarLista();
+                        iniciarPollingLembretes();
+                        if (user.tipo === 'admin') iniciarPollingSolicitacoes();
+                        setTimeout(() => {
+                            setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
+                            setupEncaixeLogic('pacienteCadEncaixe', 'pacienteCadNeurodivergente', 'pacienteCadDeficienciaFisica');
+                            setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
+                            setupEncaixeLogic('novoPacienteEncaixe', 'novoPacienteNeurodivergente', 'novoPacienteDeficienciaFisica');
+                        }, 100);
+                        navegarPara('pageLista');
+                    } else {
+                        localStorage.clear();
+                    }
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+        })();
+
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.classList.remove('show');
+            });
+        });
+
+        // Fechar modal de impressão ao clicar fora
+        document.getElementById('modalImpressao').addEventListener('click', function(e) {
+            if (e.target === this) fecharModalImpressao();
+        });
+
+        console.log('✅ Sistema com impressão (Bobina/A4/PDF) e múltiplos turnos.');
+    </script>
+</body>
+</html>
