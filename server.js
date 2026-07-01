@@ -600,7 +600,7 @@ app.get('/api/consultas', authenticateToken, async (req, res) => {
   }
 });
 
-// ---------- FILTRAR CONSULTAS (NOVO) ----------
+// ---------- FILTRAR CONSULTAS ----------
 app.get('/api/consultas/filtrar', authenticateToken, async (req, res) => {
   try {
     const { data_inicio, data_fim, medico_id, status, paciente, vendedor_id } = req.query;
