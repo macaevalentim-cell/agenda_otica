@@ -66,6 +66,8 @@
         .btn-medico:hover { background: #0d8bcf; }
         .btn-process { background: #9b59b6; }
         .btn-process:hover { background: #8e44ad; }
+        .btn-print { background: #4a5568; }
+        .btn-print:hover { background: #2d3748; }
 
         .consulta-card { border-bottom: 1px solid #ddd; padding: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .consulta-card .info { flex: 1; }
@@ -93,7 +95,6 @@
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
         .modal-overlay.show { display: flex; }
         .modal-box { background: white; border-radius: 10px; max-width: 650px; width: 90%; padding: 25px; max-height: 80vh; overflow-y: auto; }
-        .modal-box h3 { margin-bottom: 15px; }
 
         .horario-radio-group label { margin-right: 15px; cursor: pointer; }
         .horario-radio-group input[type="radio"] { margin-right: 4px; }
@@ -140,6 +141,58 @@
             padding-bottom: 4px;
         }
 
+        /* Estilos para impressão do comprovante */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #comprovante, #comprovante * {
+                visibility: visible;
+            }
+            #comprovante {
+                position: fixed;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 20px;
+                background: white;
+                font-family: 'Courier New', monospace;
+            }
+            #comprovante .cancelar-imprimir {
+                display: none;
+            }
+        }
+
+        .comprovante-container {
+            background: white;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            max-width: 600px;
+            margin: 0 auto;
+            font-family: 'Courier New', monospace;
+        }
+        .comprovante-container h2 {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        .comprovante-container .detalhe {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px dashed #ccc;
+        }
+        .comprovante-container .detalhe .label {
+            font-weight: bold;
+        }
+        .comprovante-container .rodape {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+        }
+
         @media (max-width: 768px) {
             .header-title h2 { font-size: 16px; }
             .side-menu { width: 240px; left: -240px; }
@@ -183,7 +236,6 @@
                 <span class="tipo" id="menuUserTipo">tipo</span>
             </div>
             <hr style="border-color: #4a5568; margin: 10px 0;">
-            <!-- Menus: Lista e Calendário separados -->
             <button class="menu-item active" data-page="pageLista">📋 Lista de Consultas</button>
             <button class="menu-item" data-page="pageCalendario">📅 Calendário</button>
             <button class="menu-item" data-page="pageAgendar" id="menuAgendar">📝 Agendar</button>
@@ -198,7 +250,7 @@
             <button class="menu-item" data-page="pageAdmin" data-sub="whatsapp">📱 WhatsApp</button>
         </div>
 
-        <!-- PÁGINA LISTA DE CONSULTAS (cards) -->
+        <!-- PÁGINA LISTA DE CONSULTAS -->
         <div id="pageLista" class="page-section active">
             <h3>📋 Lista de Consultas</h3>
             <div id="consultasListMain"></div>
@@ -263,6 +315,9 @@
                 <div class="form-row">
                     <select id="medicoSelect"></select>
                     <input type="text" id="observacoes" placeholder="Observações">
+                </div>
+                <div class="form-row">
+                    <input type="text" id="numeroPedido" placeholder="Número do Pedido (opcional)" style="flex:1;">
                 </div>
                 <input type="hidden" id="editConsultaId">
                 <button onclick="salvarConsulta()">💾 Salvar</button>
@@ -335,7 +390,6 @@
                     <h3>Médicos Cadastrados</h3>
                     <div id="medicosList"></div>
                 </div>
-                <!-- SEÇÃO DE HORÁRIOS com separação manhã/tarde -->
                 <div id="horariosMedico" style="display:none; background:#f8f9fa; padding:20px; border-radius:10px; margin-top:20px;">
                     <h4>Gerenciar Horários de Atendimento</h4>
                     <div id="horariosList"></div>
@@ -469,6 +523,9 @@
                 <select id="solMedicoSelect"></select>
                 <input type="text" id="solObservacoes" placeholder="Observações">
             </div>
+            <div class="form-row">
+                <input type="text" id="solNumeroPedido" placeholder="Número do Pedido (opcional)" style="flex:1;">
+            </div>
             <button onclick="enviarSolicitacao()" class="btn-success">Enviar Solicitação</button>
             <div id="solMsg" style="margin-top:10px;"></div>
         </div>
@@ -481,6 +538,7 @@
                 <button onclick="fecharModalLembretes()" style="margin-top:10px;">Fechar</button>
             </div>
         </div>
+
         <div id="modalDetalhes" class="modal-overlay">
             <div class="modal-box">
                 <h3>Detalhes da Consulta</h3>
@@ -488,6 +546,7 @@
                 <button onclick="fecharModalDetalhes()" style="margin-top:10px;">Fechar</button>
             </div>
         </div>
+
         <div id="modalCadastroPaciente" class="modal-overlay">
             <div class="modal-box">
                 <h3>Novo Paciente</h3>
@@ -512,8 +571,12 @@
                 <div id="novoPacienteMsg"></div>
             </div>
         </div>
+
         <div id="toast" class="toast"></div>
     </div>
+
+    <!-- COMPROVANTE (escondido, usado para impressão) -->
+    <div id="comprovante" style="display:none;"></div>
 
     <script>
         // ========================================================================
@@ -1084,7 +1147,7 @@
         }
 
         // ========================================================================
-        // HORÁRIOS DOS MÉDICOS (com separação manhã/tarde)
+        // HORÁRIOS DOS MÉDICOS
         // ========================================================================
         function gerenciarHorarios(medicoId) {
             medicoSelecionadoId = medicoId;
@@ -1106,7 +1169,6 @@
                     return;
                 }
 
-                // Separar manhã (até 12:00) e tarde (13:00 em diante)
                 const manha = horarios.filter(h => h.hora_inicio < '12:00');
                 const tarde = horarios.filter(h => h.hora_inicio >= '13:00');
 
@@ -1374,6 +1436,7 @@
             const horario = document.getElementById('horarioSelect').value;
             const medicoId = document.getElementById('medicoSelect').value;
             const medicoNome = medicos.find(m => m.id == medicoId)?.nome;
+            const numeroPedido = document.getElementById('numeroPedido').value.trim() || null;
 
             if (!pacienteNome || !pacienteTelefone || !dataConsulta || !horario || !medicoId) {
                 showToast('Preencha todos os campos obrigatórios!', true);
@@ -1396,7 +1459,8 @@
                 horario: horario,
                 medico_id: parseInt(medicoId),
                 medico_nome: medicoNome,
-                observacoes: document.getElementById('observacoes').value
+                observacoes: document.getElementById('observacoes').value,
+                numero_pedido: numeroPedido
             };
             const url = editandoId ? `${API_URL}/consultas/${editandoId}` : `${API_URL}/consultas`;
             const method = editandoId ? 'PUT' : 'POST';
@@ -1441,6 +1505,7 @@
                 let actions = '';
                 let extraClass = '';
                 let infoHtml = '';
+                const hasPedido = c.numero_pedido ? `<br><small>📦 Pedido: ${escapeHtml(c.numero_pedido)}</small>` : '';
 
                 if (isAdmin) {
                     actions = `
@@ -1454,12 +1519,14 @@
                                 `<button onclick="processarConsulta(${c.id})" class="btn-process">🔄 Processar</button>` : ''}
                             <button onclick="enviarWhatsAppPaciente(${c.id})" class="btn-whatsapp">📱 WhatsApp</button>
                             <button onclick="enviarWhatsAppMedico(${c.id})" class="btn-medico">📱 Médico</button>
+                            ${c.status === 'confirmada' ? `<button onclick="imprimirComprovante(${c.id})" class="btn-print">🖨️ Imprimir Comprovante</button>` : ''}
                         </div>
                     `;
                     infoHtml = `
                         <strong>${escapeHtml(c.paciente_nome)}</strong>
                         <span class="${statusClass}">${status}</span><br>
                         ${formatDisplay(c.data_consulta)} ${c.horario} | Dr. ${escapeHtml(c.medico_nome)}
+                        ${hasPedido}
                         ${c.observacoes ? `<br><small>📝 ${escapeHtml(c.observacoes)}</small>` : ''}
                         <br><small>👤 Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
                     `;
@@ -1474,6 +1541,7 @@
                             <strong>${escapeHtml(c.paciente_nome)}</strong>
                             <span class="${statusClass}">${status}</span><br>
                             ${formatDisplay(c.data_consulta)} ${c.horario} | Dr. ${escapeHtml(c.medico_nome)}
+                            ${hasPedido}
                             ${c.observacoes ? `<br><small>📝 ${escapeHtml(c.observacoes)}</small>` : ''}
                             <br><small>👤 Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
                         `;
@@ -1498,6 +1566,53 @@
                     ${actions}
                 </div>`;
             }).join('');
+        }
+
+        // ========================================================================
+        // IMPRIMIR COMPROVANTE
+        // ========================================================================
+        function imprimirComprovante(id) {
+            const c = consultas.find(cons => cons.id === id);
+            if (!c) {
+                showToast('Consulta não encontrada.', true);
+                return;
+            }
+
+            const comprovanteDiv = document.getElementById('comprovante');
+            const dataFormatada = formatDisplay(c.data_consulta);
+            const status = c.status || 'agendada';
+            const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+            const pedido = c.numero_pedido || 'Não informado';
+
+            comprovanteDiv.innerHTML = `
+                <div class="comprovante-container">
+                    <h2>🏥 ÓTICA MACAÉ</h2>
+                    <h3 style="text-align:center; color:#2d3748;">Comprovante de Consulta</h3>
+                    <hr style="margin: 15px 0;">
+                    <div class="detalhe"><span class="label">Paciente:</span> <span>${escapeHtml(c.paciente_nome)}</span></div>
+                    <div class="detalhe"><span class="label">Data:</span> <span>${dataFormatada}</span></div>
+                    <div class="detalhe"><span class="label">Horário:</span> <span>${c.horario}</span></div>
+                    <div class="detalhe"><span class="label">Médico:</span> <span>Dr. ${escapeHtml(c.medico_nome)}</span></div>
+                    <div class="detalhe"><span class="label">Status:</span> <span>${statusLabel}</span></div>
+                    <div class="detalhe"><span class="label">Nº Pedido:</span> <span>${pedido}</span></div>
+                    ${c.observacoes ? `<div class="detalhe"><span class="label">Observações:</span> <span>${escapeHtml(c.observacoes)}</span></div>` : ''}
+                    <hr style="margin: 15px 0;">
+                    <div class="rodape">
+                        Rua Marechal Deodoro, 185 - Centro - Macae/RJ<br>
+                        Telefone: (22) 99764-0112<br>
+                        <em>Este comprovante é válido como confirmação de agendamento.</em>
+                    </div>
+                    <button onclick="fecharComprovante()" class="cancelar-imprimir" style="display:block; margin:20px auto; padding:8px 20px; background:#e53e3e; color:white; border:none; border-radius:5px; cursor:pointer;">Fechar</button>
+                </div>
+            `;
+            comprovanteDiv.style.display = 'block';
+
+            // Abrir janela de impressão
+            window.print();
+        }
+
+        function fecharComprovante() {
+            document.getElementById('comprovante').style.display = 'none';
         }
 
         // ========================================================================
@@ -1722,6 +1837,7 @@
             document.getElementById('horarioSelect').value = c.horario;
             document.getElementById('medicoSelect').value = c.medico_id;
             document.getElementById('observacoes').value = c.observacoes || '';
+            document.getElementById('numeroPedido').value = c.numero_pedido || '';
             document.getElementById('cancelEditBtn').style.display = 'inline-block';
             const paciente = clientes.find(p => p.nome === c.paciente_nome && p.telefone === c.paciente_telefone);
             if (paciente) {
@@ -1752,6 +1868,7 @@
             document.getElementById('horarioSelect').value = '';
             document.getElementById('medicoSelect').value = '';
             document.getElementById('observacoes').value = '';
+            document.getElementById('numeroPedido').value = '';
             document.getElementById('cancelEditBtn').style.display = 'none';
             document.getElementById('idadeDisplay').innerHTML = '';
             document.getElementById('buscarCpf').value = '';
@@ -1837,6 +1954,7 @@
             }
             let msg = `🏥 *ÓTICA MACAÉ - GUIA DE CONSULTA*\n\nPaciente: ${e.paciente_nome}\nData: ${formatDisplay(e.data_consulta)}\nHorário: ${e.horario}\nMédico: Dr. ${e.medico_nome}\nLocal: ${endereco}\nCondição: ${condicao}`;
             if (mensagemPadrao) msg += `\n\n${mensagemPadrao}`;
+            if (e.numero_pedido) msg += `\nNº Pedido: ${e.numero_pedido}`;
             const phone = e.paciente_telefone.replace(/\D/g, '');
             if (phone) window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
             else showToast('Número do paciente não disponível', true);
@@ -1861,6 +1979,7 @@
             }
             const endereco = 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ';
             const msg = `📋 *Nova consulta agendada*\n\nPaciente: ${e.paciente_nome}\nData: ${formatDisplay(e.data_consulta)}\nHorário: ${e.horario}\nTelefone: ${e.paciente_telefone}\nLocal: ${endereco}\nCondição: ${condicao}`;
+            if (e.numero_pedido) msg += `\nNº Pedido: ${e.numero_pedido}`;
             const phone = medico.whatsapp.replace(/\D/g, '');
             if (phone) window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
             else showToast('WhatsApp do médico inválido', true);
@@ -1966,7 +2085,8 @@
                 horario3: document.getElementById('solHorario3').value,
                 medico_id: parseInt(document.getElementById('solMedicoSelect').value),
                 medico_nome: medicos.find(m => m.id == document.getElementById('solMedicoSelect').value)?.nome,
-                observacoes: document.getElementById('solObservacoes').value
+                observacoes: document.getElementById('solObservacoes').value,
+                numero_pedido: document.getElementById('solNumeroPedido').value.trim() || null
             };
 
             if (!data.paciente_nome || !data.paciente_telefone || !data.data_consulta || !data.horario1 || !data.medico_id) {
@@ -1997,6 +2117,7 @@
                     document.getElementById('solHorario2').value = '';
                     document.getElementById('solHorario3').value = '';
                     document.getElementById('solObservacoes').value = '';
+                    document.getElementById('solNumeroPedido').value = '';
                     document.getElementById('solIdadeDisplay').innerHTML = '';
                     setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
                 }, 3000);
@@ -2041,10 +2162,12 @@
                         `;
                     }
 
+                    const hasPedido = s.numero_pedido ? `<br><small>📦 Pedido: ${escapeHtml(s.numero_pedido)}</small>` : '';
+
                     return `
                         <div style="border-bottom:1px solid #ddd; padding:10px; ${s.status === 'pendente' ? 'background:#fffbe6;' : ''}">
                             <div>
-                                <strong>${escapeHtml(s.paciente_nome)}</strong><br>
+                                <strong>${escapeHtml(s.paciente_nome)}</strong> ${hasPedido}<br>
                                 ${formatDisplay(s.data_consulta)} | Médico: ${s.medico_nome}<br>
                                 <span style="font-size:12px; color:${s.status === 'pendente' ? 'orange' : s.status === 'aprovado' ? 'green' : 'red'};">Status: ${s.status}</span>
                                 ${s.status === 'pendente' ? `<span style="font-size:11px; color:#999;"> | Solicitado por: ${escapeHtml(s.solicitante_nome)}</span>` : ''}
@@ -2227,7 +2350,7 @@
         }
 
         // ========================================================================
-        // NAVEGAÇÃO ENTRE PÁGINAS
+        // NAVEGAÇÃO
         // ========================================================================
         function navegarPara(pageId) {
             document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
@@ -2237,7 +2360,6 @@
             const menuBtn = document.querySelector(`.side-menu .menu-item[data-page="${pageId}"]`);
             if (menuBtn) menuBtn.classList.add('active');
 
-            // Renderizar conteúdo específico
             if (pageId === 'pageLista') renderizarLista();
             else if (pageId === 'pageCalendario') renderizarCalendario();
             else if (pageId === 'pageDashboard' && user.tipo === 'admin') carregarDashboard();
@@ -2335,9 +2457,12 @@
                     ${podeEditar ? `<button onclick="cancelarConsulta(${e.id}); fecharModalDetalhes();" class="btn-danger" style="width:100%; margin-top:5px;">🚫 Cancelar</button>` : ''}
                     ${!isRealizada ? `<button onclick="enviarWhatsAppPaciente(${e.id})" class="btn-whatsapp" style="width:100%; margin-top:5px;">📱 WhatsApp Paciente</button>` : ''}
                     ${!isRealizada ? `<button onclick="enviarWhatsAppMedico(${e.id})" class="btn-medico" style="width:100%; margin-top:5px;">📱 WhatsApp Médico</button>` : ''}
+                    ${e.status === 'confirmada' ? `<button onclick="imprimirComprovante(${e.id}); fecharModalDetalhes();" class="btn-print" style="width:100%; margin-top:5px;">🖨️ Imprimir Comprovante</button>` : ''}
                     ${isRealizada ? '<p style="color:#2b6cb0; font-weight:bold; margin-top:10px;">✅ Consulta já realizada. Nenhuma ação disponível.</p>' : ''}
                 `;
             }
+
+            const hasPedido = e.numero_pedido ? `<div><strong>Nº Pedido:</strong> ${escapeHtml(e.numero_pedido)}</div>` : '';
 
             body.innerHTML = `
                 <div><strong>Paciente:</strong> ${escapeHtml(e.paciente_nome)}</div>
@@ -2345,6 +2470,7 @@
                 <div><strong>Médico:</strong> Dr. ${escapeHtml(e.medico_nome)}</div>
                 <div><strong>Telefone:</strong> ${e.paciente_telefone}</div>
                 ${e.paciente_email ? `<div><strong>E-mail:</strong> ${escapeHtml(e.paciente_email)}</div>` : ''}
+                ${hasPedido}
                 ${e.observacoes ? `<div><strong>Observações:</strong> ${escapeHtml(e.observacoes)}</div>` : ''}
                 <div><strong>Status:</strong> ${status}${statusHtml}</div>
                 <div><strong>Vendedor:</strong> ${escapeHtml(vendedor)}</div>
@@ -2421,7 +2547,7 @@
             });
         });
 
-        console.log('✅ Sistema com lista e calendário separados, e horários agrupados em manhã/tarde.');
+        console.log('✅ Sistema com Número do Pedido, Comprovante de Impressão e Dashboard.');
     </script>
 </body>
 </html>
