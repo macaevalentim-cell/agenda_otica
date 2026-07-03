@@ -2,27 +2,43 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
-// Configuração do pool: se DATABASE_URL existir (Render), use-a; senão, use variáveis individuais.
+// ==================== CONEXÃO COM O BANCO ====================
 let poolConfig;
+
+// Se DATABASE_URL estiver definida (ex: no Render), use-a com SSL
 if (process.env.DATABASE_URL) {
   poolConfig = {
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false } // Render exige SSL
   };
 } else {
+  // Caso contrário, use variáveis individuais (desenvolvimento local)
+  const sslEnabled = process.env.DB_SSL === 'true';
   poolConfig = {
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT || 5432,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT) || 5432,
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'agenda_medica',
     max: 10,
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
+    ssl: sslEnabled ? { rejectUnauthorized: false } : false
   };
 }
 
 const pool = new Pool(poolConfig);
 
+// Teste de conexão
+pool.connect()
+  .then(client => {
+    console.log('✅ Conectado ao PostgreSQL!');
+    client.release();
+  })
+  .catch(err => {
+    console.error('❌ Erro ao conectar:', err.message);
+    // Não encerra o processo para que as tabelas possam ser criadas se o banco existir
+  });
+
+// ==================== INICIALIZAÇÃO DAS TABELAS ====================
 async function initDatabase() {
   try {
     console.log('📦 Inicializando banco de dados...');
@@ -238,7 +254,7 @@ async function initDatabase() {
     console.log('✅ Banco de dados inicializado com sucesso!');
   } catch (error) {
     console.error('❌ Erro ao inicializar banco:', error.message);
-    process.exit(1);
+    // Não encerra o processo para permitir reiniciar após corrigir
   }
 }
 
