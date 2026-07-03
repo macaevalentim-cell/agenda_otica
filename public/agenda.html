@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minha Agenda - Ótica Macaé</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .agenda-container {
+            display: flex;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        .agenda-header {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .logo i {
+            font-size: 20px;
+        }
+
+        .logo-area h1 {
+            font-size: 20px;
+            color: #2d3748;
+        }
+
+        .nav-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .nav-btn, .today-btn {
+            background: white;
+            border: 1px solid #e2e8f0;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover, .today-btn:hover {
+            background: #f7fafc;
+            border-color: #cbd5e0;
+        }
+
+        .view-selector {
+            display: flex;
+            gap: 8px;
+            background: #f7fafc;
+            padding: 4px;
+            border-radius: 10px;
+        }
+
+        .view-btn {
+            padding: 8px 20px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .view-btn.active {
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            color: #667eea;
+        }
+
+        .user-area {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .logout-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #718096;
+            font-size: 20px;
+            padding: 8px;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: #f7fafc;
+        }
+
+        .calendar-main {
+            flex: 1;
+            overflow: auto;
+            padding: 24px;
+            background: white;
+        }
+
+        .month-view {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            background: #f7fafc;
+            border-bottom: 1px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+        }
+
+        .weekday {
+            padding: 16px;
+            text-align: center;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .month-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            flex: 1;
+        }
+
+        .day-cell {
+            min-height: 120px;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .day-cell:hover {
+            background: #f7fafc;
+        }
+
+        .day-cell.other-month {
+            background: #fafafa;
+            color: #a0aec0;
+        }
+
+        .day-cell.today {
+            background: #ebf8ff;
+            border: 2px solid #667eea;
+        }
+
+        .day-number {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2d3748;
+        }
+
+        .day-appointments {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .appointment-badge {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: all 0.2s;
+        }
+
+        .appointment-badge:hover {
+            transform: translateX(3px);
+            opacity: 0.9;
+        }
+
+        .week-view {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .week-header {
+            display: grid;
+            grid-template-columns: 80px repeat(7, 1fr);
+            background: #f7fafc;
+            border-bottom: 1px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+        }
+
+        .day-header-cell {
+            padding: 12px;
+            text-align: center;
+            border-right: 1px solid #e2e8f0;
+        }
+
+        .day-header-day {
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .day-header-date {
+            font-size: 12px;
+            color: #718096;
+        }
+
+        .week-body {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .week-row {
+            display: grid;
+            grid-template-columns: 80px repeat(7, 1fr);
+            min-height: 60px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .time-slot {
+            padding: 8px;
+            text-align: right;
+            font-size: 12px;
+            color: #718096;
+            border-right: 1px solid #e2e8f0;
+            background: #f7fafc;
+        }
+
+        .appointment-slot {
+            border-right: 1px solid #e2e8f0;
+            padding: 4px;
+        }
+
+        .week-appointment {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 6px;
+            border-radius: 6px;
+            font-size: 11px;
+            margin-bottom: 2px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .week-appointment:hover {
+            transform: scale(1.02);
+        }
+
+        .day-view {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .day-header-large {
+            padding: 24px;
+            background: #f7fafc;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: center;
+        }
+
+        .day-date-large {
+            font-size: 28px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .day-weekday-large {
+            font-size: 14px;
+            color: #718096;
+            margin-top: 8px;
+        }
+
+        .timeline {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .hour-block {
+            display: flex;
+            margin-bottom: 8px;
+            min-height: 80px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .hour-label {
+            width: 80px;
+            padding: 12px;
+            color: #718096;
+            font-size: 12px;
+            text-align: right;
+        }
+
+        .hour-appointments {
+            flex: 1;
+            padding: 8px;
+            border-left: 1px solid #e2e8f0;
+        }
+
+        .day-appointment-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .day-appointment-card:hover {
+            transform: translateX(5px);
+        }
+
+        .appointment-time {
+            font-size: 11px;
+            opacity: 0.9;
+            margin-bottom: 4px;
+        }
+
+        .appointment-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .appointment-doctor {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.hidden {
+            display: none;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 18px;
+            color: #2d3748;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #a0aec0;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .detail-row {
+            margin-bottom: 15px;
+            padding: 12px;
+            background: #f7fafc;
+            border-radius: 10px;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #718096;
+            font-size: 11px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .detail-value {
+            font-size: 14px;
+            color: #2d3748;
+        }
+
+        .whatsapp-btn {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 600;
+            margin-top: 10px;
+            transition: all 0.2s;
+        }
+
+        .whatsapp-btn:hover {
+            background: #128C7E;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #48bb78;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 10px;
+            z-index: 1100;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.hidden {
+            display: none;
+        }
+
+        .toast.error {
+            background: #f56565;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="agenda-container">
+        <div class="agenda-header">
+            <div class="logo-area">
+                <div class="logo">
+                    <i class="fas fa-eye"></i>
+                </div>
+                <h1>Minha Agenda</h1>
+            </div>
+            <div class="nav-controls">
+                <button class="nav-btn" id="prevBtn">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <button class="today-btn" id="todayBtn">Hoje</button>
+                <button class="nav-btn" id="nextBtn">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="view-selector">
+                <button class="view-btn active" data-view="month">Mês</button>
+                <button class="view-btn" data-view="week">Semana</button>
+                <button class="view-btn" data-view="day">Dia</button>
+            </div>
+            <div class="user-area">
+                <div class="user-info">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <span id="userName">Carregando...</span>
+                </div>
+                <button class="logout-btn" id="logoutBtn" title="Sair">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </div>
+        <div class="calendar-main" id="calendarMain">
+            <div class="loading">Carregando agenda...</div>
+        </div>
+    </div>
+
+    <div id="detailModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Detalhes da Consulta</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script>
+        const API_URL = window.location.origin + '/api';
+        let authToken = localStorage.getItem('authToken');
+        let currentUser = null;
+        let consultas = [];
+        let currentView = 'month';
+        let currentDate = new Date();
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = isError ? 'toast error' : 'toast';
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        function formatDateTime(dateStr, timeStr) {
+            const date = new Date(dateStr);
+            return `${date.toLocaleDateString('pt-BR')} às ${timeStr}`;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function checkAuth() {
+            if (!authToken) {
+                window.location.href = '/';
+                return false;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/verify`, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    currentUser = data.user;
+                    document.getElementById('userName').textContent = currentUser.nome;
+                    
+                    if (currentUser.tipo === 'admin') {
+                        window.location.href = '/';
+                        return false;
+                    }
+                    
+                    await loadData();
+                    return true;
+                } else {
+                    throw new Error('Token inválido');
+                }
+            } catch (error) {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('currentUser');
+                window.location.href = '/';
+                return false;
+            }
+        }
+
+        async function loadData() {
+            try {
+                const res = await fetch(`${API_URL}/consultas`, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                consultas = await res.json();
+                renderCalendar();
+            } catch (error) {
+                showToast('Erro ao carregar dados', true);
+            }
+        }
+
+        function renderCalendar() {
+            const container = document.getElementById('calendarMain');
+            if (!container) return;
+
+            if (currentView === 'month') renderMonthView(container);
+            else if (currentView === 'week') renderWeekView(container);
+            else if (currentView === 'day') renderDayView(container);
+
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                if (btn.dataset.view === currentView) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+        }
+
+        function renderMonthView(container) {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            const firstDay = new Date(year, month, 1);
+            const startDate = new Date(firstDay);
+            startDate.setDate(startDate.getDate() - startDate.getDay());
+            
+            const weeks = [];
+            let currentWeek = [];
+            const todayDate = new Date();
+            
+            for (let i = 0; i < 42; i++) {
+                const date = new Date(startDate);
+                date.setDate(startDate.getDate() + i);
+                currentWeek.push(date);
+                if (currentWeek.length === 7) {
+                    weeks.push(currentWeek);
+                    currentWeek = [];
+                }
+            }
+            
+            const weekdays = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+            
+            let html = `<div class="month-view"><div class="weekdays">${weekdays.map(day => `<div class="weekday">${day}</div>`).join('')}</div><div class="month-days">`;
+            
+            weeks.forEach(week => {
+                week.forEach(date => {
+                    const dateStr = formatDate(date);
+                    const isCurrentMonth = date.getMonth() === month;
+                    const isToday = formatDate(todayDate) === dateStr;
+                    const dayConsultas = consultas.filter(c => c.data_consulta === dateStr);
+                    
+                    html += `<div class="day-cell ${!isCurrentMonth ? 'other-month' : ''} ${isToday ? 'today' : ''}">
+                        <div class="day-number">${date.getDate()}</div>
+                        <div class="day-appointments">
+                            ${dayConsultas.slice(0, 3).map(c => `
+                                <div class="appointment-badge" onclick="showDetail(${c.id})">
+                                    ${c.horario} - ${escapeHtml(c.paciente_nome.substring(0, 20))}
+                                </div>
+                            `).join('')}
+                            ${dayConsultas.length > 3 ? `<div class="appointment-badge" style="background:#a0aec0;">+${dayConsultas.length - 3}</div>` : ''}
+                        </div>
+                    </div>`;
+                });
+            });
+            
+            html += `</div></div>`;
+            container.innerHTML = html;
+        }
+
+        function renderWeekView(container) {
+            const startOfWeek = new Date(currentDate);
+            startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+            
+            const days = [];
+            for (let i = 0; i < 7; i++) {
+                const day = new Date(startOfWeek);
+                day.setDate(startOfWeek.getDate() + i);
+                days.push(day);
+            }
+            
+            const hours = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
+            
+            let html = `<div class="week-view"><div class="week-header"><div class="time-column"></div>`;
+            days.forEach(day => {
+                html += `<div class="day-header-cell">
+                    <div class="day-header-day">${day.toLocaleDateString('pt-BR', { weekday: 'short' })}</div>
+                    <div class="day-header-date">${day.getDate()}</div>
+                </div>`;
+            });
+            html += `</div><div class="week-body">`;
+            
+            hours.forEach(hour => {
+                const timeLabel = `${hour.toString().padStart(2, '0')}:00`;
+                html += `<div class="week-row"><div class="time-slot">${timeLabel}</div>`;
+                days.forEach(day => {
+                    const dateStr = formatDate(day);
+                    const hourConsultas = consultas.filter(c => 
+                        c.data_consulta === dateStr && c.horario.startsWith(timeLabel.substring(0, 2))
+                    );
+                    html += `<div class="appointment-slot">
+                        ${hourConsultas.map(c => `
+                            <div class="week-appointment" onclick="showDetail(${c.id})">
+                                <strong>${c.horario}</strong><br>${escapeHtml(c.paciente_nome.substring(0, 15))}
+                            </div>
+                        `).join('')}
+                    </div>`;
+                });
+                html += `</div>`;
+            });
+            
+            html += `</div></div>`;
+            container.innerHTML = html;
+        }
+
+        function renderDayView(container) {
+            const dateStr = formatDate(currentDate);
+            const dayConsultas = consultas.filter(c => c.data_consulta === dateStr)
+                .sort((a, b) => a.horario.localeCompare(b.horario));
+            
+            const hours = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
+            
+            let html = `<div class="day-view">
+                <div class="day-header-large">
+                    <div class="day-date-large">${currentDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+                    <div class="day-weekday-large">${currentDate.toLocaleDateString('pt-BR', { weekday: 'long' })}</div>
+                </div>
+                <div class="timeline">`;
+            
+            hours.forEach(hour => {
+                const timeLabel = `${hour.toString().padStart(2, '0')}:00`;
+                const hourConsultas = dayConsultas.filter(c => c.horario.startsWith(timeLabel.substring(0, 2)));
+                
+                html += `<div class="hour-block">
+                    <div class="hour-label">${timeLabel}</div>
+                    <div class="hour-appointments">
+                        ${hourConsultas.map(c => `
+                            <div class="day-appointment-card" onclick="showDetail(${c.id})">
+                                <div class="appointment-time">🕐 ${c.horario}</div>
+                                <div class="appointment-name">${escapeHtml(c.paciente_nome)}</div>
+                                <div class="appointment-doctor">👨‍⚕️ ${escapeHtml(c.medico_nome)}</div>
+                                ${c.observacoes ? `<div style="font-size:10px;margin-top:4px;">📝 ${escapeHtml(c.observacoes.substring(0, 50))}</div>` : ''}
+                            </div>
+                        `).join('')}
+                        ${hourConsultas.length === 0 ? '<div style="color:#cbd5e0; padding: 12px;">Nenhuma consulta</div>' : ''}
+                    </div>
+                </div>`;
+            });
+            
+            html += `</div></div>`;
+            container.innerHTML = html;
+        }
+
+        window.showDetail = async function(id) {
+            const consulta = consultas.find(c => c.id === id);
+            if (!consulta) return;
+            
+            const modal = document.getElementById('detailModal');
+            const modalBody = document.getElementById('modalBody');
+            
+            modalBody.innerHTML = `
+                <div class="detail-row">
+                    <div class="detail-label">Paciente</div>
+                    <div class="detail-value">${escapeHtml(consulta.paciente_nome)}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Data e Horário</div>
+                    <div class="detail-value">${formatDateTime(consulta.data_consulta, consulta.horario)}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Médico</div>
+                    <div class="detail-value">${escapeHtml(consulta.medico_nome)}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Telefone</div>
+                    <div class="detail-value">${consulta.paciente_telefone}</div>
+                </div>
+                ${consulta.paciente_email ? `
+                    <div class="detail-row">
+                        <div class="detail-label">E-mail</div>
+                        <div class="detail-value">${escapeHtml(consulta.paciente_email)}</div>
+                    </div>
+                ` : ''}
+                ${consulta.observacoes ? `
+                    <div class="detail-row">
+                        <div class="detail-label">Observações</div>
+                        <div class="detail-value">${escapeHtml(consulta.observacoes)}</div>
+                    </div>
+                ` : ''}
+                <button class="whatsapp-btn" onclick="sendWhatsApp(${consulta.id})">
+                    <i class="fab fa-whatsapp"></i> Enviar Guia por WhatsApp
+                </button>
+            `;
+            
+            modal.classList.remove('hidden');
+        };
+
+        window.sendWhatsApp = async function(id) {
+            const consulta = consultas.find(c => c.id === id);
+            if (!consulta) return;
+            
+            const endereco = 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ';
+            const message = `🏥 *ÓTICA MACAÉ - GUIA DE CONSULTA*\n\n` +
+                `*Paciente:* ${consulta.paciente_nome}\n` +
+                `*Data:* ${new Date(consulta.data_consulta).toLocaleDateString('pt-BR')}\n` +
+                `*Horário:* ${consulta.horario}\n` +
+                `*Médico:* ${consulta.medico_nome}\n` +
+                `*Local:* ${endereco}\n` +
+                `*Observações:* ${consulta.observacoes || 'Nenhuma'}\n\n` +
+                `⚠️ *IMPORTANTE:* Comparecer com 15 minutos de antecedência.`;
+            
+            const phone = consulta.paciente_telefone.replace(/\D/g, '');
+            if (phone) {
+                window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, '_blank');
+                showToast('Abrindo WhatsApp...');
+                document.getElementById('detailModal').classList.add('hidden');
+            } else {
+                showToast('Número de telefone não disponível', true);
+            }
+        };
+
+        function navigate(direction) {
+            if (currentView === 'month') {
+                currentDate.setMonth(currentDate.getMonth() + direction);
+            } else if (currentView === 'week') {
+                currentDate.setDate(currentDate.getDate() + (direction * 7));
+            } else {
+                currentDate.setDate(currentDate.getDate() + direction);
+            }
+            renderCalendar();
+        }
+        
+        function goToToday() {
+            currentDate = new Date();
+            renderCalendar();
+        }
+        
+        function changeView(view) {
+            currentView = view;
+            renderCalendar();
+        }
+
+        document.getElementById('prevBtn').addEventListener('click', () => navigate(-1));
+        document.getElementById('nextBtn').addEventListener('click', () => navigate(1));
+        document.getElementById('todayBtn').addEventListener('click', goToToday);
+        
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', () => changeView(btn.dataset.view));
+        });
+        
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            window.location.href = '/';
+        });
+        
+        document.querySelectorAll('.close-modal').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.getElementById('detailModal').classList.add('hidden');
+            });
+        });
+        
+        document.getElementById('detailModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('detailModal')) {
+                document.getElementById('detailModal').classList.add('hidden');
+            }
+        });
+
+        checkAuth();
+        setInterval(() => {
+            if (currentUser && currentUser.tipo === 'vendedor') {
+                loadData();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
