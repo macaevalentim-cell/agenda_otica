@@ -773,60 +773,65 @@
         // LOGIN
         // ========================================================================
         async function fazerLogin() {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            try {
-                const res = await fetch(`${API_URL}/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Erro no login');
-                token = data.token;
-                user = data.user;
-                localStorage.setItem('token', token);
-                localStorage.setItem('user', JSON.stringify(user));
-                document.getElementById('loginDiv').style.display = 'none';
-                document.getElementById('dashboardDiv').style.display = 'block';
-                document.getElementById('userName').innerHTML = `👤 ${user.nome} (${user.tipo === 'admin' ? 'Admin' : 'Vendedor'})`;
-                document.getElementById('menuUserName').textContent = user.nome;
-                document.getElementById('menuUserTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    try {
+        const res = await fetch(`${API_URL}/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
 
-                // Ajustar menus conforme tipo de usuário
-                const isAdmin = user.tipo === 'admin';
-                document.getElementById('menuAgendar').style.display = isAdmin ? 'block' : 'none';
-                document.getElementById('menuDashboard').style.display = isAdmin ? 'block' : 'none';
-                document.getElementById('menuAdmin').style.display = isAdmin ? 'block' : 'none';
-                // Itens de admin (médicos, usuários, pacientes, solicitações, whatsapp) são filhos do menuAdmin,
-                // então ocultamos tudo junto.
-
-                // Preencher perfil
-                document.getElementById('perfilNome').textContent = user.nome;
-                document.getElementById('perfilUsername').textContent = user.username;
-                document.getElementById('perfilTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
-
-                await carregarDados();
-                renderizarLista();
-                iniciarPollingLembretes();
-                if (isAdmin) {
-                    iniciarPollingSolicitacoes();
-                    carregarDashboard();
-                }
-                fecharMenu();
-                navegarPara('pageLista');
-
-                setTimeout(() => {
-                    setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
-                    setupEncaixeLogic('pacienteCadEncaixe', 'pacienteCadNeurodivergente', 'pacienteCadDeficienciaFisica');
-                    setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
-                    setupEncaixeLogic('novoPacienteEncaixe', 'novoPacienteNeurodivergente', 'novoPacienteDeficienciaFisica');
-                }, 100);
-            } catch (err) {
-                document.getElementById('loginMsg').innerHTML = `<p style="color:red;">${err.message}</p>`;
-                console.error(err);
-            }
+        // Verifica se a resposta é JSON antes de parsear
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await res.text();
+            throw new Error(text || 'Erro no servidor');
         }
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro no login');
+
+        token = data.token;
+        user = data.user;
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        document.getElementById('loginDiv').style.display = 'none';
+        document.getElementById('dashboardDiv').style.display = 'block';
+        document.getElementById('userName').innerHTML = `👤 ${user.nome} (${user.tipo === 'admin' ? 'Admin' : 'Vendedor'})`;
+        document.getElementById('menuUserName').textContent = user.nome;
+        document.getElementById('menuUserTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+
+        const isAdmin = user.tipo === 'admin';
+        document.getElementById('menuAgendar').style.display = isAdmin ? 'block' : 'none';
+        document.getElementById('menuDashboard').style.display = isAdmin ? 'block' : 'none';
+        document.getElementById('menuAdmin').style.display = isAdmin ? 'block' : 'none';
+
+        document.getElementById('perfilNome').textContent = user.nome;
+        document.getElementById('perfilUsername').textContent = user.username;
+        document.getElementById('perfilTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+
+        await carregarDados();
+        renderizarLista();
+        iniciarPollingLembretes();
+        if (isAdmin) {
+            iniciarPollingSolicitacoes();
+            carregarDashboard();
+        }
+        fecharMenu();
+        navegarPara('pageLista');
+
+        setTimeout(() => {
+            setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
+            setupEncaixeLogic('pacienteCadEncaixe', 'pacienteCadNeurodivergente', 'pacienteCadDeficienciaFisica');
+            setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
+            setupEncaixeLogic('novoPacienteEncaixe', 'novoPacienteNeurodivergente', 'novoPacienteDeficienciaFisica');
+        }, 100);
+    } catch (err) {
+        document.getElementById('loginMsg').innerHTML = `<p style="color:red;">${err.message}</p>`;
+        console.error(err);
+    }
+}
 
         // ========================================================================
         // CARREGAR DADOS
