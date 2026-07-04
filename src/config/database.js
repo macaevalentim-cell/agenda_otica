@@ -2,7 +2,6 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
-// Configuração do pool
 let poolConfig;
 if (process.env.DATABASE_URL) {
   poolConfig = {
@@ -23,48 +22,11 @@ if (process.env.DATABASE_URL) {
 
 const pool = new Pool(poolConfig);
 
-// Função para adicionar colunas se não existirem
-async function ensureColumn(table, column, definition) {
-  try {
-    const result = await pool.query(
-      `SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND column_name = $2`,
-      [table, column]
-    );
-    if (result.rows.length === 0) {
-      await pool.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-      console.log(`✅ Coluna ${column} adicionada à tabela ${table}`);
-    }
-  } catch (err) {
-    console.error(`❌ Erro ao verificar/adicionar coluna ${column} na tabela ${table}:`, err.message);
-  }
-}
-
 async function initDatabase() {
   try {
     console.log('📦 Inicializando banco de dados...');
 
-    // ===== Tabela empresas =====
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS empresas (
-        id SERIAL PRIMARY KEY,
-        nome VARCHAR(200) NOT NULL,
-        endereco TEXT,
-        telefone VARCHAR(20),
-        email VARCHAR(100),
-        cnpj VARCHAR(18),
-        ativo BOOLEAN DEFAULT TRUE,
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    // Garantir colunas (caso a tabela já exista sem elas)
-    await ensureColumn('empresas', 'endereco', 'TEXT');
-    await ensureColumn('empresas', 'email', 'VARCHAR(100)');
-    await ensureColumn('empresas', 'cnpj', 'VARCHAR(18)');
-    await ensureColumn('empresas', 'ativo', 'BOOLEAN DEFAULT TRUE');
-    await ensureColumn('empresas', 'criado_em', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
-    console.log('✅ Tabela empresas ok');
-
-    // ===== Tabela usuarios =====
+    // Tabela usuarios (sem empresa_id)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -73,20 +35,12 @@ async function initDatabase() {
         senha VARCHAR(255) NOT NULL,
         telefone VARCHAR(20),
         tipo VARCHAR(10) DEFAULT 'vendedor' CHECK (tipo IN ('admin', 'vendedor')),
-        empresa_id INTEGER REFERENCES empresas(id),
         ativo BOOLEAN DEFAULT TRUE,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    // Garantir colunas
-    await ensureColumn('usuarios', 'telefone', 'VARCHAR(20)');
-    await ensureColumn('usuarios', 'tipo', 'VARCHAR(10) DEFAULT \'vendedor\' CHECK (tipo IN (\'admin\', \'vendedor\'))');
-    await ensureColumn('usuarios', 'empresa_id', 'INTEGER REFERENCES empresas(id)');
-    await ensureColumn('usuarios', 'ativo', 'BOOLEAN DEFAULT TRUE');
-    await ensureColumn('usuarios', 'criado_em', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
-    console.log('✅ Tabela usuarios ok');
 
-    // ===== Tabela medicos =====
+    // Tabela medicos
     await pool.query(`
       CREATE TABLE IF NOT EXISTS medicos (
         id SERIAL PRIMARY KEY,
@@ -102,9 +56,8 @@ async function initDatabase() {
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('✅ Tabela medicos ok');
 
-    // ===== Tabela clientes =====
+    // Tabela clientes
     await pool.query(`
       CREATE TABLE IF NOT EXISTS clientes (
         id SERIAL PRIMARY KEY,
@@ -121,9 +74,8 @@ async function initDatabase() {
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('✅ Tabela clientes ok');
 
-    // ===== Tabela consultas =====
+    // Tabela consultas (sem empresa_id)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS consultas (
         id SERIAL PRIMARY KEY,
@@ -139,15 +91,11 @@ async function initDatabase() {
         numero_pedido VARCHAR(50),
         status VARCHAR(20) DEFAULT 'agendada' CHECK (status IN ('agendada', 'confirmada', 'cancelada', 'realizada')),
         criado_por INTEGER REFERENCES usuarios(id),
-        empresa_id INTEGER REFERENCES empresas(id),
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    await ensureColumn('consultas', 'numero_pedido', 'VARCHAR(50)');
-    await ensureColumn('consultas', 'empresa_id', 'INTEGER REFERENCES empresas(id)');
-    console.log('✅ Tabela consultas ok');
 
-    // ===== Tabela solicitacoes_consultas =====
+    // Tabela solicitacoes (sem empresa_id)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS solicitacoes_consultas (
         id SERIAL PRIMARY KEY,
@@ -166,15 +114,11 @@ async function initDatabase() {
         numero_pedido VARCHAR(50),
         status VARCHAR(20) DEFAULT 'pendente' CHECK (status IN ('pendente', 'aprovado', 'rejeitado')),
         solicitado_por INTEGER NOT NULL REFERENCES usuarios(id),
-        empresa_id INTEGER REFERENCES empresas(id),
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    await ensureColumn('solicitacoes_consultas', 'numero_pedido', 'VARCHAR(50)');
-    await ensureColumn('solicitacoes_consultas', 'empresa_id', 'INTEGER REFERENCES empresas(id)');
-    console.log('✅ Tabela solicitacoes_consultas ok');
 
-    // ===== Tabela medico_horarios =====
+    // Tabela medico_horarios
     await pool.query(`
       CREATE TABLE IF NOT EXISTS medico_horarios (
         id SERIAL PRIMARY KEY,
@@ -187,9 +131,8 @@ async function initDatabase() {
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('✅ Tabela medico_horarios ok');
 
-    // ===== Tabela lembretes =====
+    // Tabela lembretes
     await pool.query(`
       CREATE TABLE IF NOT EXISTS lembretes (
         id SERIAL PRIMARY KEY,
@@ -205,9 +148,8 @@ async function initDatabase() {
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('✅ Tabela lembretes ok');
 
-    // ===== Tabela whatsapp_config =====
+    // Tabela whatsapp_config
     await pool.query(`
       CREATE TABLE IF NOT EXISTS whatsapp_config (
         id INTEGER PRIMARY KEY DEFAULT 1,
@@ -217,53 +159,35 @@ async function initDatabase() {
         atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('✅ Tabela whatsapp_config ok');
 
-    // ===== Índices para performance =====
+    // Índices
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_data ON consultas(data_consulta)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_medico ON consultas(medico_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_status ON consultas(status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_criado_por ON consultas(criado_por)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_empresa ON consultas(empresa_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_clientes_cpf ON clientes(cpf)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_horarios_medico ON medico_horarios(medico_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitacoes_status ON solicitacoes_consultas(status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_lembretes_status ON lembretes(status)`);
-    console.log('✅ Índices criados');
 
-    // ===== Dados iniciais =====
-    // Empresa padrão
-    const empresaExist = await pool.query('SELECT id FROM empresas WHERE nome = $1', ['Ótica Macaé']);
-    let empresaId;
-    if (empresaExist.rows.length === 0) {
-      const result = await pool.query(
-        'INSERT INTO empresas (nome, endereco, telefone) VALUES ($1, $2, $3) RETURNING id',
-        ['Ótica Macaé', 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ', '(22) 99764-0112']
-      );
-      empresaId = result.rows[0].id;
-      console.log('✅ Empresa padrão criada');
-    } else {
-      empresaId = empresaExist.rows[0].id;
-    }
-
-    // Usuário admin
+    // Usuário admin padrão
     const admin = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['admin']);
     if (admin.rows.length === 0) {
       const hash = await bcrypt.hash('admin123', 10);
       await pool.query(
-        'INSERT INTO usuarios (nome, username, senha, tipo, empresa_id, ativo) VALUES ($1, $2, $3, $4, $5, $6)',
-        ['Administrador', 'admin', hash, 'admin', empresaId, true]
+        'INSERT INTO usuarios (nome, username, senha, tipo, ativo) VALUES ($1, $2, $3, $4, $5)',
+        ['Administrador', 'admin', hash, 'admin', true]
       );
       console.log('✅ Usuário admin criado');
     }
 
-    // Usuário vendedor
+    // Usuário vendedor padrão
     const vendedor = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['vendedor']);
     if (vendedor.rows.length === 0) {
       const hash = await bcrypt.hash('vender123', 10);
       await pool.query(
-        'INSERT INTO usuarios (nome, username, senha, tipo, empresa_id, ativo) VALUES ($1, $2, $3, $4, $5, $6)',
-        ['Vendedor', 'vendedor', hash, 'vendedor', empresaId, true]
+        'INSERT INTO usuarios (nome, username, senha, tipo, ativo) VALUES ($1, $2, $3, $4, $5)',
+        ['Vendedor', 'vendedor', hash, 'vendedor', true]
       );
       console.log('✅ Usuário vendedor criado');
     }
@@ -281,8 +205,6 @@ async function initDatabase() {
     console.log('✅ Banco de dados inicializado com sucesso!');
   } catch (error) {
     console.error('❌ Erro ao inicializar banco:', error.message);
-    console.error(error.stack);
-    throw error; // para que o processo possa tratá-lo
   }
 }
 

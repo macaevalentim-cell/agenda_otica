@@ -1,44 +1,34 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { pool } = require('../config/database'); // importa apenas o pool, NÃO o database.js inteiro
+const { pool } = require('../config/database');
 const { validate, loginValidation } = require('../middleware/validation');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// ==================== ROTA DE LOGIN ====================
 router.post('/login', validate(loginValidation), async (req, res) => {
   try {
     const { username, password } = req.body;
-
-    // Busca o usuário no banco com os dados da empresa
-    const result = await pool.query(`
-      SELECT u.id, u.nome, u.username, u.senha, u.tipo, u.telefone, u.empresa_id,
-             e.nome as empresa_nome, e.endereco as empresa_endereco, e.telefone as empresa_telefone
-      FROM usuarios u
-      LEFT JOIN empresas e ON u.empresa_id = e.id
-      WHERE u.username = $1 AND u.ativo = true
-    `, [username]);
-
+    const result = await pool.query(
+      `SELECT id, nome, username, senha, tipo, telefone
+       FROM usuarios
+       WHERE username = $1 AND ativo = true`,
+      [username]
+    );
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Usuário ou senha inválidos' });
     }
-
     const user = result.rows[0];
     const valid = await bcrypt.compare(password, user.senha);
-
     if (!valid) {
       return res.status(401).json({ error: 'Usuário ou senha inválidos' });
     }
-
-    // Gera o token JWT
     const token = jwt.sign(
-      { id: user.id, nome: user.nome, username: user.username, tipo: user.tipo, empresa_id: user.empresa_id },
+      { id: user.id, nome: user.nome, username: user.username, tipo: user.tipo },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
-
     res.json({
       token,
       user: {
@@ -46,34 +36,24 @@ router.post('/login', validate(loginValidation), async (req, res) => {
         nome: user.nome,
         username: user.username,
         tipo: user.tipo,
-        telefone: user.telefone,
-        empresa_id: user.empresa_id,
-        empresa_nome: user.empresa_nome,
-        empresa_endereco: user.empresa_endereco,
-        empresa_telefone: user.empresa_telefone
+        telefone: user.telefone
       }
     });
   } catch (error) {
-    console.error('❌ Erro no login:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    console.error(error);
+    res.status(500).json({ error: 'Erro interno' });
   }
 });
 
-// ==================== ROTA DE VERIFICAÇÃO DE TOKEN ====================
 router.get('/verify', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT u.id, u.nome, u.username, u.tipo, u.telefone, u.empresa_id,
-             e.nome as empresa_nome, e.endereco as empresa_endereco, e.telefone as empresa_telefone
-      FROM usuarios u
-      LEFT JOIN empresas e ON u.empresa_id = e.id
-      WHERE u.id = $1
-    `, [req.user.id]);
-
+    const result = await pool.query(
+      `SELECT id, nome, username, tipo, telefone FROM usuarios WHERE id = $1`,
+      [req.user.id]
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
-
     res.json({ valid: true, user: result.rows[0] });
   } catch (error) {
     res.status(500).json({ error: error.message });
