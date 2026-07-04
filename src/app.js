@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
+// Importação de todas as rotas
 const authRoutes = require('./routes/auth');
 const empresasRoutes = require('./routes/empresas');
 const medicosRoutes = require('./routes/medicos');
@@ -19,12 +20,12 @@ const dashboardRoutes = require('./routes/dashboard');
 
 const app = express();
 
-// ==================== SEGURANÇA ====================
-// Desabilitando CSP para permitir scripts inline e event handlers
-// Mantemos outras proteções como XSS, etc.
+// ==================== SEGURANÇA (CSP) ====================
+// DESABILITAMOS A CSP PARA PERMITIR EVENT HANDLERS INLINE (onclick, onchange, etc.)
+// Em produção, você pode reativar com as diretivas corretas se preferir
 app.use(helmet({
-  contentSecurityPolicy: false,  // DESABILITA COMPLETAMENTE A CSP
-  // Ou use uma política mais permissiva:
+  contentSecurityPolicy: false,  // Desabilita completamente (resolve o erro)
+  // Ou, se quiser manter, use:
   // contentSecurityPolicy: {
   //   directives: {
   //     defaultSrc: ["'self'"],
@@ -38,20 +39,24 @@ app.use(helmet({
   // }
 }));
 
-// CORS – permitir a origem do frontend
+// ==================== CORS ====================
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
   optionsSuccessStatus: 200
 }));
 
+// ==================== MIDDLEWARES GERAIS ====================
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Rate limiting
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+// ==================== RATE LIMITING ====================
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // limite de 100 requisições por IP
+});
 app.use('/api/', limiter);
 
-// Rotas
+// ==================== ROTAS DA API ====================
 app.use('/api', authRoutes);
 app.use('/api/empresas', empresasRoutes);
 app.use('/api/medicos', medicosRoutes);
@@ -59,17 +64,17 @@ app.use('/api/clientes', clientesRoutes);
 app.use('/api/consultas', consultasRoutes);
 app.use('/api/solicitacoes', solicitacoesRoutes);
 app.use('/api/usuarios', usuariosRoutes);
-app.use('/api', horariosRoutes);
+app.use('/api', horariosRoutes); // as rotas de horários estão com prefixo /api
 app.use('/api/lembretes', lembretesRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
-// Página inicial
+// ==================== PÁGINA INICIAL ====================
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-// Middleware de erro
+// ==================== MIDDLEWARE DE ERRO ====================
 app.use((err, req, res, next) => {
   console.error('❌ Erro não tratado:', err.stack);
   res.status(500).json({ error: 'Erro interno do servidor' });
