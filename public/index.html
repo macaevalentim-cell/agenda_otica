@@ -111,9 +111,114 @@
             text-align: center;
         }
 
-        .dashboard-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; }
-        .dashboard-card .numero { font-size: 32px; font-weight: bold; display: block; }
-        .dashboard-card .label { font-size: 14px; color: #718096; }
+        /* ======= DASHBOARD MELHORADO ======= */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .dashboard-card {
+            background: white;
+            padding: 20px 15px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            text-align: center;
+            border-top: 4px solid #667eea;
+            transition: 0.2s;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.10);
+        }
+        .dashboard-card .icon {
+            font-size: 28px;
+            margin-bottom: 6px;
+            display: block;
+        }
+        .dashboard-card .numero {
+            font-size: 36px;
+            font-weight: 700;
+            display: block;
+            line-height: 1.2;
+        }
+        .dashboard-card .label {
+            font-size: 14px;
+            color: #718096;
+            font-weight: 500;
+        }
+        .dashboard-card.azul { border-top-color: #667eea; }
+        .dashboard-card.verde { border-top-color: #48bb78; }
+        .dashboard-card.laranja { border-top-color: #ed8936; }
+        .dashboard-card.roxo { border-top-color: #9b59b6; }
+        .dashboard-card.vermelho { border-top-color: #f56565; }
+
+        .dashboard-tabela {
+            background: white;
+            border-radius: 12px;
+            padding: 15px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            overflow-x: auto;
+        }
+        .dashboard-tabela h4 {
+            padding: 0 20px 15px 20px;
+            font-size: 18px;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .dashboard-tabela table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .dashboard-tabela th {
+            background: #f7fafc;
+            color: #4a5568;
+            font-weight: 600;
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .dashboard-tabela td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #edf2f7;
+            vertical-align: middle;
+        }
+        .dashboard-tabela tr:hover td {
+            background: #f7fafc;
+        }
+        .dashboard-tabela .barra-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .dashboard-tabela .barra {
+            height: 8px;
+            background: #edf2f7;
+            border-radius: 8px;
+            flex: 1;
+            min-width: 60px;
+            overflow: hidden;
+        }
+        .dashboard-tabela .barra .preenchimento {
+            height: 100%;
+            border-radius: 8px;
+            background: #667eea;
+            transition: width 0.6s ease;
+        }
+        .dashboard-tabela .badge-status {
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .badge-agendada { background: #fefcbf; color: #975a16; }
+        .badge-confirmada { background: #c6f6d5; color: #276749; }
+        .badge-realizada { background: #bee3f8; color: #2a69ac; }
+        .badge-cancelada { background: #fed7d7; color: #9b2c2c; }
 
         /* ======= CALENDÁRIO EXPANDIDO ======= */
         #calendarioContainer .mes-grid {
@@ -345,6 +450,7 @@
             .side-menu { width: 240px; left: -240px; }
             .btn-tipo-impressao { flex-direction: column; align-items: center; }
             .btn-tipo-impressao button { width: 100%; }
+            .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
 </head>
@@ -482,37 +588,46 @@
             </div>
         </div>
 
-        <!-- PÁGINA DASHBOARD -->
+        <!-- PÁGINA DASHBOARD MELHORADA -->
         <div id="pageDashboard" class="page-section">
             <h3>📊 Dashboard de Métricas</h3>
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:15px; margin-bottom:25px;">
-                <div class="dashboard-card" style="background:#667eea; color:white;">
+            <div class="dashboard-grid" id="dashboardCards">
+                <div class="dashboard-card azul">
+                    <span class="icon"><i class="fas fa-calendar-check"></i></span>
                     <span class="numero" id="totalConsultas">0</span>
-                    <span class="label" style="color:rgba(255,255,255,0.8);">Total Consultas</span>
+                    <span class="label">Total Consultas</span>
                 </div>
-                <div class="dashboard-card" style="background:#48bb78; color:white;">
+                <div class="dashboard-card verde">
+                    <span class="icon"><i class="fas fa-user-md"></i></span>
                     <span class="numero" id="totalMedicos">0</span>
-                    <span class="label" style="color:rgba(255,255,255,0.8);">Médicos</span>
+                    <span class="label">Médicos</span>
                 </div>
-                <div class="dashboard-card" style="background:#ed8936; color:white;">
+                <div class="dashboard-card laranja">
+                    <span class="icon"><i class="fas fa-clock"></i></span>
                     <span class="numero" id="totalAgendadas">0</span>
-                    <span class="label" style="color:rgba(255,255,255,0.8);">Agendadas</span>
+                    <span class="label">Agendadas</span>
                 </div>
-                <div class="dashboard-card" style="background:#38a169; color:white;">
+                <div class="dashboard-card azul">
+                    <span class="icon"><i class="fas fa-check-circle"></i></span>
                     <span class="numero" id="totalConfirmadas">0</span>
-                    <span class="label" style="color:rgba(255,255,255,0.8);">Confirmadas</span>
+                    <span class="label">Confirmadas</span>
                 </div>
-                <div class="dashboard-card" style="background:#9b59b6; color:white;">
+                <div class="dashboard-card roxo">
+                    <span class="icon"><i class="fas fa-check-double"></i></span>
                     <span class="numero" id="totalRealizadas">0</span>
-                    <span class="label" style="color:rgba(255,255,255,0.8);">Realizadas</span>
+                    <span class="label">Realizadas</span>
                 </div>
-                <div class="dashboard-card" style="background:#f56565; color:white;">
+                <div class="dashboard-card vermelho">
+                    <span class="icon"><i class="fas fa-times-circle"></i></span>
                     <span class="numero" id="totalCanceladas">0</span>
-                    <span class="label" style="color:rgba(255,255,255,0.8);">Canceladas</span>
+                    <span class="label">Canceladas</span>
                 </div>
             </div>
-            <h4>📋 Consultas por Vendedor</h4>
-            <div id="vendedoresRelatorio"></div>
+
+            <div class="dashboard-tabela">
+                <h4><i class="fas fa-users"></i> Consultas por Vendedor</h4>
+                <div id="vendedoresRelatorio"></div>
+            </div>
         </div>
 
         <!-- PÁGINA ADMIN -->
@@ -2102,7 +2217,7 @@
         }
 
         // ========================================================================
-        // DASHBOARD
+        // DASHBOARD – MELHORADO
         // ========================================================================
         async function carregarDashboard() {
             if (user.tipo !== 'admin') return;
@@ -2113,6 +2228,7 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Erro');
 
+                // Atualizar cards
                 document.getElementById('totalConsultas').textContent = data.total_consultas || 0;
                 document.getElementById('totalMedicos').textContent = data.total_medicos || 0;
                 document.getElementById('totalAgendadas').textContent = data.por_status?.agendada || 0;
@@ -2120,37 +2236,51 @@
                 document.getElementById('totalRealizadas').textContent = data.por_status?.realizada || 0;
                 document.getElementById('totalCanceladas').textContent = data.por_status?.cancelada || 0;
 
+                // Tabela de vendedores
                 const container = document.getElementById('vendedoresRelatorio');
                 if (!data.por_vendedor || data.por_vendedor.length === 0) {
-                    container.innerHTML = '<p>Nenhum vendedor com consultas.</p>';
+                    container.innerHTML = '<p style="padding:20px; color:#999;">Nenhum vendedor com consultas.</p>';
                     return;
                 }
+
+                // Calcular o total máximo para barras (usando o total de consultas)
+                const maxTotal = Math.max(...data.por_vendedor.map(v => v.total), 1);
 
                 let html = `<table>
                     <thead>
                         <tr>
                             <th>Vendedor</th>
-                            <th>Total</th>
-                            <th>Agendadas</th>
-                            <th>Confirmadas</th>
-                            <th>Realizadas</th>
-                            <th>Canceladas</th>
+                            <th style="text-align:center;">Total</th>
+                            <th style="text-align:center;">Agendadas</th>
+                            <th style="text-align:center;">Confirmadas</th>
+                            <th style="text-align:center;">Realizadas</th>
+                            <th style="text-align:center;">Canceladas</th>
+                            <th style="min-width:120px;">Progresso</th>
                         </tr>
                     </thead>
                     <tbody>`;
                 data.por_vendedor.forEach(v => {
+                    const pct = Math.round((v.total / maxTotal) * 100);
+                    const barColor = v.total > 0 ? '#667eea' : '#e2e8f0';
                     html += `<tr>
-                        <td>${escapeHtml(v.vendedor_nome)}</td>
-                        <td>${v.total}</td>
-                        <td>${v.agendadas}</td>
-                        <td>${v.confirmadas}</td>
-                        <td>${v.realizadas}</td>
-                        <td>${v.canceladas}</td>
+                        <td><strong>${escapeHtml(v.vendedor_nome)}</strong></td>
+                        <td style="text-align:center; font-weight:600;">${v.total}</td>
+                        <td style="text-align:center;"><span class="badge-status badge-agendada">${v.agendadas}</span></td>
+                        <td style="text-align:center;"><span class="badge-status badge-confirmada">${v.confirmadas}</span></td>
+                        <td style="text-align:center;"><span class="badge-status badge-realizada">${v.realizadas}</span></td>
+                        <td style="text-align:center;"><span class="badge-status badge-cancelada">${v.canceladas}</span></td>
+                        <td>
+                            <div class="barra-container">
+                                <div class="barra">
+                                    <div class="preenchimento" style="width:${pct}%; background:${barColor};"></div>
+                                </div>
+                                <span style="font-size:12px; color:#4a5568; min-width:40px;">${pct}%</span>
+                            </div>
+                        </td>
                     </tr>`;
                 });
                 html += `</tbody></table>`;
                 container.innerHTML = html;
-
             } catch (err) {
                 console.error(err);
                 showToast('Erro ao carregar dashboard', true);
@@ -2907,7 +3037,7 @@
             if (e.target === this) fecharModalImpressao();
         });
 
-        console.log('✅ Sistema completo com calendário expandido e todas as funcionalidades.');
+        console.log('✅ Sistema completo com dashboard melhorado e calendário expandido.');
     </script>
 </body>
 </html>
