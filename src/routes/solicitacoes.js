@@ -1,3 +1,44 @@
+const express = require('express');
+const { pool } = require('../config/database');
+const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { toNull, formatDateToYYYYMMDD } = require('../utils/helpers');
+const { agendarLembrete } = require('../services/lembreteService');
+
+const router = express.Router(); // <-- LINHA CRUCIAL: define o router
+
+// ==================== LISTAR SOLICITAÇÕES ====================
+router.get('/', authenticateToken, async (req, res) => {
+    try {
+        const isAdmin = req.user.tipo === 'admin';
+        let query = `
+            SELECT s.*, u.nome as solicitante_nome
+            FROM solicitacoes_consultas s
+            JOIN usuarios u ON s.solicitado_por = u.id
+        `;
+        const params = [];
+        if (!isAdmin) {
+            query += ' WHERE s.solicitado_por = $1';
+            params.push(req.user.id);
+        }
+        query += ' ORDER BY s.criado_em DESC';
+        const result = await pool.query(query, params);
+        res.json(result.rows.map(s => ({ ...s, data_consulta: formatDateToYYYYMMDD(s.data_consulta) })));
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==================== CONTAR SOLICITAÇÕES PENDENTES ====================
+router.get('/pendentes/count', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT COUNT(*) as total FROM solicitacoes_consultas WHERE status = $1', ['pendente']);
+        res.json({ total: parseInt(result.rows[0].total) });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==================== CRIAR SOLICITAÇÃO ====================
 router.post('/', authenticateToken, async (req, res) => {
     try {
         const {
@@ -88,3 +129,77 @@ router.post('/', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Erro interno do servidor' });
     }
 });
+
+// ==================== APROVAR/REJEITAR SOLICITAÇÃO ====================
+router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { status, horario_escolhido } = req.body;
+        if (!['aprovado', 'rejeitado'].includes(status)) {
+            return res.status(400).json({ error: 'Status inválido' });
+        }
+
+        const solic = await pool.query('SELECT * FROM solicitacoes_consultas WHERE id = $1', [req.params.id]);
+        if (solic.rows.length === 0) {
+            return res.status(404).json({ error: 'Solicitação não encontrada' });
+        }
+        const s = solic.rows[0];
+
+        if (status === 'aprovado') {
+            if (!horario_escolhido) {
+                return res.status(400).json({ error: 'Selecione um horário para aprovar.' });
+            }
+            const horarios = [s.horario_sugerido1, s.horario_sugerido2, s.horario_sugerido3].filter(h => h);
+            if (!horarios.includes(horario_escolhido)) {
+                return res.status(400).json({ error: 'Horário escolhido não está entre os sugeridos.' });
+            }
+
+            // Validar horário
+            const diaSemana = new Date(s.data_consulta).getDay();
+            const horariosConfig = await pool.query(
+                `SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
+                [s.medico_id, diaSemana]
+            );
+            let valido = false;
+            for (const config of horariosConfig.rows) {
+                if (horario_escolhido >= config.hora_inicio && horario_escolhido < config.hora_fim) {
+                    valido = true;
+                    break;
+                }
+            }
+            if (!valido) {
+                return res.status(400).json({ error: 'Horário fora do expediente do médico.' });
+            }
+
+            const conflito = await pool.query(
+                'SELECT id FROM consultas WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 AND status NOT IN ($4, $5)',
+                [s.data_consulta, horario_escolhido, s.medico_id, 'cancelada', 'realizada']
+            );
+            if (conflito.rows.length > 0) {
+                return res.status(400).json({ error: 'Horário já ocupado para este médico.' });
+            }
+
+            // Criar consulta
+            const result = await pool.query(
+                `INSERT INTO consultas
+                 (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta, horario, medico_id, medico_nome, observacoes, numero_pedido, criado_por)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+                [s.paciente_nome, s.paciente_telefone, s.paciente_email, s.paciente_cpf, s.data_consulta, horario_escolhido,
+                 s.medico_id, s.medico_nome, s.observacoes, s.numero_pedido, s.solicitado_por]
+            );
+            const consultaId = result.rows[0].id;
+            await agendarLembrete(consultaId, s.paciente_nome, s.paciente_telefone, s.data_consulta,
+                horario_escolhido, s.medico_nome, s.medico_id, s.solicitado_por, s.numero_pedido);
+            await pool.query('UPDATE solicitacoes_consultas SET horario_escolhido = $1 WHERE id = $2',
+                [horario_escolhido, req.params.id]);
+        }
+
+        await pool.query('UPDATE solicitacoes_consultas SET status = $1 WHERE id = $2', [status, req.params.id]);
+        res.json({ message: `Solicitação ${status} com sucesso` });
+    } catch (error) {
+        console.error('Erro ao atualizar solicitação:', error);
+        res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+});
+
+// ==================== EXPORTA O ROUTER ====================
+module.exports = router; // <-- LINHA CRUCIAL: exporta o router
