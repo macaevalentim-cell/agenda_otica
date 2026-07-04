@@ -19,25 +19,39 @@ const dashboardRoutes = require('./routes/dashboard');
 
 const app = express();
 
+// ==================== SEGURANÇA ====================
+// Desabilitando CSP para permitir scripts inline e event handlers
+// Mantemos outras proteções como XSS, etc.
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-hashes'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3000'],
-    }
-  }
+  contentSecurityPolicy: false,  // DESABILITA COMPLETAMENTE A CSP
+  // Ou use uma política mais permissiva:
+  // contentSecurityPolicy: {
+  //   directives: {
+  //     defaultSrc: ["'self'"],
+  //     scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-hashes'"],
+  //     scriptSrcAttr: ["'unsafe-inline'", "'unsafe-hashes'"],
+  //     styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+  //     imgSrc: ["'self'", "data:", "https:"],
+  //     connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3000'],
+  //     fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
+  //   }
+  // }
 }));
 
-app.use(cors({ origin: process.env.FRONTEND_URL || '*', optionsSuccessStatus: 200 }));
+// CORS – permitir a origem do frontend
+app.use(cors({
+  origin: process.env.FRONTEND_URL || '*',
+  optionsSuccessStatus: 200
+}));
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
+// Rate limiting
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use('/api/', limiter);
 
+// Rotas
 app.use('/api', authRoutes);
 app.use('/api/empresas', empresasRoutes);
 app.use('/api/medicos', medicosRoutes);
@@ -50,10 +64,12 @@ app.use('/api/lembretes', lembretesRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
+// Página inicial
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
+// Middleware de erro
 app.use((err, req, res, next) => {
   console.error('❌ Erro não tratado:', err.stack);
   res.status(500).json({ error: 'Erro interno do servidor' });
