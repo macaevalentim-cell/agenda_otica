@@ -88,7 +88,7 @@
         .view-buttons { display: flex; flex-wrap: wrap; gap: 10px; margin: 15px 0; }
         .view-buttons button { background: #718096; }
         .view-buttons button.active { background: #667eea; }
-        table { width: 100%; border-collapse: collapse; }
+        table { width: 100%; border-collapse: collapse; overflow-x: auto; display: block; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #667eea; color: white; }
         .consulta-item { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 5px 8px; margin: 3px 0; border-radius: 5px; font-size: 12px; cursor: pointer; }
@@ -1332,7 +1332,6 @@
             medicoSelecionadoId = medicoId;
             document.getElementById('horariosMedico').style.display = 'block';
             carregarHorarios(medicoId);
-            // Rolar para a seção
             document.getElementById('horariosMedico').scrollIntoView({ behavior: 'smooth' });
         }
 
