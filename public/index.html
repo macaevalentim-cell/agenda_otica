@@ -88,10 +88,6 @@
         .view-buttons { display: flex; flex-wrap: wrap; gap: 10px; margin: 15px 0; }
         .view-buttons button { background: #718096; }
         .view-buttons button.active { background: #667eea; }
-        table { width: 100%; border-collapse: collapse; overflow-x: auto; display: block; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; }
-        th { background: #667eea; color: white; }
-        .consulta-item { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 5px 8px; margin: 3px 0; border-radius: 5px; font-size: 12px; cursor: pointer; }
 
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
         .modal-overlay.show { display: flex; }
@@ -106,7 +102,6 @@
         .horario-item:last-child { border-bottom: none; }
 
         .msg-horarios { margin: 5px 0 10px 0; padding: 10px; border-radius: 5px; background: #fff3cd; border: 1px solid #ffeeba; color: #856404; }
-        .msg-horarios a { color: #0056b3; text-decoration: underline; cursor: pointer; }
 
         .calendario-titulo {
             font-size: 22px;
@@ -120,29 +115,180 @@
         .dashboard-card .numero { font-size: 32px; font-weight: bold; display: block; }
         .dashboard-card .label { font-size: 14px; color: #718096; }
 
-        .filtros-box {
-            background: #f7fafc;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+        /* ======= CALENDÁRIO EXPANDIDO ======= */
+        #calendarioContainer .mes-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+        #calendarioContainer .mes-grid .dia-cell {
             border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 8px;
+            min-height: 120px;
+            background: white;
+            transition: 0.2s;
+            position: relative;
         }
-        .filtros-box .form-row { margin-bottom: 5px; }
-
-        .horario-periodo {
-            margin-top: 15px;
-            padding: 10px;
-            background: #f0f4f8;
-            border-radius: 6px;
+        #calendarioContainer .mes-grid .dia-cell:hover {
+            background: #f7fafc;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
-        .horario-periodo h5 {
+        #calendarioContainer .mes-grid .dia-cell .dia-numero {
+            font-size: 18px;
+            font-weight: 600;
             color: #2d3748;
-            margin-bottom: 8px;
-            border-bottom: 2px solid #cbd5e0;
-            padding-bottom: 4px;
+            margin-bottom: 6px;
+            display: block;
+        }
+        #calendarioContainer .mes-grid .dia-cell .dia-consulta {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #calendarioContainer .mes-grid .dia-cell .dia-consulta.mais {
+            background: transparent;
+            color: #718096;
+            font-size: 10px;
+            text-align: center;
+        }
+        #calendarioContainer .mes-grid .dia-cell .dia-consulta .horario {
+            font-weight: 600;
+            margin-right: 4px;
+        }
+        #calendarioContainer .mes-grid .dia-cell .dia-consulta .paciente {
+            font-weight: 400;
+        }
+        #calendarioContainer .mes-grid .dia-cell .dia-consulta .medico {
+            font-size: 9px;
+            opacity: 0.8;
+        }
+        #calendarioContainer .mes-grid .dia-cell.dia-hoje {
+            background: #ebf8ff;
+            border-color: #667eea;
+        }
+        #calendarioContainer .mes-grid .dia-cell.outro-mes {
+            opacity: 0.4;
         }
 
-        /* Estilos para impressão */
+        #calendarioContainer .semana-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        #calendarioContainer .semana-table th {
+            background: #667eea;
+            color: white;
+            padding: 12px 8px;
+            text-align: center;
+            font-weight: 600;
+        }
+        #calendarioContainer .semana-table th .dia-semana {
+            font-size: 12px;
+            font-weight: 400;
+            display: block;
+        }
+        #calendarioContainer .semana-table th .dia-numero {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        #calendarioContainer .semana-table td {
+            border: 1px solid #e2e8f0;
+            padding: 8px 4px;
+            vertical-align: top;
+            min-width: 100px;
+            height: 60px;
+        }
+        #calendarioContainer .semana-table .horario-label {
+            font-weight: 600;
+            color: #4a5568;
+            width: 60px;
+            text-align: center;
+            background: #f7fafc;
+        }
+        #calendarioContainer .semana-table .consulta-item {
+            background: #667eea;
+            color: white;
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin: 2px 0;
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #calendarioContainer .semana-table .consulta-item:hover {
+            opacity: 0.8;
+            transform: scale(1.02);
+        }
+        #calendarioContainer .semana-table .consulta-item .paciente-nome {
+            font-weight: 600;
+        }
+        #calendarioContainer .semana-table .consulta-item .medico-nome {
+            font-size: 9px;
+            opacity: 0.8;
+            display: block;
+        }
+
+        #calendarioContainer .dia-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        #calendarioContainer .dia-list .dia-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 16px 20px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+            transition: 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        #calendarioContainer .dia-list .dia-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        #calendarioContainer .dia-list .dia-card .info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 20px;
+            flex: 1;
+        }
+        #calendarioContainer .dia-list .dia-card .info .horario {
+            font-weight: 700;
+            color: #667eea;
+            font-size: 18px;
+            width: 70px;
+        }
+        #calendarioContainer .dia-list .dia-card .info .dados {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        #calendarioContainer .dia-list .dia-card .info .dados .paciente {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        #calendarioContainer .dia-list .dia-card .info .dados .detalhes {
+            font-size: 13px;
+            color: #4a5568;
+        }
+        #calendarioContainer .dia-list .dia-card .info .dados .detalhes .medico {
+            font-weight: 500;
+        }
+
+        /* ======= IMPRESSÃO ======= */
         .comprovante-container {
             background: white;
             padding: 15px 20px;
@@ -193,10 +339,6 @@
         .btn-tipo-impressao .btn-bobina { background: #2d3748; color: white; }
         .btn-tipo-impressao .btn-a4 { background: #667eea; color: white; }
         .btn-tipo-impressao .btn-pdf { background: #e53e3e; color: white; }
-
-        .copias-select { margin: 10px 0; text-align: center; }
-        .copias-select label { font-weight: 600; margin-right: 10px; }
-        .copias-select select { padding: 6px 12px; border-radius: 4px; border: 1px solid #ccc; }
 
         @media (max-width: 768px) {
             .header-title h2 { font-size: 16px; }
@@ -549,7 +691,7 @@
             <div class="form-row">
                 <input type="text" id="solNumeroPedido" placeholder="Número do Pedido (opcional)" style="flex:1;">
             </div>
-            <button onclick="enviarSolicitacao()" class="btn-success">Enviar Solicitação</button>
+            <button onclick="enviarSolicitacao()" class="btn-success" id="btnEnviarSolicitacao">Enviar Solicitação</button>
             <div id="solMsg" style="margin-top:10px;"></div>
         </div>
 
@@ -773,65 +915,64 @@
         // LOGIN
         // ========================================================================
         async function fazerLogin() {
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    try {
-        const res = await fetch(`${API_URL}/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        });
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            try {
+                const res = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
 
-        // Verifica se a resposta é JSON antes de parsear
-        const contentType = res.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await res.text();
-            throw new Error(text || 'Erro no servidor');
+                const contentType = res.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await res.text();
+                    throw new Error(text || 'Erro no servidor');
+                }
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Erro no login');
+
+                token = data.token;
+                user = data.user;
+                localStorage.setItem('token', token);
+                localStorage.setItem('user', JSON.stringify(user));
+                document.getElementById('loginDiv').style.display = 'none';
+                document.getElementById('dashboardDiv').style.display = 'block';
+                document.getElementById('userName').innerHTML = `👤 ${user.nome} (${user.tipo === 'admin' ? 'Admin' : 'Vendedor'})`;
+                document.getElementById('menuUserName').textContent = user.nome;
+                document.getElementById('menuUserTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+
+                const isAdmin = user.tipo === 'admin';
+                document.getElementById('menuAgendar').style.display = isAdmin ? 'block' : 'none';
+                document.getElementById('menuDashboard').style.display = isAdmin ? 'block' : 'none';
+                document.getElementById('menuAdmin').style.display = isAdmin ? 'block' : 'none';
+
+                document.getElementById('perfilNome').textContent = user.nome;
+                document.getElementById('perfilUsername').textContent = user.username;
+                document.getElementById('perfilTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+
+                await carregarDados();
+                renderizarLista();
+                iniciarPollingLembretes();
+                if (isAdmin) {
+                    iniciarPollingSolicitacoes();
+                    carregarDashboard();
+                }
+                fecharMenu();
+                navegarPara('pageLista');
+
+                setTimeout(() => {
+                    setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
+                    setupEncaixeLogic('pacienteCadEncaixe', 'pacienteCadNeurodivergente', 'pacienteCadDeficienciaFisica');
+                    setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
+                    setupEncaixeLogic('novoPacienteEncaixe', 'novoPacienteNeurodivergente', 'novoPacienteDeficienciaFisica');
+                }, 100);
+            } catch (err) {
+                document.getElementById('loginMsg').innerHTML = `<p style="color:red;">${err.message}</p>`;
+                console.error(err);
+            }
         }
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Erro no login');
-
-        token = data.token;
-        user = data.user;
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
-        document.getElementById('loginDiv').style.display = 'none';
-        document.getElementById('dashboardDiv').style.display = 'block';
-        document.getElementById('userName').innerHTML = `👤 ${user.nome} (${user.tipo === 'admin' ? 'Admin' : 'Vendedor'})`;
-        document.getElementById('menuUserName').textContent = user.nome;
-        document.getElementById('menuUserTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
-
-        const isAdmin = user.tipo === 'admin';
-        document.getElementById('menuAgendar').style.display = isAdmin ? 'block' : 'none';
-        document.getElementById('menuDashboard').style.display = isAdmin ? 'block' : 'none';
-        document.getElementById('menuAdmin').style.display = isAdmin ? 'block' : 'none';
-
-        document.getElementById('perfilNome').textContent = user.nome;
-        document.getElementById('perfilUsername').textContent = user.username;
-        document.getElementById('perfilTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
-
-        await carregarDados();
-        renderizarLista();
-        iniciarPollingLembretes();
-        if (isAdmin) {
-            iniciarPollingSolicitacoes();
-            carregarDashboard();
-        }
-        fecharMenu();
-        navegarPara('pageLista');
-
-        setTimeout(() => {
-            setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
-            setupEncaixeLogic('pacienteCadEncaixe', 'pacienteCadNeurodivergente', 'pacienteCadDeficienciaFisica');
-            setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
-            setupEncaixeLogic('novoPacienteEncaixe', 'novoPacienteNeurodivergente', 'novoPacienteDeficienciaFisica');
-        }, 100);
-    } catch (err) {
-        document.getElementById('loginMsg').innerHTML = `<p style="color:red;">${err.message}</p>`;
-        console.error(err);
-    }
-}
 
         // ========================================================================
         // CARREGAR DADOS
@@ -1389,62 +1530,58 @@
         // CARREGAR HORÁRIOS DISPONÍVEIS (SOLICITAÇÃO)
         // ========================================================================
         async function carregarHorariosDisponiveisSol() {
-    const medicoId = document.getElementById('solMedicoSelect').value;
-    const data = document.getElementById('solDataConsulta').value;
-    const selects = [
-        document.getElementById('solHorario1'),
-        document.getElementById('solHorario2'),
-        document.getElementById('solHorario3')
-    ];
-    const msgDiv = document.getElementById('solMsgHorarios');
+            const medicoId = document.getElementById('solMedicoSelect').value;
+            const data = document.getElementById('solDataConsulta').value;
+            const selects = [
+                document.getElementById('solHorario1'),
+                document.getElementById('solHorario2'),
+                document.getElementById('solHorario3')
+            ];
+            const msgDiv = document.getElementById('solMsgHorarios');
 
-    selects.forEach(s => s.innerHTML = '<option value="">Carregando...</option>');
-    msgDiv.style.display = 'none';
-    msgDiv.innerHTML = '';
+            selects.forEach(s => s.innerHTML = '<option value="">Carregando...</option>');
+            msgDiv.style.display = 'none';
+            msgDiv.innerHTML = '';
 
-    if (!medicoId || !data) {
-        selects.forEach(s => s.innerHTML = '<option value="">Selecione médico e data</option>');
-        return;
-    }
+            if (!medicoId || !data) {
+                selects.forEach(s => s.innerHTML = '<option value="">Selecione médico e data</option>');
+                return;
+            }
 
-    if (isDataPassada(data)) {
-        selects.forEach(s => s.innerHTML = '<option value="">Data inválida</option>');
-        msgDiv.style.display = 'block';
-        msgDiv.innerHTML = '⚠️ Data não pode ser no passado.';
-        return;
-    }
+            if (isDataPassada(data)) {
+                selects.forEach(s => s.innerHTML = '<option value="">Data inválida</option>');
+                msgDiv.style.display = 'block';
+                msgDiv.innerHTML = '⚠️ Data não pode ser no passado.';
+                return;
+            }
 
-    try {
-        const res = await fetch(`${API_URL}/medicos/${medicoId}/horarios/disponiveis?data=${data}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        const horarios = await res.json();
-
-        if (horarios.error || !Array.isArray(horarios)) {
-            selects.forEach(s => s.innerHTML = '<option value="">Nenhum disponível</option>');
-            msgDiv.style.display = 'block';
-            msgDiv.innerHTML = `⚠️ ${horarios.error || 'Erro ao carregar horários'}`;
-            return;
+            try {
+                const res = await fetch(`${API_URL}/medicos/${medicoId}/horarios/disponiveis?data=${data}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const horarios = await res.json();
+                if (horarios.error) {
+                    selects.forEach(s => s.innerHTML = '<option value="">Nenhum disponível</option>');
+                    msgDiv.style.display = 'block';
+                    msgDiv.innerHTML = `⚠️ ${horarios.error}`;
+                    return;
+                }
+                if (horarios.length === 0) {
+                    selects.forEach(s => s.innerHTML = '<option value="">Nenhum horário disponível</option>');
+                    msgDiv.style.display = 'block';
+                    msgDiv.innerHTML = '⚠️ Médico não possui horários disponíveis para esta data.';
+                    return;
+                }
+                const options = '<option value="">Selecione um horário</option>' +
+                    horarios.map(h => `<option value="${h.horario}">${h.horario}</option>`).join('');
+                selects.forEach(s => s.innerHTML = options);
+                msgDiv.style.display = 'none';
+            } catch (err) {
+                selects.forEach(s => s.innerHTML = '<option value="">Erro</option>');
+                msgDiv.style.display = 'block';
+                msgDiv.innerHTML = `⚠️ ${err.message}`;
+            }
         }
-
-        if (horarios.length === 0) {
-            selects.forEach(s => s.innerHTML = '<option value="">Nenhum horário disponível</option>');
-            msgDiv.style.display = 'block';
-            msgDiv.innerHTML = '⚠️ Médico não possui horários disponíveis para esta data.';
-            return;
-        }
-
-        const options = '<option value="">Selecione um horário</option>' +
-            horarios.map(h => `<option value="${h.horario}">${h.horario}</option>`).join('');
-
-        selects.forEach(s => s.innerHTML = options);
-        msgDiv.style.display = 'none';
-    } catch (err) {
-        selects.forEach(s => s.innerHTML = '<option value="">Erro</option>');
-        msgDiv.style.display = 'block';
-        msgDiv.innerHTML = `⚠️ ${err.message}`;
-    }
-}
 
         document.getElementById('solMedicoSelect').addEventListener('change', carregarHorariosDisponiveisSol);
         document.getElementById('solDataConsulta').addEventListener('change', carregarHorariosDisponiveisSol);
@@ -1833,6 +1970,54 @@
             document.querySelectorAll(`.view-buttons button[onclick*="${currentView}"]`).forEach(btn => btn.classList.add('active'));
         }
 
+        // ========================================================================
+        // RENDERIZAR MÊS – EXPANDIDO
+        // ========================================================================
+        function renderizarMes(container) {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const startDay = firstDay.getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const today = formatDate(new Date());
+            
+            let html = `<div class="mes-grid">`;
+            // Cabeçalho com dias da semana
+            ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d => {
+                html += `<div style="font-weight:600; padding:8px; text-align:center; color:#4a5568;">${d}</div>`;
+            });
+            // Dias vazios
+            for (let i = 0; i < startDay; i++) {
+                html += `<div class="dia-cell outro-mes"></div>`;
+            }
+            // Dias do mês
+            for (let d = 1; d <= daysInMonth; d++) {
+                let dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                let isToday = dateStr === today;
+                let dayEvents = consultas.filter(c => c.data_consulta === dateStr);
+                html += `<div class="dia-cell ${isToday ? 'dia-hoje' : ''}">
+                    <span class="dia-numero">${d}</span>`;
+                // Mostrar até 3 consultas
+                const maxShow = 3;
+                dayEvents.slice(0, maxShow).forEach(e => {
+                    html += `<div class="dia-consulta" onclick="mostrarDetalhes(${e.id})">
+                        <span class="horario">${e.horario}</span>
+                        <span class="paciente">${escapeHtml(e.paciente_nome.substring(0,12))}</span>
+                        <span class="medico">${escapeHtml(e.medico_nome)}</span>
+                    </div>`;
+                });
+                if (dayEvents.length > maxShow) {
+                    html += `<div class="dia-consulta mais">+ ${dayEvents.length - maxShow} mais</div>`;
+                }
+                html += `</div>`;
+            }
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        // ========================================================================
+        // RENDERIZAR SEMANA – EXPANDIDO
+        // ========================================================================
         function renderizarSemana(container) {
             let start = new Date(currentDate);
             start.setDate(currentDate.getDate() - currentDate.getDay());
@@ -1842,12 +2027,18 @@
                 d.setDate(start.getDate() + i);
                 days.push(d);
             }
+            // Horários (ajuste conforme preferir)
             let hours = ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00'];
-            let html = `<table><thead><tr><th>Horário</th>`;
+            
+            let html = `<table class="semana-table"><thead><tr><th>Horário</th>`;
             days.forEach(day => {
                 let dateStr = formatDate(day);
                 let dayEvents = consultas.filter(c => c.data_consulta === dateStr);
-                html += `<th>${day.toLocaleDateString('pt-BR', { weekday: 'short' })}<br>${day.getDate()}<br><small>${dayEvents.length}</small></th>`;
+                html += `<th>
+                    <span class="dia-semana">${day.toLocaleDateString('pt-BR', { weekday: 'short' })}</span>
+                    <span class="dia-numero">${day.getDate()}</span>
+                    <span style="font-size:12px; font-weight:400;">(${dayEvents.length})</span>
+                </th>`;
             });
             html += `</tr></thead><tbody>`;
             hours.forEach(hour => {
@@ -1855,11 +2046,11 @@
                 days.forEach(day => {
                     let dateStr = formatDate(day);
                     let hourEvents = consultas.filter(c => c.data_consulta === dateStr && c.horario === hour);
-                    html += `<td style="background: ${hourEvents.length > 0 ? '#e8f0fe' : 'white'};">`;
+                    html += `<td style="background: ${hourEvents.length > 0 ? '#f0f4ff' : 'white'};">`;
                     hourEvents.forEach(e => {
                         html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})">
-                            <strong>${escapeHtml(e.paciente_nome)}</strong><br>
-                            <small>${e.medico_nome}</small>
+                            <span class="paciente-nome">${escapeHtml(e.paciente_nome)}</span>
+                            <span class="medico-nome">${escapeHtml(e.medico_nome)}</span>
                         </div>`;
                     });
                     html += `</td>`;
@@ -1870,52 +2061,42 @@
             container.innerHTML = html;
         }
 
-        function renderizarMes(container) {
-            const year = currentDate.getFullYear();
-            const month = currentDate.getMonth();
-            const firstDay = new Date(year, month, 1);
-            const startDay = firstDay.getDay();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const today = formatDate(new Date());
-            let html = `<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:5px;">`;
-            ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d => html += `<div style="font-weight:bold; padding:5px; background:#f7fafc; text-align:center;">${d}</div>`);
-            for (let i = 0; i < startDay; i++) html += `<div></div>`;
-            for (let d = 1; d <= daysInMonth; d++) {
-                let dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                let isToday = dateStr === today;
-                let dayEvents = consultas.filter(c => c.data_consulta === dateStr);
-                html += `<div style="border:1px solid #ddd; border-radius:8px; padding:8px; min-height:100px; background:${isToday ? '#e8f0fe' : 'white'}">
-                    <strong>${d}</strong><br>`;
-                dayEvents.slice(0, 3).forEach(e => {
-                    html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})" style="font-size:10px;">${e.horario} ${escapeHtml(e.paciente_nome.substring(0,15))}</div>`;
-                });
-                if (dayEvents.length > 3) html += `<small>+${dayEvents.length-3}</small>`;
-                html += `</div>`;
-            }
-            html += `</div>`;
-            container.innerHTML = html;
-        }
-
+        // ========================================================================
+        // RENDERIZAR DIA – EXPANDIDO
+        // ========================================================================
         function renderizarDia(container) {
             let dateStr = formatDate(currentDate);
             let dayEvents = consultas.filter(c => c.data_consulta === dateStr).sort((a,b) => a.horario.localeCompare(b.horario));
-            let html = `<div style="background:linear-gradient(135deg,#667eea,#764ba2); color:white; padding:20px; text-align:center; border-radius:10px; margin-bottom:20px;">
-                <h2>${currentDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</h2>
-                <p>${currentDate.toLocaleDateString('pt-BR', { weekday: 'long' })}</p>
-                <p>${dayEvents.length} consulta(s)</p>
+            
+            let html = `<div style="background:linear-gradient(135deg,#667eea,#764ba2); color:white; padding:25px 20px; text-align:center; border-radius:12px; margin-bottom:25px; box-shadow:0 4px 12px rgba(102,126,234,0.3);">
+                <h2 style="font-size:28px;">${currentDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</h2>
+                <p style="font-size:18px; opacity:0.9; margin-top:5px;">${currentDate.toLocaleDateString('pt-BR', { weekday: 'long' })}</p>
+                <p style="font-size:16px; margin-top:8px; background:rgba(255,255,255,0.2); display:inline-block; padding:4px 18px; border-radius:20px;">${dayEvents.length} consulta(s)</p>
             </div>`;
+            
             if (dayEvents.length === 0) {
-                html += `<div class="no-data">Nenhuma consulta</div>`;
+                html += `<div class="no-data" style="padding:40px; font-size:18px;">📭 Nenhuma consulta agendada para este dia.</div>`;
             } else {
+                html += `<div class="dia-list">`;
                 dayEvents.forEach(e => {
-                    html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})" style="margin-bottom:10px; padding:15px;">
-                        <strong>🕐 ${e.horario}</strong><br>
-                        <strong>${escapeHtml(e.paciente_nome)}</strong><br>
-                        👨‍⚕️ Dr. ${escapeHtml(e.medico_nome)}<br>
-                        📞 ${e.paciente_telefone}
-                        ${e.observacoes ? `<br>📝 ${escapeHtml(e.observacoes)}` : ''}
+                    html += `<div class="dia-card" onclick="mostrarDetalhes(${e.id})" style="cursor:pointer;">
+                        <div class="info">
+                            <div class="horario">${e.horario}</div>
+                            <div class="dados">
+                                <span class="paciente">${escapeHtml(e.paciente_nome)}</span>
+                                <span class="detalhes">
+                                    👨‍⚕️ <span class="medico">Dr. ${escapeHtml(e.medico_nome)}</span>
+                                    ${e.paciente_telefone ? ` 📞 ${e.paciente_telefone}` : ''}
+                                    ${e.observacoes ? ` 📝 ${escapeHtml(e.observacoes)}` : ''}
+                                </span>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:6px;">
+                            <span style="background:#edf2f7; color:#4a5568; padding:2px 10px; border-radius:12px; font-size:11px;">${e.status || 'agendada'}</span>
+                        </div>
                     </div>`;
                 });
+                html += `</div>`;
             }
             container.innerHTML = html;
         }
@@ -2120,104 +2301,116 @@
         // ========================================================================
         // SOLICITAÇÕES
         // ========================================================================
-async function enviarSolicitacao() {
-    const dataConsulta = document.getElementById('solDataConsulta').value;
-    if (!validarDataNaoPassada(dataConsulta, 'Data da consulta')) {
-        return;
-    }
+        async function enviarSolicitacao() {
+            const btn = document.getElementById('btnEnviarSolicitacao');
+            btn.disabled = true;
+            btn.textContent = 'Enviando...';
 
-    // Captura os valores
-    const medicoId = document.getElementById('solMedicoSelect').value;
-    const medicoNome = medicos.find(m => m.id == medicoId)?.nome || '';
-    const horario1 = document.getElementById('solHorario1').value;
-    const horario2 = document.getElementById('solHorario2').value;
-    const horario3 = document.getElementById('solHorario3').value;
+            try {
+                const dataConsulta = document.getElementById('solDataConsulta').value;
+                if (!validarDataNaoPassada(dataConsulta, 'Data da consulta')) {
+                    btn.disabled = false;
+                    btn.textContent = 'Enviar Solicitação';
+                    return;
+                }
 
-    // Validação básica
-    if (!medicoId) {
-        document.getElementById('solMsg').innerHTML = '<p style="color:red;">Selecione um médico.</p>';
-        return;
-    }
-    if (!dataConsulta) {
-        document.getElementById('solMsg').innerHTML = '<p style="color:red;">Selecione uma data.</p>';
-        return;
-    }
-    if (!horario1) {
-        document.getElementById('solMsg').innerHTML = '<p style="color:red;">Selecione pelo menos o 1º horário.</p>';
-        return;
-    }
+                const medicoId = document.getElementById('solMedicoSelect').value;
+                const medicoNome = medicos.find(m => m.id == medicoId)?.nome || '';
+                const horario1 = document.getElementById('solHorario1').value;
+                const horario2 = document.getElementById('solHorario2').value;
+                const horario3 = document.getElementById('solHorario3').value;
 
-    const dados = {
-        paciente_nome: document.getElementById('solPacienteNome').value.trim(),
-        paciente_telefone: document.getElementById('solPacienteTelefone').value.trim(),
-        paciente_email: document.getElementById('solPacienteEmail').value.trim(),
-        paciente_cpf: document.getElementById('solPacienteCpf').value.trim(),
-        data_nascimento: document.getElementById('solPacienteDataNasc').value,
-        neurodivergente: document.getElementById('solNeurodivergente').checked ? 1 : 0,
-        deficiencia_fisica: document.getElementById('solDeficienciaFisica').checked ? 1 : 0,
-        encaixe: document.getElementById('solEncaixe').checked ? 1 : 0,
-        data_consulta: dataConsulta,
-        horario1: horario1,
-        horario2: horario2,
-        horario3: horario3,
-        medico_id: parseInt(medicoId),
-        medico_nome: medicoNome,
-        observacoes: document.getElementById('solObservacoes').value.trim(),
-        numero_pedido: document.getElementById('solNumeroPedido').value.trim() || null
-    };
+                if (!medicoId) {
+                    document.getElementById('solMsg').innerHTML = '<p style="color:red;">Selecione um médico.</p>';
+                    btn.disabled = false;
+                    btn.textContent = 'Enviar Solicitação';
+                    return;
+                }
+                if (!dataConsulta) {
+                    document.getElementById('solMsg').innerHTML = '<p style="color:red;">Selecione uma data.</p>';
+                    btn.disabled = false;
+                    btn.textContent = 'Enviar Solicitação';
+                    return;
+                }
+                if (!horario1) {
+                    document.getElementById('solMsg').innerHTML = '<p style="color:red;">Selecione pelo menos o 1º horário.</p>';
+                    btn.disabled = false;
+                    btn.textContent = 'Enviar Solicitação';
+                    return;
+                }
 
-    // Verifica campos obrigatórios
-    if (!dados.paciente_nome || !dados.paciente_telefone) {
-        document.getElementById('solMsg').innerHTML = '<p style="color:red;">Nome e telefone do paciente são obrigatórios.</p>';
-        return;
-    }
+                const dados = {
+                    paciente_nome: document.getElementById('solPacienteNome').value.trim(),
+                    paciente_telefone: document.getElementById('solPacienteTelefone').value.trim(),
+                    paciente_email: document.getElementById('solPacienteEmail').value.trim(),
+                    paciente_cpf: document.getElementById('solPacienteCpf').value.trim(),
+                    data_nascimento: document.getElementById('solPacienteDataNasc').value,
+                    neurodivergente: document.getElementById('solNeurodivergente').checked ? 1 : 0,
+                    deficiencia_fisica: document.getElementById('solDeficienciaFisica').checked ? 1 : 0,
+                    encaixe: document.getElementById('solEncaixe').checked ? 1 : 0,
+                    data_consulta: dataConsulta,
+                    horario1: horario1,
+                    horario2: horario2,
+                    horario3: horario3,
+                    medico_id: parseInt(medicoId),
+                    medico_nome: medicoNome,
+                    observacoes: document.getElementById('solObservacoes').value.trim(),
+                    numero_pedido: document.getElementById('solNumeroPedido').value.trim() || null
+                };
 
-    try {
-        const res = await fetch(`${API_URL}/solicitacoes`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify(dados)
-        });
+                if (!dados.paciente_nome || !dados.paciente_telefone) {
+                    document.getElementById('solMsg').innerHTML = '<p style="color:red;">Nome e telefone do paciente são obrigatórios.</p>';
+                    btn.disabled = false;
+                    btn.textContent = 'Enviar Solicitação';
+                    return;
+                }
 
-        // Verifica se a resposta é JSON
-        const contentType = res.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await res.text();
-            throw new Error(text || 'Erro no servidor');
+                const res = await fetch(`${API_URL}/solicitacoes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                    },
+                    body: JSON.stringify(dados)
+                });
+
+                const contentType = res.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await res.text();
+                    throw new Error(text || 'Erro no servidor');
+                }
+
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || 'Erro ao enviar solicitação');
+
+                document.getElementById('solMsg').innerHTML = '<p style="color:green;">✅ Solicitação enviada com sucesso! Aguarde aprovação.</p>';
+                setTimeout(() => {
+                    document.getElementById('solMsg').innerHTML = '';
+                    document.getElementById('solPacienteNome').value = '';
+                    document.getElementById('solPacienteTelefone').value = '';
+                    document.getElementById('solPacienteEmail').value = '';
+                    document.getElementById('solPacienteCpf').value = '';
+                    document.getElementById('solPacienteDataNasc').value = '';
+                    document.getElementById('solNeurodivergente').checked = false;
+                    document.getElementById('solDeficienciaFisica').checked = false;
+                    document.getElementById('solEncaixe').checked = true;
+                    document.getElementById('solHorario1').value = '';
+                    document.getElementById('solHorario2').value = '';
+                    document.getElementById('solHorario3').value = '';
+                    document.getElementById('solObservacoes').value = '';
+                    document.getElementById('solNumeroPedido').value = '';
+                    document.getElementById('solIdadeDisplay').innerHTML = '';
+                    setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
+                }, 3000);
+
+            } catch (err) {
+                document.getElementById('solMsg').innerHTML = `<p style="color:red;">❌ ${err.message}</p>`;
+                console.error('Erro ao enviar solicitação:', err);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Enviar Solicitação';
+            }
         }
-
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.error || 'Erro ao enviar solicitação');
-
-        document.getElementById('solMsg').innerHTML = '<p style="color:green;">✅ Solicitação enviada com sucesso! Aguarde aprovação.</p>';
-        // Limpa os campos após 3 segundos
-        setTimeout(() => {
-            document.getElementById('solMsg').innerHTML = '';
-            document.getElementById('solPacienteNome').value = '';
-            document.getElementById('solPacienteTelefone').value = '';
-            document.getElementById('solPacienteEmail').value = '';
-            document.getElementById('solPacienteCpf').value = '';
-            document.getElementById('solPacienteDataNasc').value = '';
-            document.getElementById('solNeurodivergente').checked = false;
-            document.getElementById('solDeficienciaFisica').checked = false;
-            document.getElementById('solEncaixe').checked = true;
-            document.getElementById('solHorario1').value = '';
-            document.getElementById('solHorario2').value = '';
-            document.getElementById('solHorario3').value = '';
-            document.getElementById('solObservacoes').value = '';
-            document.getElementById('solNumeroPedido').value = '';
-            document.getElementById('solIdadeDisplay').innerHTML = '';
-            setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
-        }, 3000);
-
-    } catch (err) {
-        document.getElementById('solMsg').innerHTML = `<p style="color:red;">❌ ${err.message}</p>`;
-        console.error('Erro ao enviar solicitação:', err);
-    }
-}
 
         async function carregarSolicitacoes() {
             if (user.tipo !== 'admin') return;
@@ -2459,7 +2652,6 @@ async function enviarSolicitacao() {
             if (menuBtn) menuBtn.classList.add('active');
             fecharMenu();
 
-            // Limpar campos
             document.getElementById('perfilSenhaAtual').value = '';
             document.getElementById('perfilNovaSenha').value = '';
             document.getElementById('perfilConfirmarSenha').value = '';
@@ -2715,7 +2907,7 @@ async function enviarSolicitacao() {
             if (e.target === this) fecharModalImpressao();
         });
 
-        console.log('✅ Sistema completo com multiempresas removido e permissões ajustadas.');
+        console.log('✅ Sistema completo com calendário expandido e todas as funcionalidades.');
     </script>
 </body>
 </html>
