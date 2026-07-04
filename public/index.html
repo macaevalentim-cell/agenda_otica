@@ -1389,59 +1389,62 @@
         // CARREGAR HORÁRIOS DISPONÍVEIS (SOLICITAÇÃO)
         // ========================================================================
         async function carregarHorariosDisponiveisSol() {
-            const medicoId = document.getElementById('solMedicoSelect').value;
-            const data = document.getElementById('solDataConsulta').value;
-            const selects = [
-                document.getElementById('solHorario1'),
-                document.getElementById('solHorario2'),
-                document.getElementById('solHorario3')
-            ];
-            const msgDiv = document.getElementById('solMsgHorarios');
+    const medicoId = document.getElementById('solMedicoSelect').value;
+    const data = document.getElementById('solDataConsulta').value;
+    const selects = [
+        document.getElementById('solHorario1'),
+        document.getElementById('solHorario2'),
+        document.getElementById('solHorario3')
+    ];
+    const msgDiv = document.getElementById('solMsgHorarios');
 
-            selects.forEach(s => s.innerHTML = '<option value="">Carregando...</option>');
-            msgDiv.style.display = 'none';
-            msgDiv.innerHTML = '';
+    selects.forEach(s => s.innerHTML = '<option value="">Carregando...</option>');
+    msgDiv.style.display = 'none';
+    msgDiv.innerHTML = '';
 
-            if (!medicoId || !data) {
-                selects.forEach(s => s.innerHTML = '<option value="">Selecione médico e data</option>');
-                return;
-            }
+    if (!medicoId || !data) {
+        selects.forEach(s => s.innerHTML = '<option value="">Selecione médico e data</option>');
+        return;
+    }
 
-            if (isDataPassada(data)) {
-                selects.forEach(s => s.innerHTML = '<option value="">Data inválida</option>');
-                msgDiv.style.display = 'block';
-                msgDiv.innerHTML = '⚠️ Data não pode ser no passado.';
-                return;
-            }
+    if (isDataPassada(data)) {
+        selects.forEach(s => s.innerHTML = '<option value="">Data inválida</option>');
+        msgDiv.style.display = 'block';
+        msgDiv.innerHTML = '⚠️ Data não pode ser no passado.';
+        return;
+    }
 
-            try {
-                const res = await fetch(`${API_URL}/medicos/${medicoId}/horarios/disponiveis?data=${data}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                const horarios = await res.json();
-                if (horarios.error) {
-                    selects.forEach(s => s.innerHTML = '<option value="">Nenhum disponível</option>');
-                    msgDiv.style.display = 'block';
-                    msgDiv.innerHTML = `⚠️ ${horarios.error}`;
-                    return;
-                }
-                if (horarios.length === 0) {
-                    selects.forEach(s => s.innerHTML = '<option value="">Nenhum horário disponível</option>');
-                    msgDiv.style.display = 'block';
-                    msgDiv.innerHTML = '⚠️ Médico não possui horários disponíveis para esta data.';
-                    return;
-                }
-                selects.forEach(s => {
-                    s.innerHTML = '<option value="">Selecione um horário</option>' +
-                        horarios.map(h => `<option value="${h.horario}">${h.horario}</option>`).join('');
-                });
-                msgDiv.style.display = 'none';
-            } catch (err) {
-                selects.forEach(s => s.innerHTML = '<option value="">Erro</option>');
-                msgDiv.style.display = 'block';
-                msgDiv.innerHTML = `⚠️ ${err.message}`;
-            }
+    try {
+        const res = await fetch(`${API_URL}/medicos/${medicoId}/horarios/disponiveis?data=${data}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        const horarios = await res.json();
+
+        if (horarios.error || !Array.isArray(horarios)) {
+            selects.forEach(s => s.innerHTML = '<option value="">Nenhum disponível</option>');
+            msgDiv.style.display = 'block';
+            msgDiv.innerHTML = `⚠️ ${horarios.error || 'Erro ao carregar horários'}`;
+            return;
         }
+
+        if (horarios.length === 0) {
+            selects.forEach(s => s.innerHTML = '<option value="">Nenhum horário disponível</option>');
+            msgDiv.style.display = 'block';
+            msgDiv.innerHTML = '⚠️ Médico não possui horários disponíveis para esta data.';
+            return;
+        }
+
+        const options = '<option value="">Selecione um horário</option>' +
+            horarios.map(h => `<option value="${h.horario}">${h.horario}</option>`).join('');
+
+        selects.forEach(s => s.innerHTML = options);
+        msgDiv.style.display = 'none';
+    } catch (err) {
+        selects.forEach(s => s.innerHTML = '<option value="">Erro</option>');
+        msgDiv.style.display = 'block';
+        msgDiv.innerHTML = `⚠️ ${err.message}`;
+    }
+}
 
         document.getElementById('solMedicoSelect').addEventListener('change', carregarHorariosDisponiveisSol);
         document.getElementById('solDataConsulta').addEventListener('change', carregarHorariosDisponiveisSol);
@@ -2117,67 +2120,104 @@
         // ========================================================================
         // SOLICITAÇÕES
         // ========================================================================
-        async function enviarSolicitacao() {
-            const dataConsulta = document.getElementById('solDataConsulta').value;
-            if (!validarDataNaoPassada(dataConsulta, 'Data da consulta')) {
-                return;
-            }
+async function enviarSolicitacao() {
+    const dataConsulta = document.getElementById('solDataConsulta').value;
+    if (!validarDataNaoPassada(dataConsulta, 'Data da consulta')) {
+        return;
+    }
 
-            const data = {
-                paciente_nome: document.getElementById('solPacienteNome').value,
-                paciente_telefone: document.getElementById('solPacienteTelefone').value,
-                paciente_email: document.getElementById('solPacienteEmail').value,
-                paciente_cpf: document.getElementById('solPacienteCpf').value,
-                data_nascimento: document.getElementById('solPacienteDataNasc').value,
-                neurodivergente: document.getElementById('solNeurodivergente').checked ? 1 : 0,
-                deficiencia_fisica: document.getElementById('solDeficienciaFisica').checked ? 1 : 0,
-                encaixe: document.getElementById('solEncaixe').checked ? 1 : 0,
-                data_consulta: dataConsulta,
-                horario1: document.getElementById('solHorario1').value,
-                horario2: document.getElementById('solHorario2').value,
-                horario3: document.getElementById('solHorario3').value,
-                medico_id: parseInt(document.getElementById('solMedicoSelect').value),
-                medico_nome: medicos.find(m => m.id == document.getElementById('solMedicoSelect').value)?.nome,
-                observacoes: document.getElementById('solObservacoes').value,
-                numero_pedido: document.getElementById('solNumeroPedido').value.trim() || null
-            };
+    // Captura os valores
+    const medicoId = document.getElementById('solMedicoSelect').value;
+    const medicoNome = medicos.find(m => m.id == medicoId)?.nome || '';
+    const horario1 = document.getElementById('solHorario1').value;
+    const horario2 = document.getElementById('solHorario2').value;
+    const horario3 = document.getElementById('solHorario3').value;
 
-            if (!data.paciente_nome || !data.paciente_telefone || !data.data_consulta || !data.horario1 || !data.medico_id) {
-                document.getElementById('solMsg').innerHTML = '<p style="color:red;">Preencha todos os campos obrigatórios (pelo menos o 1º horário).</p>';
-                return;
-            }
+    // Validação básica
+    if (!medicoId) {
+        document.getElementById('solMsg').innerHTML = '<p style="color:red;">Selecione um médico.</p>';
+        return;
+    }
+    if (!dataConsulta) {
+        document.getElementById('solMsg').innerHTML = '<p style="color:red;">Selecione uma data.</p>';
+        return;
+    }
+    if (!horario1) {
+        document.getElementById('solMsg').innerHTML = '<p style="color:red;">Selecione pelo menos o 1º horário.</p>';
+        return;
+    }
 
-            try {
-                const res = await fetch(`${API_URL}/solicitacoes`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify(data)
-                });
-                const result = await res.json();
-                if (!res.ok) throw new Error(result.error || 'Erro');
-                document.getElementById('solMsg').innerHTML = '<p style="color:green;">Solicitação enviada! Aguarde aprovação.</p>';
-                setTimeout(() => {
-                    document.getElementById('solMsg').innerHTML = '';
-                    document.getElementById('solPacienteNome').value = '';
-                    document.getElementById('solPacienteTelefone').value = '';
-                    document.getElementById('solPacienteEmail').value = '';
-                    document.getElementById('solPacienteCpf').value = '';
-                    document.getElementById('solPacienteDataNasc').value = '';
-                    document.getElementById('solNeurodivergente').checked = false;
-                    document.getElementById('solDeficienciaFisica').checked = false;
-                    document.getElementById('solEncaixe').checked = true;
-                    document.getElementById('solHorario1').value = '';
-                    document.getElementById('solHorario2').value = '';
-                    document.getElementById('solHorario3').value = '';
-                    document.getElementById('solObservacoes').value = '';
-                    document.getElementById('solNumeroPedido').value = '';
-                    document.getElementById('solIdadeDisplay').innerHTML = '';
-                    setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
-                }, 3000);
-            } catch (err) {
-                document.getElementById('solMsg').innerHTML = `<p style="color:red;">${err.message}</p>`;
-            }
+    const dados = {
+        paciente_nome: document.getElementById('solPacienteNome').value.trim(),
+        paciente_telefone: document.getElementById('solPacienteTelefone').value.trim(),
+        paciente_email: document.getElementById('solPacienteEmail').value.trim(),
+        paciente_cpf: document.getElementById('solPacienteCpf').value.trim(),
+        data_nascimento: document.getElementById('solPacienteDataNasc').value,
+        neurodivergente: document.getElementById('solNeurodivergente').checked ? 1 : 0,
+        deficiencia_fisica: document.getElementById('solDeficienciaFisica').checked ? 1 : 0,
+        encaixe: document.getElementById('solEncaixe').checked ? 1 : 0,
+        data_consulta: dataConsulta,
+        horario1: horario1,
+        horario2: horario2,
+        horario3: horario3,
+        medico_id: parseInt(medicoId),
+        medico_nome: medicoNome,
+        observacoes: document.getElementById('solObservacoes').value.trim(),
+        numero_pedido: document.getElementById('solNumeroPedido').value.trim() || null
+    };
+
+    // Verifica campos obrigatórios
+    if (!dados.paciente_nome || !dados.paciente_telefone) {
+        document.getElementById('solMsg').innerHTML = '<p style="color:red;">Nome e telefone do paciente são obrigatórios.</p>';
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/solicitacoes`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify(dados)
+        });
+
+        // Verifica se a resposta é JSON
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await res.text();
+            throw new Error(text || 'Erro no servidor');
         }
+
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Erro ao enviar solicitação');
+
+        document.getElementById('solMsg').innerHTML = '<p style="color:green;">✅ Solicitação enviada com sucesso! Aguarde aprovação.</p>';
+        // Limpa os campos após 3 segundos
+        setTimeout(() => {
+            document.getElementById('solMsg').innerHTML = '';
+            document.getElementById('solPacienteNome').value = '';
+            document.getElementById('solPacienteTelefone').value = '';
+            document.getElementById('solPacienteEmail').value = '';
+            document.getElementById('solPacienteCpf').value = '';
+            document.getElementById('solPacienteDataNasc').value = '';
+            document.getElementById('solNeurodivergente').checked = false;
+            document.getElementById('solDeficienciaFisica').checked = false;
+            document.getElementById('solEncaixe').checked = true;
+            document.getElementById('solHorario1').value = '';
+            document.getElementById('solHorario2').value = '';
+            document.getElementById('solHorario3').value = '';
+            document.getElementById('solObservacoes').value = '';
+            document.getElementById('solNumeroPedido').value = '';
+            document.getElementById('solIdadeDisplay').innerHTML = '';
+            setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
+        }, 3000);
+
+    } catch (err) {
+        document.getElementById('solMsg').innerHTML = `<p style="color:red;">❌ ${err.message}</p>`;
+        console.error('Erro ao enviar solicitação:', err);
+    }
+}
 
         async function carregarSolicitacoes() {
             if (user.tipo !== 'admin') return;
