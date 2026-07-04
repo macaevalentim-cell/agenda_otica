@@ -26,7 +26,7 @@ app.use(cors({ origin: process.env.FRONTEND_URL || '*', optionsSuccessStatus: 20
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
 app.use('/api/', limiter);
 
 app.use('/api', authRoutes);
