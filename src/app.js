@@ -16,10 +16,10 @@ const lembretesRoutes = require('./routes/lembretes');
 const whatsappRoutes = require('./routes/whatsapp');
 const dashboardRoutes = require('./routes/dashboard');
 const perfilRoutes = require('./routes/perfil');
+const lojasRoutes = require('./routes/lojas'); // NOVO
 
 const app = express();
 
-// CSP desabilitada para permitir inline event handlers
 app.use(helmet({ contentSecurityPolicy: false }));
 
 app.use(cors({ origin: process.env.FRONTEND_URL || '*', optionsSuccessStatus: 200 }));
@@ -40,6 +40,7 @@ app.use('/api/lembretes', lembretesRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/perfil', perfilRoutes);
+app.use('/api/lojas', lojasRoutes); // NOVA ROTA
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));

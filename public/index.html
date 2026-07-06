@@ -393,27 +393,7 @@
             font-weight: 500;
         }
 
-        /* ======= IMPRESSÃO ======= */
-        .comprovante-container {
-            background: white;
-            padding: 15px 20px;
-            margin: 0 auto;
-            font-family: 'Courier New', monospace;
-            page-break-after: avoid;
-            page-break-inside: avoid;
-            max-height: 100vh;
-            overflow: hidden;
-        }
-        .comprovante-container h2 { text-align: center; border-bottom: 2px solid #333; padding-bottom: 8px; font-size: 18px; }
-        .comprovante-container h3 { text-align: center; font-size: 16px; margin: 6px 0; }
-        .comprovante-container .detalhe { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed #ccc; font-size: 14px; }
-        .comprovante-container .detalhe .label { font-weight: bold; }
-        .comprovante-container .rodape { display: none; }
-
-        .comprovante-bobina { width: 80mm; padding: 8px 10px; font-size: 11px; border: none; margin: 0 auto; }
-        .comprovante-bobina .detalhe { padding: 3px 0; font-size: 10px; }
-        .comprovante-bobina h2 { font-size: 14px; }
-
+        /* ======= IMPRESSÃO – TOPO DA PÁGINA ======= */
         @media print {
             body * { visibility: hidden; }
             .comprovante-container, .comprovante-container * { visibility: visible; }
@@ -425,7 +405,7 @@
                 height: 100%;
                 display: flex;
                 flex-direction: column;
-                justify-content: center;
+                justify-content: flex-start; /* Topo */
                 align-items: center;
                 background: white;
                 padding: 20px;
@@ -433,10 +413,69 @@
                 border: none;
                 box-shadow: none;
             }
-            .comprovante-container .comprovante-conteudo { width: 100%; max-width: 210mm; margin: 0 auto; }
+            .comprovante-container .comprovante-conteudo {
+                width: 100%;
+                max-width: 210mm;
+                margin: 0 auto;
+                padding-top: 10px;
+            }
             .no-print { display: none !important; }
             .comprovante-container .rodape { display: none !important; }
+            /* Remove margens da página */
+            @page { margin: 0; }
         }
+
+        /* Estilos para o comprovante (visual) */
+        .comprovante-container {
+            background: white;
+            padding: 15px 20px;
+            margin: 0 auto;
+            font-family: 'Courier New', monospace;
+            page-break-after: avoid;
+            page-break-inside: avoid;
+            max-height: 100vh;
+            overflow: hidden;
+        }
+        .comprovante-container h2 {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 8px;
+            font-size: 18px;
+        }
+        .comprovante-container h3 {
+            text-align: center;
+            font-size: 16px;
+            margin: 6px 0;
+        }
+        .comprovante-container .detalhe {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px dashed #ccc;
+            font-size: 14px;
+        }
+        .comprovante-container .detalhe .label {
+            font-weight: bold;
+        }
+        .comprovante-container .rodape {
+            display: none;
+        }
+        .comprovante-container .header-loja {
+            text-align: center;
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 4px;
+        }
+        .comprovante-container .header-vendedor {
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            margin-bottom: 12px;
+        }
+
+        .comprovante-bobina { width: 80mm; padding: 8px 10px; font-size: 11px; border: none; margin: 0 auto; }
+        .comprovante-bobina .detalhe { padding: 3px 0; font-size: 10px; }
+        .comprovante-bobina h2 { font-size: 14px; }
 
         .btn-tipo-impressao { display: flex; gap: 10px; justify-content: center; margin: 15px 0; }
         .btn-tipo-impressao button { padding: 12px 24px; font-size: 16px; border-radius: 8px; cursor: pointer; border: none; font-weight: bold; transition: 0.3s; }
@@ -475,6 +514,7 @@
             </div>
             <div class="header-right">
                 <span id="userName"></span>
+                <span id="lojaNome" style="font-size:13px; color:#718096; margin-left:10px;"></span>
                 <button onclick="abrirModalLembretes()" style="background:transparent; border:none; font-size:20px; position:relative; color:#2d3748;">
                     <i class="fas fa-bell"></i>
                     <span id="badgeLembretes" class="badge" style="display:none;">0</span>
@@ -492,6 +532,7 @@
             <div class="user-info">
                 <span class="nome" id="menuUserName">Usuário</span>
                 <span class="tipo" id="menuUserTipo">tipo</span>
+                <span class="tipo" id="menuLojaNome" style="font-size:12px; opacity:0.7;"></span>
             </div>
             <hr style="border-color: #4a5568; margin: 10px 0;">
             <button class="menu-item active" data-page="pageLista">📋 Lista de Consultas</button>
@@ -504,6 +545,7 @@
             <button class="menu-item" data-page="pageAdmin" data-sub="medicos">👨‍⚕️ Médicos</button>
             <button class="menu-item" data-page="pageAdmin" data-sub="usuarios">👥 Usuários</button>
             <button class="menu-item" data-page="pageAdmin" data-sub="pacientes">🧑‍⚕️ Pacientes</button>
+            <button class="menu-item" data-page="pageAdmin" data-sub="lojas">🏢 Lojas</button>
             <button class="menu-item" data-page="pageAdmin" data-sub="solicitacoes">📩 Solicitações <span id="badgeSolicitacoesMenu" class="badge" style="display:none;">0</span></button>
             <button class="menu-item" data-page="pageAdmin" data-sub="whatsapp">📱 WhatsApp</button>
             <hr style="border-color: #4a5568; margin: 10px 0;">
@@ -588,7 +630,7 @@
             </div>
         </div>
 
-        <!-- PÁGINA DASHBOARD MELHORADA -->
+        <!-- PÁGINA DASHBOARD -->
         <div id="pageDashboard" class="page-section">
             <h3>📊 Dashboard de Métricas</h3>
             <div class="dashboard-grid" id="dashboardCards">
@@ -701,6 +743,9 @@
                             <option value="vendedor">Vendedor</option>
                             <option value="admin">Admin</option>
                         </select>
+                        <select id="usuarioLoja">
+                            <option value="">Selecione uma loja</option>
+                        </select>
                     </div>
                     <input type="hidden" id="editUsuarioId">
                     <button onclick="salvarUsuario()">Salvar</button>
@@ -736,6 +781,23 @@
                 <div style="background:white; padding:20px; border-radius:10px;">
                     <h3>Pacientes Cadastrados</h3>
                     <div id="pacientesList"></div>
+                </div>
+            </div>
+
+            <div id="subLojas" class="sub-page">
+                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
+                    <h3>Cadastrar Loja</h3>
+                    <div class="form-row">
+                        <input type="text" id="lojaNome" placeholder="Nome *">
+                        <input type="text" id="lojaEndereco" placeholder="Endereço">
+                    </div>
+                    <input type="hidden" id="editLojaId">
+                    <button onclick="salvarLoja()">Salvar</button>
+                    <button id="cancelLojaBtn" onclick="cancelarEdicaoLoja()" style="display:none;">Cancelar</button>
+                </div>
+                <div style="background:white; padding:20px; border-radius:10px;">
+                    <h3>Lojas Cadastradas</h3>
+                    <div id="lojasList"></div>
                 </div>
             </div>
 
@@ -822,6 +884,9 @@
                 </div>
                 <div class="form-row">
                     <label style="width:100%;"><strong>Tipo:</strong> <span id="perfilTipo"></span></label>
+                </div>
+                <div class="form-row">
+                    <label style="width:100%;"><strong>Loja:</strong> <span id="perfilLoja"></span></label>
                 </div>
                 <hr style="margin:20px 0;">
                 <h4>Alterar Senha</h4>
@@ -912,6 +977,7 @@
         let medicos = [];
         let usuarios = [];
         let clientes = [];
+        let lojas = [];
         let currentView = 'week';
         let currentDate = new Date();
         let editandoId = null;
@@ -1058,6 +1124,11 @@
                 document.getElementById('menuUserName').textContent = user.nome;
                 document.getElementById('menuUserTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
 
+                if (user.loja_nome) {
+                    document.getElementById('lojaNome').innerHTML = `🏢 ${user.loja_nome}`;
+                    document.getElementById('menuLojaNome').textContent = `🏢 ${user.loja_nome}`;
+                }
+
                 const isAdmin = user.tipo === 'admin';
                 document.getElementById('menuAgendar').style.display = isAdmin ? 'block' : 'none';
                 document.getElementById('menuDashboard').style.display = isAdmin ? 'block' : 'none';
@@ -1066,6 +1137,7 @@
                 document.getElementById('perfilNome').textContent = user.nome;
                 document.getElementById('perfilUsername').textContent = user.username;
                 document.getElementById('perfilTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+                document.getElementById('perfilLoja').textContent = user.loja_nome || 'Não vinculado';
 
                 await carregarDados();
                 renderizarLista();
@@ -1073,6 +1145,7 @@
                 if (isAdmin) {
                     iniciarPollingSolicitacoes();
                     carregarDashboard();
+                    carregarLojas();
                 }
                 fecharMenu();
                 navegarPara('pageLista');
@@ -1130,6 +1203,105 @@
             } catch (err) {
                 console.error('Erro ao carregar dados:', err);
                 showToast('Erro ao carregar dados', true);
+            }
+        }
+
+        // ========================================================================
+        // LOJAS (CRUD)
+        // ========================================================================
+        async function carregarLojas() {
+            try {
+                const res = await fetch(`${API_URL}/lojas`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                lojas = await res.json();
+                renderLojas();
+                preencherSelectLojas();
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderLojas() {
+            const container = document.getElementById('lojasList');
+            if (!container) return;
+            if (lojas.length === 0) {
+                container.innerHTML = '<p class="no-data">Nenhuma loja cadastrada.</p>';
+                return;
+            }
+            container.innerHTML = lojas.map(l => `
+                <div style="border-bottom:1px solid #ddd; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <strong>${escapeHtml(l.nome)}</strong><br>
+                        ${l.endereco || ''}
+                    </div>
+                    <div>
+                        <button onclick="editarLoja(${l.id})">✏️</button>
+                        <button onclick="excluirLoja(${l.id})">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function preencherSelectLojas() {
+            const select = document.getElementById('usuarioLoja');
+            if (select) {
+                select.innerHTML = '<option value="">Selecione uma loja</option>' +
+                    lojas.map(l => `<option value="${l.id}">${l.nome}</option>`).join('');
+            }
+        }
+
+        async function salvarLoja() {
+            const data = {
+                nome: document.getElementById('lojaNome').value,
+                endereco: document.getElementById('lojaEndereco').value
+            };
+            const editId = document.getElementById('editLojaId').value;
+            const url = editId ? `${API_URL}/lojas/${editId}` : `${API_URL}/lojas`;
+            const method = editId ? 'PUT' : 'POST';
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) throw new Error('Erro');
+                showToast(editId ? 'Atualizado!' : 'Cadastrado!');
+                cancelarEdicaoLoja();
+                await carregarLojas();
+                // Atualiza select de usuários se estiver visível
+                preencherSelectLojas();
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        function editarLoja(id) {
+            const l = lojas.find(loj => loj.id === id);
+            if (!l) return;
+            document.getElementById('editLojaId').value = l.id;
+            document.getElementById('lojaNome').value = l.nome;
+            document.getElementById('lojaEndereco').value = l.endereco || '';
+            document.getElementById('cancelLojaBtn').style.display = 'inline-block';
+            mostrarSubPage('lojas');
+        }
+
+        function cancelarEdicaoLoja() {
+            document.getElementById('editLojaId').value = '';
+            document.getElementById('cancelLojaBtn').style.display = 'none';
+            document.getElementById('lojaNome').value = '';
+            document.getElementById('lojaEndereco').value = '';
+        }
+
+        async function excluirLoja(id) {
+            if (!confirm('Excluir esta loja?')) return;
+            try {
+                await fetch(`${API_URL}/lojas/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+                showToast('Excluída');
+                await carregarLojas();
+                preencherSelectLojas();
+            } catch (err) {
+                showToast(err.message, true);
             }
         }
 
@@ -1780,6 +1952,7 @@
                 let extraClass = '';
                 let infoHtml = '';
                 const hasPedido = c.numero_pedido ? `<br><small>📦 Pedido: ${escapeHtml(c.numero_pedido)}</small>` : '';
+                const lojaStr = c.loja_nome ? `<br><small>🏢 ${escapeHtml(c.loja_nome)}</small>` : '';
 
                 if (isAdmin) {
                     actions = `
@@ -1801,6 +1974,7 @@
                         <span class="${statusClass}">${status}</span><br>
                         ${formatDisplay(c.data_consulta)} ${c.horario} | Dr. ${escapeHtml(c.medico_nome)}
                         ${hasPedido}
+                        ${lojaStr}
                         ${c.observacoes ? `<br><small>📝 ${escapeHtml(c.observacoes)}</small>` : ''}
                         <br><small>👤 Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
                     `;
@@ -1816,6 +1990,7 @@
                             <span class="${statusClass}">${status}</span><br>
                             ${formatDisplay(c.data_consulta)} ${c.horario} | Dr. ${escapeHtml(c.medico_nome)}
                             ${hasPedido}
+                            ${lojaStr}
                             ${c.observacoes ? `<br><small>📝 ${escapeHtml(c.observacoes)}</small>` : ''}
                             <br><small>👤 Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
                         `;
@@ -1982,7 +2157,7 @@
         }
 
         // ========================================================================
-        // IMPRESSÃO
+        // IMPRESSÃO – COM CABEÇALHO DA LOJA E VENDEDOR, NO TOPO
         // ========================================================================
         function abrirModalImpressao(id) {
             consultaParaImprimir = id;
@@ -2025,18 +2200,25 @@
                 else if (paciente.encaixe) condicao = 'Encaixe';
             }
 
-            const empresaNome = 'Ótica Macaé';
+            // Dados da loja (prioriza o da consulta, senão usa o do usuário logado)
+            const lojaNome = c.loja_nome || user.loja_nome || 'Ótica Macaé';
+            const lojaEndereco = c.loja_endereco || user.loja_endereco || '';
+            const vendedorNome = c.vendedor_nome || user.nome || 'Não informado';
+
             const dataFormatada = formatDisplay(c.data_consulta);
             const status = c.status || 'agendada';
             const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
             const pedido = c.numero_pedido || 'Não informado';
 
+            // Monta o HTML do comprovante
             const html = `
                 <div class="comprovante-container">
                     <div class="comprovante-conteudo">
-                        <h2>🏥 ${escapeHtml(empresaNome)}</h2>
-                        <h3>Comprovante de Consulta</h3>
-                        <hr style="margin: 10px 0;">
+                        <div class="header-loja"><strong>${escapeHtml(lojaNome)}</strong></div>
+                        ${lojaEndereco ? `<div class="header-loja" style="font-size:12px;">${escapeHtml(lojaEndereco)}</div>` : ''}
+                        <div class="header-vendedor">Vendedor: ${escapeHtml(vendedorNome)}</div>
+                        <h2>🏥 Comprovante de Consulta</h2>
+                        <hr style="margin: 6px 0;">
                         <div class="detalhe"><span class="label">Paciente:</span> <span>${escapeHtml(c.paciente_nome)}</span></div>
                         <div class="detalhe"><span class="label">Data:</span> <span>${dataFormatada}</span></div>
                         <div class="detalhe"><span class="label">Horário:</span> <span>${c.horario}</span></div>
@@ -2045,7 +2227,10 @@
                         <div class="detalhe"><span class="label">Condição:</span> <span>${condicao}</span></div>
                         <div class="detalhe"><span class="label">Nº Pedido:</span> <span>${pedido}</span></div>
                         ${c.observacoes ? `<div class="detalhe"><span class="label">Observações:</span> <span>${escapeHtml(c.observacoes)}</span></div>` : ''}
-                        <hr style="margin: 10px 0;">
+                        <hr style="margin: 6px 0;">
+                        <div style="text-align:center; font-size:12px; color:#999; margin-top:8px;">
+                            Este comprovante é válido como comprovação de agendamento.
+                        </div>
                     </div>
                     <button onclick="fecharComprovante()" class="no-print" style="display:block; margin:10px auto; padding:6px 16px; background:#e53e3e; color:white; border:none; border-radius:4px; cursor:pointer;">Fechar</button>
                 </div>
@@ -2055,6 +2240,7 @@
             comprovanteDiv.innerHTML = html;
             comprovanteDiv.style.display = 'block';
 
+            // Ajuste para impressão no topo: o CSS já trata com @page { margin: 0; } e top: 0
             setTimeout(() => {
                 window.print();
             }, 300);
@@ -2217,7 +2403,7 @@
         }
 
         // ========================================================================
-        // DASHBOARD – MELHORADO
+        // DASHBOARD
         // ========================================================================
         async function carregarDashboard() {
             if (user.tipo !== 'admin') return;
@@ -2228,7 +2414,6 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Erro');
 
-                // Atualizar cards
                 document.getElementById('totalConsultas').textContent = data.total_consultas || 0;
                 document.getElementById('totalMedicos').textContent = data.total_medicos || 0;
                 document.getElementById('totalAgendadas').textContent = data.por_status?.agendada || 0;
@@ -2236,14 +2421,12 @@
                 document.getElementById('totalRealizadas').textContent = data.por_status?.realizada || 0;
                 document.getElementById('totalCanceladas').textContent = data.por_status?.cancelada || 0;
 
-                // Tabela de vendedores
                 const container = document.getElementById('vendedoresRelatorio');
                 if (!data.por_vendedor || data.por_vendedor.length === 0) {
                     container.innerHTML = '<p style="padding:20px; color:#999;">Nenhum vendedor com consultas.</p>';
                     return;
                 }
 
-                // Calcular o total máximo para barras (usando o total de consultas)
                 const maxTotal = Math.max(...data.por_vendedor.map(v => v.total), 1);
 
                 let html = `<table>
@@ -2288,7 +2471,7 @@
         }
 
         // ========================================================================
-        // ENVIO DE WHATSAPP
+        // ENVIO DE WHATSAPP COM CARD FORMATADO
         // ========================================================================
         async function enviarWhatsAppPaciente(id) {
             if (user.tipo !== 'admin') { showToast('Apenas administradores podem enviar.', true); return; }
@@ -2296,8 +2479,10 @@
             if (!e) return;
             const medico = medicos.find(m => m.id === e.medico_id);
             const mensagemPadrao = medico ? medico.mensagem_padrao : '';
-            const endereco = 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ';
+            const endereco = e.loja_endereco || user.loja_endereco || 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ';
+            const lojaNome = e.loja_nome || user.loja_nome || 'Ótica Macaé';
             const paciente = clientes.find(p => p.nome === e.paciente_nome && p.telefone === e.paciente_telefone);
+            
             let condicao = 'Encaixe';
             if (paciente) {
                 if (paciente.neurodivergente && paciente.deficiencia_fisica) condicao = 'Neurodivergente e Def. Física';
@@ -2305,12 +2490,32 @@
                 else if (paciente.deficiencia_fisica) condicao = 'Deficiência Física';
                 else if (paciente.encaixe) condicao = 'Encaixe';
             }
-            let msg = `🏥 *Ótica Macaé - GUIA DE CONSULTA*\n\nPaciente: ${e.paciente_nome}\nData: ${formatDisplay(e.data_consulta)}\nHorário: ${e.horario}\nMédico: Dr. ${e.medico_nome}\nLocal: ${endereco}\nCondição: ${condicao}`;
-            if (mensagemPadrao) msg += `\n\n${mensagemPadrao}`;
-            if (e.numero_pedido) msg += `\nNº Pedido: ${e.numero_pedido}`;
+
+            let msg = `🏥 *${lojaNome}*\n`;
+            msg += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
+            msg += `📋 *GUIA DE CONSULTA*\n`;
+            msg += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n`;
+            msg += `👤 *Paciente:* ${e.paciente_nome}\n`;
+            msg += `📅 *Data:* ${formatDisplay(e.data_consulta)}\n`;
+            msg += `🕐 *Horário:* ${e.horario}\n`;
+            msg += `👨‍⚕️ *Médico:* Dr. ${e.medico_nome}\n`;
+            msg += `📍 *Local:* ${endereco}\n`;
+            msg += `🏷️ *Condição:* ${condicao}\n`;
+            if (e.numero_pedido) {
+                msg += `📦 *Pedido:* #${e.numero_pedido}\n`;
+            }
+            if (mensagemPadrao) {
+                msg += `\n📌 *Mensagem do médico:*\n${mensagemPadrao}\n`;
+            }
+            msg += `\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
+            msg += `✅ *Confirme sua presença* respondendo esta mensagem.`;
+
             const phone = e.paciente_telefone.replace(/\D/g, '');
-            if (phone) window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
-            else showToast('Número do paciente não disponível', true);
+            if (phone) {
+                window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+            } else {
+                showToast('Número do paciente não disponível', true);
+            }
         }
 
         async function enviarWhatsAppMedico(id) {
@@ -2322,7 +2527,8 @@
                 showToast('Médico não possui WhatsApp cadastrado.', true);
                 return;
             }
-            const endereco = 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ';
+            const endereco = e.loja_endereco || user.loja_endereco || 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ';
+            const lojaNome = e.loja_nome || user.loja_nome || 'Ótica Macaé';
             const paciente = clientes.find(p => p.nome === e.paciente_nome && p.telefone === e.paciente_telefone);
             let condicao = 'Encaixe';
             if (paciente) {
@@ -2331,15 +2537,29 @@
                 else if (paciente.deficiencia_fisica) condicao = 'Deficiência Física';
                 else if (paciente.encaixe) condicao = 'Encaixe';
             }
-            const msg = `📋 *Nova consulta agendada*\n\nEmpresa: Ótica Macaé\nPaciente: ${e.paciente_nome}\nData: ${formatDisplay(e.data_consulta)}\nHorário: ${e.horario}\nTelefone: ${e.paciente_telefone}\nLocal: ${endereco}\nCondição: ${condicao}`;
-            if (e.numero_pedido) msg += `\nNº Pedido: ${e.numero_pedido}`;
+            const msg = `📋 *Nova consulta agendada*\n`;
+            msg += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
+            msg += `🏢 *${lojaNome}*\n`;
+            msg += `👤 *Paciente:* ${e.paciente_nome}\n`;
+            msg += `📅 *Data:* ${formatDisplay(e.data_consulta)}\n`;
+            msg += `🕐 *Horário:* ${e.horario}\n`;
+            msg += `📞 *Telefone:* ${e.paciente_telefone}\n`;
+            msg += `📍 *Local:* ${endereco}\n`;
+            msg += `🏷️ *Condição:* ${condicao}\n`;
+            if (e.numero_pedido) {
+                msg += `📦 *Pedido:* #${e.numero_pedido}\n`;
+            }
+
             const phone = medico.whatsapp.replace(/\D/g, '');
-            if (phone) window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
-            else showToast('WhatsApp do médico inválido', true);
+            if (phone) {
+                window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+            } else {
+                showToast('WhatsApp do médico inválido', true);
+            }
         }
 
         // ========================================================================
-        // USUÁRIOS
+        // USUÁRIOS (com loja)
         // ========================================================================
         async function salvarUsuario() {
             if (user.tipo !== 'admin') { showToast('Apenas administradores podem criar usuários.', true); return; }
@@ -2354,7 +2574,8 @@
                 username: document.getElementById('usuarioUsername').value,
                 senha: document.getElementById('usuarioSenha').value || undefined,
                 telefone: telefone,
-                tipo: tipo
+                tipo: tipo,
+                loja_id: document.getElementById('usuarioLoja').value || null
             };
             const editId = document.getElementById('editUsuarioId').value;
             const url = editId ? `${API_URL}/usuarios/${editId}` : `${API_URL}/usuarios`;
@@ -2369,6 +2590,8 @@
                 showToast(editId ? 'Atualizado' : 'Criado');
                 cancelarEdicaoUsuario();
                 await carregarDados();
+                // Recarregar lojas para atualizar select
+                await carregarLojas();
             } catch (err) {
                 showToast(err.message, true);
             }
@@ -2383,6 +2606,7 @@
                     <div>
                         <strong>${escapeHtml(u.nome)}</strong><br>
                         @${u.username} | ${u.tipo} ${u.telefone ? '📞 ' + u.telefone : ''}
+                        ${u.loja_nome ? `<br>🏢 ${escapeHtml(u.loja_nome)}` : ''}
                     </div>
                     <div>
                         <button onclick="editarUsuario(${u.id})">✏️</button>
@@ -2402,8 +2626,11 @@
             document.getElementById('usuarioSenha').value = '';
             document.getElementById('usuarioTelefone').value = u.telefone || '';
             document.getElementById('usuarioTipo').value = u.tipo;
+            document.getElementById('usuarioLoja').value = u.loja_id || '';
             document.getElementById('cancelUsuarioBtn').style.display = 'inline-block';
             mostrarSubPage('usuarios');
+            // Garantir que o select de lojas esteja populado
+            preencherSelectLojas();
         }
 
         function cancelarEdicaoUsuario() {
@@ -2414,6 +2641,7 @@
             document.getElementById('usuarioSenha').value = '';
             document.getElementById('usuarioTelefone').value = '';
             document.getElementById('usuarioTipo').value = 'vendedor';
+            document.getElementById('usuarioLoja').value = '';
         }
 
         async function excluirUsuario(id) {
@@ -2860,6 +3088,7 @@
                 document.getElementById('perfilNome').textContent = user.nome;
                 document.getElementById('perfilUsername').textContent = user.username;
                 document.getElementById('perfilTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+                document.getElementById('perfilLoja').textContent = user.loja_nome || 'Não vinculado';
             }
 
             fecharMenu();
@@ -2872,7 +3101,11 @@
             if (target) target.classList.add('active');
             if (subId === 'solicitacoes') carregarSolicitacoes();
             if (subId === 'whatsapp') carregarConfigWhatsapp();
-            if (subId === 'usuarios') renderUsuarios();
+            if (subId === 'usuarios') {
+                renderUsuarios();
+                preencherSelectLojas();
+            }
+            if (subId === 'lojas') carregarLojas();
             navegarPara('pageAdmin');
         }
 
@@ -2945,6 +3178,7 @@
             }
 
             const hasPedido = e.numero_pedido ? `<div><strong>Nº Pedido:</strong> ${escapeHtml(e.numero_pedido)}</div>` : '';
+            const lojaStr = e.loja_nome ? `<div><strong>Loja:</strong> ${escapeHtml(e.loja_nome)}</div>` : '';
 
             body.innerHTML = `
                 <div><strong>Paciente:</strong> ${escapeHtml(e.paciente_nome)}</div>
@@ -2953,6 +3187,7 @@
                 <div><strong>Telefone:</strong> ${e.paciente_telefone}</div>
                 ${e.paciente_email ? `<div><strong>E-mail:</strong> ${escapeHtml(e.paciente_email)}</div>` : ''}
                 ${hasPedido}
+                ${lojaStr}
                 ${e.observacoes ? `<div><strong>Observações:</strong> ${escapeHtml(e.observacoes)}</div>` : ''}
                 <div><strong>Status:</strong> ${status}${statusHtml}</div>
                 <div><strong>Vendedor:</strong> ${escapeHtml(vendedor)}</div>
@@ -2995,6 +3230,11 @@
                         document.getElementById('menuUserName').textContent = user.nome;
                         document.getElementById('menuUserTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
 
+                        if (user.loja_nome) {
+                            document.getElementById('lojaNome').innerHTML = `🏢 ${user.loja_nome}`;
+                            document.getElementById('menuLojaNome').textContent = `🏢 ${user.loja_nome}`;
+                        }
+
                         const isAdmin = user.tipo === 'admin';
                         document.getElementById('menuAgendar').style.display = isAdmin ? 'block' : 'none';
                         document.getElementById('menuDashboard').style.display = isAdmin ? 'block' : 'none';
@@ -3003,6 +3243,7 @@
                         document.getElementById('perfilNome').textContent = user.nome;
                         document.getElementById('perfilUsername').textContent = user.username;
                         document.getElementById('perfilTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+                        document.getElementById('perfilLoja').textContent = user.loja_nome || 'Não vinculado';
 
                         await carregarDados();
                         renderizarLista();
@@ -3010,6 +3251,7 @@
                         if (isAdmin) {
                             iniciarPollingSolicitacoes();
                             carregarDashboard();
+                            carregarLojas();
                         }
                         setTimeout(() => {
                             setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
@@ -3037,7 +3279,7 @@
             if (e.target === this) fecharModalImpressao();
         });
 
-        console.log('✅ Sistema completo com dashboard melhorado e calendário expandido.');
+        console.log('✅ Sistema completo com Lojas, Vínculo de Vendedor, Impressão no topo e card WhatsApp.');
     </script>
 </body>
 </html>

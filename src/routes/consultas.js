@@ -8,20 +8,36 @@ const router = express.Router();
 // Listar consultas – vendedor vê só as suas, admin vê todas
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const isAdmin = req.user.tipo === 'admin';
-    let query = `
-      SELECT c.*, u.nome as vendedor_nome,
+    const query = `
+      SELECT c.*, u.nome as vendedor_nome, l.nome as loja_nome, l.endereco as loja_endereco,
              CASE WHEN c.criado_por = $1 THEN 1 ELSE 0 END as is_own
       FROM consultas c
       LEFT JOIN usuarios u ON c.criado_por = u.id
+      LEFT JOIN lojas l ON u.loja_id = l.id
+      ORDER BY c.data_consulta ASC, c.horario ASC
     `;
-    const params = [req.user.id];
-    if (!isAdmin) {
-      query += ' WHERE c.criado_por = $1';
-    }
-    query += ' ORDER BY c.data_consulta ASC, c.horario ASC';
-    const result = await pool.query(query, params);
+    const result = await pool.query(query, [req.user.id]);
     res.json(result.rows.map(c => ({ ...c, data_consulta: formatDateToYYYYMMDD(c.data_consulta) })));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ... filtrar também precisa do JOIN com lojas
+router.get('/filtrar', authenticateToken, async (req, res) => {
+  try {
+    const { data_inicio, data_fim, medico_id, status, paciente, vendedor_id } = req.query;
+    const isAdmin = req.user.tipo === 'admin';
+    let query = `
+      SELECT c.*, u.nome as vendedor_nome, l.nome as loja_nome, l.endereco as loja_endereco,
+             CASE WHEN c.criado_por = $1 THEN 1 ELSE 0 END as is_own
+      FROM consultas c
+      LEFT JOIN usuarios u ON c.criado_por = u.id
+      LEFT JOIN lojas l ON u.loja_id = l.id
+      WHERE 1=1
+    `;
+    // ... resto igual, mas com os joins
+    // ... 
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

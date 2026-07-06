@@ -10,12 +10,13 @@ const router = express.Router();
 router.post('/login', validate(loginValidation), async (req, res) => {
   try {
     const { username, password } = req.body;
-    const result = await pool.query(
-      `SELECT id, nome, username, senha, tipo, telefone
-       FROM usuarios
-       WHERE username = $1 AND ativo = true`,
-      [username]
-    );
+    const result = await pool.query(`
+      SELECT u.id, u.nome, u.username, u.senha, u.tipo, u.telefone, u.loja_id,
+             l.nome as loja_nome, l.endereco as loja_endereco
+      FROM usuarios u
+      LEFT JOIN lojas l ON u.loja_id = l.id
+      WHERE u.username = $1 AND u.ativo = true
+    `, [username]);
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Usuário ou senha inválidos' });
     }
@@ -25,7 +26,7 @@ router.post('/login', validate(loginValidation), async (req, res) => {
       return res.status(401).json({ error: 'Usuário ou senha inválidos' });
     }
     const token = jwt.sign(
-      { id: user.id, nome: user.nome, username: user.username, tipo: user.tipo },
+      { id: user.id, nome: user.nome, username: user.username, tipo: user.tipo, loja_id: user.loja_id },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -36,7 +37,10 @@ router.post('/login', validate(loginValidation), async (req, res) => {
         nome: user.nome,
         username: user.username,
         tipo: user.tipo,
-        telefone: user.telefone
+        telefone: user.telefone,
+        loja_id: user.loja_id,
+        loja_nome: user.loja_nome,
+        loja_endereco: user.loja_endereco
       }
     });
   } catch (error) {
@@ -47,10 +51,13 @@ router.post('/login', validate(loginValidation), async (req, res) => {
 
 router.get('/verify', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT id, nome, username, tipo, telefone FROM usuarios WHERE id = $1`,
-      [req.user.id]
-    );
+    const result = await pool.query(`
+      SELECT u.id, u.nome, u.username, u.tipo, u.telefone, u.loja_id,
+             l.nome as loja_nome, l.endereco as loja_endereco
+      FROM usuarios u
+      LEFT JOIN lojas l ON u.loja_id = l.id
+      WHERE u.id = $1
+    `, [req.user.id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }

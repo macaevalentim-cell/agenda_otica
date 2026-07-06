@@ -26,7 +26,18 @@ async function initDatabase() {
   try {
     console.log('📦 Inicializando banco de dados...');
 
-    // Tabela usuarios (sem empresa_id)
+    // Tabela lojas
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS lojas (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(200) NOT NULL,
+        endereco TEXT,
+        ativo BOOLEAN DEFAULT TRUE,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Tabela usuarios (com loja_id)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -35,12 +46,23 @@ async function initDatabase() {
         senha VARCHAR(255) NOT NULL,
         telefone VARCHAR(20),
         tipo VARCHAR(10) DEFAULT 'vendedor' CHECK (tipo IN ('admin', 'vendedor')),
+        loja_id INTEGER REFERENCES lojas(id),
         ativo BOOLEAN DEFAULT TRUE,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Tabela medicos
+    // Verifica coluna loja_id (migração)
+    const checkColumn = await pool.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name='usuarios' AND column_name='loja_id'
+    `);
+    if (checkColumn.rows.length === 0) {
+      await pool.query('ALTER TABLE usuarios ADD COLUMN loja_id INTEGER REFERENCES lojas(id)');
+      console.log('✅ Coluna loja_id adicionada à tabela usuarios');
+    }
+
+    // Tabela medicos (sem alterações)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS medicos (
         id SERIAL PRIMARY KEY,
@@ -57,7 +79,7 @@ async function initDatabase() {
       )
     `);
 
-    // Tabela clientes
+    // Tabela clientes (sem alterações)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS clientes (
         id SERIAL PRIMARY KEY,
@@ -75,7 +97,7 @@ async function initDatabase() {
       )
     `);
 
-    // Tabela consultas (sem empresa_id)
+    // Tabela consultas (com loja_id via vendedor, mas não armazenamos diretamente)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS consultas (
         id SERIAL PRIMARY KEY,
@@ -95,7 +117,7 @@ async function initDatabase() {
       )
     `);
 
-    // Tabela solicitacoes (sem empresa_id)
+    // Tabela solicitacoes (sem loja diretamente)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS solicitacoes_consultas (
         id SERIAL PRIMARY KEY,
@@ -132,7 +154,7 @@ async function initDatabase() {
       )
     `);
 
-    // Tabela lembretes
+    // Tabela lembretes (sem alterações)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS lembretes (
         id SERIAL PRIMARY KEY,
@@ -170,24 +192,38 @@ async function initDatabase() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitacoes_status ON solicitacoes_consultas(status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_lembretes_status ON lembretes(status)`);
 
-    // Usuário admin padrão
+    // Loja padrão
+    const lojaExist = await pool.query('SELECT id FROM lojas WHERE nome = $1', ['Ótica Macaé - Matriz']);
+    let lojaId;
+    if (lojaExist.rows.length === 0) {
+      const result = await pool.query(
+        'INSERT INTO lojas (nome, endereco) VALUES ($1, $2) RETURNING id',
+        ['Ótica Macaé - Matriz', 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ']
+      );
+      lojaId = result.rows[0].id;
+      console.log('✅ Loja padrão criada');
+    } else {
+      lojaId = lojaExist.rows[0].id;
+    }
+
+    // Usuário admin (associado à loja padrão)
     const admin = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['admin']);
     if (admin.rows.length === 0) {
       const hash = await bcrypt.hash('admin123', 10);
       await pool.query(
-        'INSERT INTO usuarios (nome, username, senha, tipo, ativo) VALUES ($1, $2, $3, $4, $5)',
-        ['Administrador', 'admin', hash, 'admin', true]
+        'INSERT INTO usuarios (nome, username, senha, tipo, loja_id, ativo) VALUES ($1, $2, $3, $4, $5, $6)',
+        ['Administrador', 'admin', hash, 'admin', lojaId, true]
       );
       console.log('✅ Usuário admin criado');
     }
 
-    // Usuário vendedor padrão
+    // Usuário vendedor (associado à loja padrão)
     const vendedor = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['vendedor']);
     if (vendedor.rows.length === 0) {
       const hash = await bcrypt.hash('vender123', 10);
       await pool.query(
-        'INSERT INTO usuarios (nome, username, senha, tipo, ativo) VALUES ($1, $2, $3, $4, $5)',
-        ['Vendedor', 'vendedor', hash, 'vendedor', true]
+        'INSERT INTO usuarios (nome, username, senha, tipo, loja_id, ativo) VALUES ($1, $2, $3, $4, $5, $6)',
+        ['Vendedor', 'vendedor', hash, 'vendedor', lojaId, true]
       );
       console.log('✅ Usuário vendedor criado');
     }
