@@ -7,17 +7,21 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
+// ==================== LOGIN ====================
 router.post('/login', validate(loginValidation), async (req, res) => {
   try {
     const { username, password } = req.body;
-    const [rows] = await pool.query(`
+
+    // Query adaptada para PostgreSQL (placeholders $1, $2, ...)
+    const result = await pool.query(`
       SELECT u.id, u.nome, u.username, u.senha, u.tipo, u.telefone, u.loja_id,
              l.nome as loja_nome, l.endereco as loja_endereco
       FROM usuarios u
       LEFT JOIN lojas l ON u.loja_id = l.id
-      WHERE u.username = ? AND u.ativo = true
+      WHERE u.username = $1 AND u.ativo = true
     `, [username]);
 
+    const rows = result.rows;
     if (rows.length === 0) {
       return res.status(401).json({ error: 'Usuário ou senha inválidos' });
     }
@@ -53,24 +57,25 @@ router.post('/login', validate(loginValidation), async (req, res) => {
   }
 });
 
+// ==================== VERIFICAR TOKEN ====================
 router.get('/verify', authenticateToken, async (req, res) => {
   try {
-    const [rows] = await pool.query(`
+    const result = await pool.query(`
       SELECT u.id, u.nome, u.username, u.tipo, u.telefone, u.loja_id,
              l.nome as loja_nome, l.endereco as loja_endereco
       FROM usuarios u
       LEFT JOIN lojas l ON u.loja_id = l.id
-      WHERE u.id = ?
+      WHERE u.id = $1
     `, [req.user.id]);
 
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
-    res.json({ valid: true, user: rows[0] });
+    res.json({ valid: true, user: result.rows[0] });
   } catch (error) {
     console.error('❌ Erro no verify:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Erro interno' });
   }
 });
 
