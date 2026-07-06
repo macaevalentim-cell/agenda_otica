@@ -25,8 +25,8 @@ router.put('/:id/enviar', authenticateToken, async (req, res) => {
     await pool.query('UPDATE lembretes SET status = $1, enviado_em = NOW() WHERE id = $2', ['enviado', req.params.id]);
     res.json({ message: 'Lembrete enviado' });
   } catch (error) {
-    console.error('❌ Erro ao enviar lembrete:', error);
-    res.status(500).json({ error: 'Erro interno ao enviar lembrete' });
+    console.error('❌ Erro ao marcar lembrete como enviado:', error);
+    res.status(500).json({ error: 'Erro interno ao marcar lembrete como enviado' });
   }
 });
 

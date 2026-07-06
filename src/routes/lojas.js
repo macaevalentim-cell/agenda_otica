@@ -3,7 +3,6 @@ const { pool } = require('../config/database');
 const { authenticateToken, isAdmin } = require('../middleware/auth');
 const router = express.Router();
 
-// Listar lojas
 router.get('/', authenticateToken, isAdmin, async (req, res) => {
   try {
     const result = await pool.query('SELECT id, nome, endereco FROM lojas WHERE ativo = true ORDER BY nome');
@@ -14,17 +13,16 @@ router.get('/', authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// Criar loja
 router.post('/', authenticateToken, isAdmin, async (req, res) => {
   try {
     const { nome, endereco } = req.body;
     if (!nome || nome.trim() === '') {
-      return res.status(400).json({ error: 'Nome da loja é obrigatório' });
+      return res.status(400).json({ error: 'Nome da loja é obrigatório.' });
     }
+
     const nomeLimpo = nome.trim();
     const enderecoLimpo = endereco ? endereco.trim() : null;
 
-    // Verifica duplicidade
     const existente = await pool.query('SELECT id FROM lojas WHERE nome = $1 AND ativo = true', [nomeLimpo]);
     if (existente.rows.length > 0) {
       return res.status(400).json({ error: 'Já existe uma loja com este nome.' });
@@ -34,6 +32,7 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
       'INSERT INTO lojas (nome, endereco) VALUES ($1, $2) RETURNING id',
       [nomeLimpo, enderecoLimpo]
     );
+
     res.status(201).json({ id: result.rows[0].id, message: 'Loja criada com sucesso!' });
   } catch (error) {
     console.error('❌ Erro ao criar loja:', error);
@@ -41,14 +40,14 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// Atualizar loja
 router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
     const { nome, endereco } = req.body;
     const id = req.params.id;
     if (!nome || nome.trim() === '') {
-      return res.status(400).json({ error: 'Nome da loja é obrigatório' });
+      return res.status(400).json({ error: 'Nome da loja é obrigatório.' });
     }
+
     const nomeLimpo = nome.trim();
     const enderecoLimpo = endereco ? endereco.trim() : null;
 
@@ -65,7 +64,6 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// Excluir loja
 router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
     await pool.query('UPDATE lojas SET ativo = false WHERE id = $1', [req.params.id]);

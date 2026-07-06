@@ -2,17 +2,13 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
-// Configuração do pool
 let poolConfig;
 if (process.env.DATABASE_URL) {
-  // Render fornece uma URL completa com SSL
   poolConfig = {
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
   };
 } else {
-  // Fallback para desenvolvimento local (MySQL não é usado)
-  // Se quiser manter MySQL local, use mysql2 – mas aqui assumimos PostgreSQL
   poolConfig = {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT) || 5432,
@@ -26,12 +22,10 @@ if (process.env.DATABASE_URL) {
 
 const pool = new Pool(poolConfig);
 
-// ==================== INICIALIZAÇÃO DO BANCO ====================
 async function initDatabase() {
   try {
     console.log('📦 Inicializando banco de dados (PostgreSQL)...');
-    
-    // Tabela lojas
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS lojas (
         id SERIAL PRIMARY KEY,
@@ -42,7 +36,6 @@ async function initDatabase() {
       )
     `);
 
-    // Tabela usuarios (com loja_id)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -57,7 +50,6 @@ async function initDatabase() {
       )
     `);
 
-    // Tabela medicos
     await pool.query(`
       CREATE TABLE IF NOT EXISTS medicos (
         id SERIAL PRIMARY KEY,
@@ -74,7 +66,6 @@ async function initDatabase() {
       )
     `);
 
-    // Tabela clientes
     await pool.query(`
       CREATE TABLE IF NOT EXISTS clientes (
         id SERIAL PRIMARY KEY,
@@ -92,7 +83,6 @@ async function initDatabase() {
       )
     `);
 
-    // Tabela consultas
     await pool.query(`
       CREATE TABLE IF NOT EXISTS consultas (
         id SERIAL PRIMARY KEY,
@@ -112,7 +102,6 @@ async function initDatabase() {
       )
     `);
 
-    // Tabela solicitacoes_consultas
     await pool.query(`
       CREATE TABLE IF NOT EXISTS solicitacoes_consultas (
         id SERIAL PRIMARY KEY,
@@ -135,7 +124,6 @@ async function initDatabase() {
       )
     `);
 
-    // Tabela medico_horarios
     await pool.query(`
       CREATE TABLE IF NOT EXISTS medico_horarios (
         id SERIAL PRIMARY KEY,
@@ -149,7 +137,6 @@ async function initDatabase() {
       )
     `);
 
-    // Tabela lembretes
     await pool.query(`
       CREATE TABLE IF NOT EXISTS lembretes (
         id SERIAL PRIMARY KEY,
@@ -166,7 +153,6 @@ async function initDatabase() {
       )
     `);
 
-    // Tabela whatsapp_config
     await pool.query(`
       CREATE TABLE IF NOT EXISTS whatsapp_config (
         id INTEGER PRIMARY KEY DEFAULT 1,
@@ -177,7 +163,6 @@ async function initDatabase() {
       )
     `);
 
-    // Índices (PostgreSQL suporta IF NOT EXISTS)
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_data ON consultas(data_consulta)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_medico ON consultas(medico_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_status ON consultas(status)`);
@@ -201,7 +186,6 @@ async function initDatabase() {
       lojaId = lojaExist.rows[0].id;
     }
 
-    // Usuário admin
     const adminExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['admin']);
     if (adminExist.rows.length === 0) {
       const hash = await bcrypt.hash('admin123', 10);
@@ -212,7 +196,6 @@ async function initDatabase() {
       console.log('✅ Usuário admin criado');
     }
 
-    // Usuário vendedor
     const vendedorExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['vendedor']);
     if (vendedorExist.rows.length === 0) {
       const hash = await bcrypt.hash('vender123', 10);
@@ -223,7 +206,6 @@ async function initDatabase() {
       console.log('✅ Usuário vendedor criado');
     }
 
-    // Configuração WhatsApp
     const configExist = await pool.query('SELECT id FROM whatsapp_config WHERE id = 1');
     if (configExist.rows.length === 0) {
       await pool.query(

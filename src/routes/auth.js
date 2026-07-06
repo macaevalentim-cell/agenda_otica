@@ -7,12 +7,9 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// ==================== LOGIN ====================
 router.post('/login', validate(loginValidation), async (req, res) => {
   try {
     const { username, password } = req.body;
-
-    // Query adaptada para PostgreSQL (placeholders $1, $2, ...)
     const result = await pool.query(`
       SELECT u.id, u.nome, u.username, u.senha, u.tipo, u.telefone, u.loja_id,
              l.nome as loja_nome, l.endereco as loja_endereco
@@ -21,12 +18,11 @@ router.post('/login', validate(loginValidation), async (req, res) => {
       WHERE u.username = $1 AND u.ativo = true
     `, [username]);
 
-    const rows = result.rows;
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Usuário ou senha inválidos' });
     }
 
-    const user = rows[0];
+    const user = result.rows[0];
     const valid = await bcrypt.compare(password, user.senha);
     if (!valid) {
       return res.status(401).json({ error: 'Usuário ou senha inválidos' });
@@ -57,7 +53,6 @@ router.post('/login', validate(loginValidation), async (req, res) => {
   }
 });
 
-// ==================== VERIFICAR TOKEN ====================
 router.get('/verify', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(`

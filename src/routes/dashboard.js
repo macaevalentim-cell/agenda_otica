@@ -5,7 +5,9 @@ const router = express.Router();
 
 router.get('/', authenticateToken, isAdmin, async (req, res) => {
   try {
-    const statusResult = await pool.query('SELECT status, COUNT(*) as total FROM consultas GROUP BY status');
+    const statusResult = await pool.query(
+      'SELECT status, COUNT(*) as total FROM consultas GROUP BY status'
+    );
     const statusCounts = {};
     statusResult.rows.forEach(row => {
       statusCounts[row.status || 'agendada'] = parseInt(row.total);

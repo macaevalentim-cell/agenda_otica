@@ -14,23 +14,23 @@ router.put('/alterar-senha', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Nova senha deve ter pelo menos 6 caracteres.' });
     }
 
-    const [rows] = await pool.query('SELECT senha FROM usuarios WHERE id = ?', [req.user.id]);
-    if (rows.length === 0) {
+    const result = await pool.query('SELECT senha FROM usuarios WHERE id = $1', [req.user.id]);
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuário não encontrado.' });
     }
 
-    const valid = await bcrypt.compare(senha_atual, rows[0].senha);
+    const valid = await bcrypt.compare(senha_atual, result.rows[0].senha);
     if (!valid) {
       return res.status(401).json({ error: 'Senha atual incorreta.' });
     }
 
     const novaHash = await bcrypt.hash(nova_senha, 10);
-    await pool.query('UPDATE usuarios SET senha = ? WHERE id = ?', [novaHash, req.user.id]);
+    await pool.query('UPDATE usuarios SET senha = $1 WHERE id = $2', [novaHash, req.user.id]);
 
     res.json({ message: 'Senha alterada com sucesso!' });
   } catch (error) {
     console.error('❌ Erro ao alterar senha:', error);
-    res.status(500).json({ error: 'Erro interno.' });
+    res.status(500).json({ error: 'Erro interno ao alterar senha' });
   }
 });
 
