@@ -1253,26 +1253,42 @@
 
         async function salvarLoja() {
             const data = {
-                nome: document.getElementById('lojaNome').value,
-                endereco: document.getElementById('lojaEndereco').value
+                nome: document.getElementById('lojaNome').value.trim(),
+                endereco: document.getElementById('lojaEndereco').value.trim()
             };
+
+            // Validação no frontend
+            if (!data.nome) {
+                showToast('O nome da loja é obrigatório.', true);
+                return;
+            }
+
             const editId = document.getElementById('editLojaId').value;
             const url = editId ? `${API_URL}/lojas/${editId}` : `${API_URL}/lojas`;
             const method = editId ? 'PUT' : 'POST';
+
             try {
                 const res = await fetch(url, {
                     method,
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                    },
                     body: JSON.stringify(data)
                 });
-                if (!res.ok) throw new Error('Erro');
-                showToast(editId ? 'Atualizado!' : 'Cadastrado!');
+
+                const result = await res.json();
+                if (!res.ok) {
+                    throw new Error(result.error || 'Erro ao salvar loja');
+                }
+
+                showToast(editId ? 'Loja atualizada!' : 'Loja cadastrada!');
                 cancelarEdicaoLoja();
                 await carregarLojas();
-                // Atualiza select de usuários se estiver visível
                 preencherSelectLojas();
             } catch (err) {
                 showToast(err.message, true);
+                console.error(err);
             }
         }
 
