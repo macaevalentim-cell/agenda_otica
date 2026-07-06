@@ -10,26 +10,30 @@ const router = express.Router();
 router.post('/login', validate(loginValidation), async (req, res) => {
   try {
     const { username, password } = req.body;
-    const result = await pool.query(`
+    const [rows] = await pool.query(`
       SELECT u.id, u.nome, u.username, u.senha, u.tipo, u.telefone, u.loja_id,
              l.nome as loja_nome, l.endereco as loja_endereco
       FROM usuarios u
       LEFT JOIN lojas l ON u.loja_id = l.id
-      WHERE u.username = $1 AND u.ativo = true
+      WHERE u.username = ? AND u.ativo = true
     `, [username]);
-    if (result.rows.length === 0) {
+
+    if (rows.length === 0) {
       return res.status(401).json({ error: 'Usuário ou senha inválidos' });
     }
-    const user = result.rows[0];
+
+    const user = rows[0];
     const valid = await bcrypt.compare(password, user.senha);
     if (!valid) {
       return res.status(401).json({ error: 'Usuário ou senha inválidos' });
     }
+
     const token = jwt.sign(
       { id: user.id, nome: user.nome, username: user.username, tipo: user.tipo, loja_id: user.loja_id },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
+
     res.json({
       token,
       user: {
@@ -44,25 +48,28 @@ router.post('/login', validate(loginValidation), async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(error);
+    console.error('❌ Erro no login:', error);
     res.status(500).json({ error: 'Erro interno' });
   }
 });
 
 router.get('/verify', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const [rows] = await pool.query(`
       SELECT u.id, u.nome, u.username, u.tipo, u.telefone, u.loja_id,
              l.nome as loja_nome, l.endereco as loja_endereco
       FROM usuarios u
       LEFT JOIN lojas l ON u.loja_id = l.id
-      WHERE u.id = $1
+      WHERE u.id = ?
     `, [req.user.id]);
-    if (result.rows.length === 0) {
+
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
-    res.json({ valid: true, user: result.rows[0] });
+
+    res.json({ valid: true, user: rows[0] });
   } catch (error) {
+    console.error('❌ Erro no verify:', error);
     res.status(500).json({ error: error.message });
   }
 });

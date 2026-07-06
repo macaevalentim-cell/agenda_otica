@@ -21,45 +21,35 @@ const lojasRoutes = require('./routes/lojas');
 
 const app = express();
 
-// ==================== TRUST PROXY (NECESSÁRIO PARA RENDER) ====================
-// Render utiliza um proxy reverso/load balancer. Esta configuração permite que o Express
-// confie no cabeçalho X-Forwarded-For para identificar o IP real do cliente.
-// Isso é essencial para o rate limiting funcionar corretamente.
+// ==================== TRUST PROXY (Render) ====================
 app.set('trust proxy', 1);
 
-// ==================== SEGURANÇA (CSP) ====================
-// Desabilitamos a CSP para permitir event handlers inline no frontend
-app.use(helmet({
-  contentSecurityPolicy: false
-}));
+// ==================== SEGURANÇA ====================
+app.use(helmet({ contentSecurityPolicy: false }));
 
 // ==================== CORS ====================
-app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
-  optionsSuccessStatus: 200
-}));
+app.use(cors({ origin: process.env.FRONTEND_URL || '*', optionsSuccessStatus: 200 }));
 
-// ==================== MIDDLEWARES GERAIS ====================
+// ==================== MIDDLEWARES ====================
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
 // ==================== RATE LIMITING ====================
-// Aumentamos o limite para 200 requisições por 15 minutos
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 200, // limite de 200 requisições por IP
+  windowMs: 15 * 60 * 1000,
+  max: 200,
   message: 'Muitas requisições, tente novamente mais tarde.'
 });
 app.use('/api/', limiter);
 
-// ==================== ROTAS DA API ====================
+// ==================== ROTAS ====================
 app.use('/api', authRoutes);
 app.use('/api/medicos', medicosRoutes);
 app.use('/api/clientes', clientesRoutes);
 app.use('/api/consultas', consultasRoutes);
 app.use('/api/solicitacoes', solicitacoesRoutes);
 app.use('/api/usuarios', usuariosRoutes);
-app.use('/api', horariosRoutes);
+app.use('/api', horariosRoutes);               // <-- ROTAS DE HORÁRIOS
 app.use('/api/lembretes', lembretesRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/dashboard', dashboardRoutes);

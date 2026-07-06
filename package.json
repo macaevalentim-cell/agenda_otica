@@ -1,7 +1,7 @@
 {
   "name": "sistema-agenda-otica",
   "version": "2.0.0",
-  "description": "Sistema de Agenda Médica com multiempresas",
+  "description": "Sistema de Agenda Médica com multi-lojas",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
