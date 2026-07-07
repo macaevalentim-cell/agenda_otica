@@ -173,14 +173,26 @@ function mostrarSubPage(subId) {
     }
 
     // Ocultar todas as sub-páginas
-    document.querySelectorAll('#pageAdmin .sub-page').forEach(el => el.classList.remove('active'));
-    const target = document.getElementById('sub' + subId.charAt(0).toUpperCase() + subId.slice(1));
-    if (target) target.classList.add('active');
+    document.querySelectorAll('#pageAdmin .sub-page').forEach(el => {
+        el.classList.remove('active');
+        el.style.display = 'none'; // redundância
+    });
 
-    // Atualizar abas do admin
-    document.querySelectorAll('.admin-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
-    const tabBtn = document.querySelector(`.admin-tabs .tab-btn[data-sub="${subId}"]`);
-    if (tabBtn) tabBtn.classList.add('active');
+    // Mostrar a sub-página alvo
+    const targetId = 'sub' + subId.charAt(0).toUpperCase() + subId.slice(1);
+    const target = document.getElementById(targetId);
+    if (target) {
+        target.classList.add('active');
+        target.style.display = 'block';
+    }
+
+    // Atualizar abas
+    document.querySelectorAll('.admin-tabs .tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-sub') === subId) {
+            btn.classList.add('active');
+        }
+    });
 
     // Carregar dados específicos
     if (subId === 'solicitacoes') carregarSolicitacoes();
@@ -193,7 +205,6 @@ function mostrarSubPage(subId) {
     if (subId === 'configImpressao') carregarConfigImpressao();
     if (subId === 'medicos') {
         renderMedicos();
-        // Ocultar horários de médico
         document.getElementById('horariosMedico').style.display = 'none';
     }
     if (subId === 'pacientes') renderPacientes();

@@ -182,7 +182,7 @@
                 <div id="vendedoresRelatorio" class="table-wrapper"></div>
             </section>
 
-            <!-- ===== PÁGINA: ADMIN (com sub-páginas) ===== -->
+            <!-- ===== PÁGINA: ADMIN (com sub-páginas separadas) ===== -->
             <section id="pageAdmin" class="page">
                 <h2><i class="fas fa-cogs"></i> Painel Administrativo</h2>
                 <div class="admin-tabs">
@@ -195,8 +195,8 @@
                     <button class="tab-btn" data-sub="whatsapp">WhatsApp</button>
                 </div>
 
-                <!-- Sub-página: Médicos -->
-                <div id="subMedicos" class="sub-page active">
+                <!-- ======= SUB-PÁGINA: MÉDICOS ======= -->
+                <div id="subMedicos" class="sub-page active" style="display:block;">
                     <div class="form-card">
                         <h3>Cadastrar Médico</h3>
                         <div class="form-row">
@@ -246,8 +246,8 @@
                     </div>
                 </div>
 
-                <!-- Sub-página: Usuários -->
-                <div id="subUsuarios" class="sub-page">
+                <!-- ======= SUB-PÁGINA: USUÁRIOS ======= -->
+                <div id="subUsuarios" class="sub-page" style="display:none;">
                     <div class="form-card">
                         <h3>Cadastrar Usuário</h3>
                         <div class="form-row">
@@ -274,8 +274,8 @@
                     </div>
                 </div>
 
-                <!-- Sub-página: Pacientes -->
-                <div id="subPacientes" class="sub-page">
+                <!-- ======= SUB-PÁGINA: PACIENTES ======= -->
+                <div id="subPacientes" class="sub-page" style="display:none;">
                     <div class="form-card">
                         <h3>Cadastrar Paciente</h3>
                         <div class="form-row">
@@ -304,8 +304,8 @@
                     </div>
                 </div>
 
-                <!-- Sub-página: Lojas -->
-                <div id="subLojas" class="sub-page">
+                <!-- ======= SUB-PÁGINA: LOJAS ======= -->
+                <div id="subLojas" class="sub-page" style="display:none;">
                     <div class="form-card">
                         <h3>Cadastrar Loja</h3>
                         <div class="form-row">
@@ -324,8 +324,8 @@
                     </div>
                 </div>
 
-                <!-- Sub-página: Configuração de Impressão -->
-                <div id="subConfigImpressao" class="sub-page">
+                <!-- ======= SUB-PÁGINA: CONFIGURAÇÃO DE IMPRESSÃO ======= -->
+                <div id="subConfigImpressao" class="sub-page" style="display:none;">
                     <div class="form-card">
                         <h3>🖨️ Configurações de Impressão</h3>
                         <p>Ajuste margens e cabeçalho do comprovante.</p>
@@ -343,16 +343,16 @@
                     </div>
                 </div>
 
-                <!-- Sub-página: Solicitações -->
-                <div id="subSolicitacoes" class="sub-page">
+                <!-- ======= SUB-PÁGINA: SOLICITAÇÕES ======= -->
+                <div id="subSolicitacoes" class="sub-page" style="display:none;">
                     <div class="list-card">
                         <h3>Solicitações de Consulta</h3>
                         <div id="solicitacoesList"></div>
                     </div>
                 </div>
 
-                <!-- Sub-página: WhatsApp -->
-                <div id="subWhatsapp" class="sub-page">
+                <!-- ======= SUB-PÁGINA: WHATSAPP ======= -->
+                <div id="subWhatsapp" class="sub-page" style="display:none;">
                     <div class="form-card">
                         <h3>Configurar WhatsApp</h3>
                         <div class="form-row">
@@ -362,6 +362,7 @@
                         <button onclick="salvarConfigWhatsapp()" class="btn-primary">Salvar</button>
                     </div>
                 </div>
+
             </section>
 
             <!-- ===== PÁGINA: SOLICITAR CONSULTA ===== -->
