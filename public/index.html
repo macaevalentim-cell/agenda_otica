@@ -6,7 +6,7 @@
     <title>Ótica Macaé - Agenda Médica</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* ======= RESET E ESTILOS GERAIS ======= */
+        /* ======= RESET ======= */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; }
         .login-box { max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -14,6 +14,7 @@
         .login-box button { background: #667eea; color: white; border: none; cursor: pointer; }
         .login-box button:hover { background: #764ba2; }
         .dashboard { display: none; max-width: 1400px; margin: 0 auto; }
+
         .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
         .header-left { display: flex; align-items: center; gap: 15px; }
         .hamburger { font-size: 28px; cursor: pointer; background: none; border: none; color: #333; }
@@ -24,6 +25,7 @@
         .badge { background: red; color: white; border-radius: 50%; padding: 2px 8px; font-size: 12px; margin-left: 5px; }
         .btn-sair { background: #f56565; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; }
         .btn-sair:hover { background: #e53e3e; }
+
         .side-menu { position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background: #2d3748; color: white; padding: 20px; transition: left 0.3s; z-index: 1000; overflow-y: auto; }
         .side-menu.open { left: 0; }
         .side-menu .close-menu { background: none; border: none; color: white; font-size: 28px; float: right; cursor: pointer; }
@@ -37,11 +39,13 @@
         .side-menu .menu-item i { margin-right: 12px; width: 20px; }
         .menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; z-index: 999; }
         .menu-overlay.show { display: block; }
+
         .page-section { display: none; background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
         .page-section.active { display: block; }
         .page-section h3 { margin-bottom: 20px; color: #2d3748; }
         .sub-page { display: none; }
         .sub-page.active { display: block; }
+
         .form-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
         .form-row input, .form-row select, .form-row textarea { flex: 1; min-width: 150px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
         .form-row textarea { min-height: 60px; }
@@ -50,6 +54,7 @@
         button:hover { background: #764ba2; }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-primary { background: #667eea; }
+        .btn-primary:hover { background: #764ba2; }
         .btn-success { background: #48bb78; }
         .btn-success:hover { background: #38a169; }
         .btn-danger { background: #f56565; }
@@ -64,6 +69,7 @@
         .btn-process:hover { background: #8e44ad; }
         .btn-print { background: #4a5568; }
         .btn-print:hover { background: #2d3748; }
+
         .consulta-card { border-bottom: 1px solid #ddd; padding: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .consulta-card .info { flex: 1; }
         .consulta-card.other-vendor { background: #f7fafc; border-left: 4px solid #a0aec0; }
@@ -73,106 +79,218 @@
         .status-realizada { color: #2b6cb0; font-weight: bold; }
         .consulta-realizada { background: #e2e8f0 !important; opacity: 0.7; }
         .no-data { color: #999; text-align: center; padding: 20px; }
+
         .toast { position: fixed; bottom: 20px; right: 20px; background: #48bb78; color: white; padding: 12px 24px; border-radius: 8px; z-index: 3000; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
         .toast.error { background: #f56565; }
         .toast.show { display: block; animation: slideIn 0.3s ease; }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
         .view-buttons { display: flex; flex-wrap: wrap; gap: 10px; margin: 15px 0; }
         .view-buttons button { background: #718096; }
         .view-buttons button.active { background: #667eea; }
+        table { width: 100%; border-collapse: collapse; overflow-x: auto; display: block; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; }
+        th { background: #667eea; color: white; }
+        .consulta-item { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 5px 8px; margin: 3px 0; border-radius: 5px; font-size: 12px; cursor: pointer; }
+
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000; }
         .modal-overlay.show { display: flex; }
         .modal-box { background: white; border-radius: 10px; max-width: 650px; width: 90%; padding: 25px; max-height: 80vh; overflow-y: auto; }
+
         .horario-radio-group label { margin-right: 15px; cursor: pointer; }
         .horario-radio-group input[type="radio"] { margin-right: 4px; }
+
         #horariosMedico { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px; }
         #horariosMedico h4 { margin-bottom: 15px; color: #2d3748; }
         .horario-item { border-bottom: 1px solid #e2e8f0; padding: 10px 0; display: flex; justify-content: space-between; align-items: center; }
         .horario-item:last-child { border-bottom: none; }
+
         .msg-horarios { margin: 5px 0 10px 0; padding: 10px; border-radius: 5px; background: #fff3cd; border: 1px solid #ffeeba; color: #856404; }
-        .calendario-titulo { font-size: 22px; font-weight: 600; color: #2d3748; margin: 10px 0 15px 0; text-align: center; }
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .dashboard-card { background: white; padding: 20px 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center; border-top: 4px solid #667eea; transition: 0.2s; }
-        .dashboard-card:hover { transform: translateY(-4px); box-shadow: 0 6px 16px rgba(0,0,0,0.10); }
-        .dashboard-card .icon { font-size: 28px; margin-bottom: 6px; display: block; }
-        .dashboard-card .numero { font-size: 36px; font-weight: 700; display: block; line-height: 1.2; }
-        .dashboard-card .label { font-size: 14px; color: #718096; font-weight: 500; }
-        .dashboard-card.azul { border-top-color: #667eea; }
-        .dashboard-card.verde { border-top-color: #48bb78; }
-        .dashboard-card.laranja { border-top-color: #ed8936; }
-        .dashboard-card.roxo { border-top-color: #9b59b6; }
-        .dashboard-card.vermelho { border-top-color: #f56565; }
-        .dashboard-tabela { background: white; border-radius: 12px; padding: 15px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow-x: auto; }
-        .dashboard-tabela h4 { padding: 0 20px 15px 20px; font-size: 18px; color: #2d3748; display: flex; align-items: center; gap: 10px; }
-        .dashboard-tabela table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        .dashboard-tabela th { background: #f7fafc; color: #4a5568; font-weight: 600; padding: 12px 15px; text-align: left; border-bottom: 2px solid #e2e8f0; }
-        .dashboard-tabela td { padding: 12px 15px; border-bottom: 1px solid #edf2f7; vertical-align: middle; }
-        .dashboard-tabela tr:hover td { background: #f7fafc; }
-        .dashboard-tabela .barra-container { display: flex; align-items: center; gap: 8px; }
-        .dashboard-tabela .barra { height: 8px; background: #edf2f7; border-radius: 8px; flex: 1; min-width: 60px; overflow: hidden; }
-        .dashboard-tabela .barra .preenchimento { height: 100%; border-radius: 8px; background: #667eea; transition: width 0.6s ease; }
-        .dashboard-tabela .badge-status { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; display: inline-block; }
-        .badge-agendada { background: #fefcbf; color: #975a16; }
-        .badge-confirmada { background: #c6f6d5; color: #276749; }
-        .badge-realizada { background: #bee3f8; color: #2a69ac; }
-        .badge-cancelada { background: #fed7d7; color: #9b2c2c; }
-        #calendarioContainer .mes-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
-        #calendarioContainer .mes-grid .dia-cell { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 8px; min-height: 120px; background: white; transition: 0.2s; }
-        #calendarioContainer .mes-grid .dia-cell:hover { background: #f7fafc; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        #calendarioContainer .mes-grid .dia-cell .dia-numero { font-size: 18px; font-weight: 600; color: #2d3748; margin-bottom: 6px; display: block; }
-        #calendarioContainer .mes-grid .dia-cell .dia-consulta { background: #667eea; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; margin-bottom: 4px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #calendarioContainer .mes-grid .dia-cell .dia-consulta.mais { background: transparent; color: #718096; font-size: 10px; text-align: center; }
-        #calendarioContainer .mes-grid .dia-cell .dia-consulta .horario { font-weight: 600; margin-right: 4px; }
-        #calendarioContainer .mes-grid .dia-cell .dia-consulta .paciente { font-weight: 400; }
-        #calendarioContainer .mes-grid .dia-cell .dia-consulta .medico { font-size: 9px; opacity: 0.8; }
-        #calendarioContainer .mes-grid .dia-cell.dia-hoje { background: #ebf8ff; border-color: #667eea; }
-        #calendarioContainer .mes-grid .dia-cell.outro-mes { opacity: 0.4; }
-        #calendarioContainer .semana-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        #calendarioContainer .semana-table th { background: #667eea; color: white; padding: 12px 8px; text-align: center; font-weight: 600; }
-        #calendarioContainer .semana-table th .dia-semana { font-size: 12px; font-weight: 400; display: block; }
-        #calendarioContainer .semana-table th .dia-numero { font-size: 20px; font-weight: 700; }
-        #calendarioContainer .semana-table td { border: 1px solid #e2e8f0; padding: 8px 4px; vertical-align: top; min-width: 100px; height: 60px; }
-        #calendarioContainer .semana-table .horario-label { font-weight: 600; color: #4a5568; width: 60px; text-align: center; background: #f7fafc; }
-        #calendarioContainer .semana-table .consulta-item { background: #667eea; color: white; padding: 4px 6px; border-radius: 4px; font-size: 11px; margin: 2px 0; cursor: pointer; transition: 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #calendarioContainer .semana-table .consulta-item:hover { opacity: 0.8; transform: scale(1.02); }
-        #calendarioContainer .semana-table .consulta-item .paciente-nome { font-weight: 600; }
-        #calendarioContainer .semana-table .consulta-item .medico-nome { font-size: 9px; opacity: 0.8; display: block; }
-        #calendarioContainer .dia-list { display: flex; flex-direction: column; gap: 12px; }
-        #calendarioContainer .dia-list .dia-card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); transition: 0.2s; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
-        #calendarioContainer .dia-list .dia-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-        #calendarioContainer .dia-list .dia-card .info { display: flex; flex-wrap: wrap; gap: 8px 20px; flex: 1; }
-        #calendarioContainer .dia-list .dia-card .info .horario { font-weight: 700; color: #667eea; font-size: 18px; width: 70px; }
-        #calendarioContainer .dia-list .dia-card .info .dados { display: flex; flex-direction: column; gap: 2px; }
-        #calendarioContainer .dia-list .dia-card .info .dados .paciente { font-weight: 600; font-size: 16px; }
-        #calendarioContainer .dia-list .dia-card .info .dados .detalhes { font-size: 13px; color: #4a5568; }
-        #calendarioContainer .dia-list .dia-card .info .dados .detalhes .medico { font-weight: 500; }
+
+        .calendario-titulo {
+            font-size: 22px;
+            font-weight: 600;
+            color: #2d3748;
+            margin: 10px 0 15px 0;
+            text-align: center;
+        }
+
+        .dashboard-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; }
+        .dashboard-card .numero { font-size: 32px; font-weight: bold; display: block; }
+        .dashboard-card .label { font-size: 14px; color: #718096; }
+
+        .filtros-box {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+        }
+        .filtros-box .form-row { margin-bottom: 5px; }
+
+        .horario-periodo {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f0f4f8;
+            border-radius: 6px;
+        }
+        .horario-periodo h5 {
+            color: #2d3748;
+            margin-bottom: 8px;
+            border-bottom: 2px solid #cbd5e0;
+            padding-bottom: 4px;
+        }
+
+        /* ======= ESTILOS MELHORADOS PARA IMPRESSÃO ======= */
+        .comprovante-container {
+            background: white;
+            padding: 20px 30px;
+            margin: 0 auto;
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            page-break-after: avoid;
+            page-break-inside: avoid;
+            max-height: 100vh;
+            overflow: hidden;
+        }
+        .comprovante-container .header-loja {
+            text-align: center;
+            font-size: 22px;
+            font-weight: 700;
+            color: #1a202c;
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+        }
+        .comprovante-container .header-endereco-loja {
+            text-align: center;
+            font-size: 14px;
+            color: #4a5568;
+            margin-bottom: 12px;
+        }
+        .comprovante-container .header-vendedor {
+            text-align: center;
+            font-size: 14px;
+            color: #4a5568;
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+        .comprovante-container h2 {
+            text-align: center;
+            border-bottom: 2px solid #2d3748;
+            padding-bottom: 10px;
+            font-size: 20px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 16px;
+        }
+        .comprovante-container .detalhe {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px dashed #e2e8f0;
+            font-size: 15px;
+            color: #2d3748;
+        }
+        .comprovante-container .detalhe .label {
+            font-weight: 600;
+            color: #4a5568;
+        }
+        .comprovante-container .detalhe .valor {
+            font-weight: 500;
+            text-align: right;
+        }
+        .comprovante-container .rodape-medico {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 2px solid #2d3748;
+            text-align: center;
+            font-size: 15px;
+            font-weight: 500;
+            color: #2d3748;
+        }
+        .comprovante-container .rodape-medico .endereco-medico {
+            font-weight: 400;
+            color: #4a5568;
+            font-size: 15px;
+        }
+        .comprovante-container .rodape-final {
+            text-align: center;
+            font-size: 12px;
+            color: #a0aec0;
+            margin-top: 12px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 10px;
+        }
+        .comprovante-container .no-print {
+            display: block;
+            margin: 16px auto 0 auto;
+            padding: 8px 24px;
+            background: #e53e3e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .comprovante-container .no-print:hover {
+            background: #c53030;
+        }
+
+        .comprovante-bobina {
+            padding: 10px 15px;
+            font-size: 12px;
+        }
+        .comprovante-bobina .header-loja { font-size: 18px; }
+        .comprovante-bobina .header-endereco-loja { font-size: 11px; }
+        .comprovante-bobina .detalhe { font-size: 11px; padding: 3px 0; }
+        .comprovante-bobina .rodape-medico { font-size: 11px; }
+        .comprovante-bobina .rodape-medico .endereco-medico { font-size: 11px; }
+        .comprovante-bobina h2 { font-size: 15px; }
+
         @media print {
             body * { visibility: hidden; }
             .comprovante-container, .comprovante-container * { visibility: visible; }
-            .comprovante-container { position: fixed; left: 0; top: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; background: white; padding: 20px; margin: 0; border: none; box-shadow: none; }
-            .comprovante-container .comprovante-conteudo { width: 100%; max-width: 210mm; margin: 0 auto; padding-top: 10px; }
+            .comprovante-container {
+                position: fixed;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-start;
+                align-items: center;
+                background: white;
+                padding: 25px 30px;
+                margin: 0;
+                border: none;
+                box-shadow: none;
+            }
+            .comprovante-container .comprovante-conteudo {
+                width: 100%;
+                max-width: 210mm;
+                margin: 0 auto;
+                padding-top: 5px;
+            }
             .no-print { display: none !important; }
-            .comprovante-container .rodape { display: none !important; }
+            .comprovante-container .rodape-final {
+                display: block !important;
+            }
             @page { margin: 0; }
         }
-        .comprovante-container { background: white; padding: 15px 20px; margin: 0 auto; font-family: 'Courier New', monospace; page-break-after: avoid; page-break-inside: avoid; max-height: 100vh; overflow: hidden; }
-        .comprovante-container h2 { text-align: center; border-bottom: 2px solid #333; padding-bottom: 8px; font-size: 18px; }
-        .comprovante-container h3 { text-align: center; font-size: 16px; margin: 6px 0; }
-        .comprovante-container .detalhe { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed #ccc; font-size: 14px; }
-        .comprovante-container .detalhe .label { font-weight: bold; }
-        .comprovante-container .rodape { display: none; }
-        .comprovante-container .header-loja { text-align: center; font-size: 14px; color: #555; margin-bottom: 4px; }
-        .comprovante-container .header-vendedor { text-align: center; font-size: 12px; color: #777; margin-bottom: 12px; }
-        .comprovante-bobina { width: 80mm; padding: 8px 10px; font-size: 11px; border: none; margin: 0 auto; }
-        .comprovante-bobina .detalhe { padding: 3px 0; font-size: 10px; }
-        .comprovante-bobina h2 { font-size: 14px; }
+
         .btn-tipo-impressao { display: flex; gap: 10px; justify-content: center; margin: 15px 0; }
         .btn-tipo-impressao button { padding: 12px 24px; font-size: 16px; border-radius: 8px; cursor: pointer; border: none; font-weight: bold; transition: 0.3s; }
         .btn-tipo-impressao button:hover { transform: scale(1.05); }
         .btn-tipo-impressao .btn-bobina { background: #2d3748; color: white; }
         .btn-tipo-impressao .btn-a4 { background: #667eea; color: white; }
         .btn-tipo-impressao .btn-pdf { background: #e53e3e; color: white; }
-        @media (max-width: 768px) { .header-title h2 { font-size: 16px; } .side-menu { width: 240px; left: -240px; } .btn-tipo-impressao { flex-direction: column; align-items: center; } .btn-tipo-impressao button { width: 100%; } .dashboard-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        @media (max-width: 768px) {
+            .header-title h2 { font-size: 16px; }
+            .side-menu { width: 240px; left: -240px; }
+            .btn-tipo-impressao { flex-direction: column; align-items: center; }
+            .btn-tipo-impressao button { width: 100%; }
+        }
     </style>
 </head>
 <body>
@@ -270,7 +388,9 @@
                 </div>
                 <div class="form-row">
                     <div style="flex:2; display:flex; gap:5px; align-items:center;">
-                        <select id="pacienteSelect" style="flex:1;"><option value="">Selecione um paciente</option></select>
+                        <select id="pacienteSelect" style="flex:1;">
+                            <option value="">Selecione um paciente</option>
+                        </select>
                         <button onclick="abrirModalCadastroPaciente()" style="background:#48bb78; padding:10px 15px;">+</button>
                     </div>
                     <input type="text" id="pacienteNome" placeholder="Nome *" style="flex:1;">
@@ -281,7 +401,7 @@
                     <input type="text" id="pacienteCpf" placeholder="CPF">
                     <div style="flex:1; display:flex; flex-direction:column; gap:3px;">
                         <label for="pacienteDataNasc" style="font-size:13px; font-weight:500; color:#4a5568;">Data de Nascimento</label>
-                        <input type="date" id="pacienteDataNasc" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:5px;">
+                        <input type="date" id="pacienteDataNasc" placeholder="Data Nascimento" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:5px;">
                     </div>
                 </div>
                 <div class="form-row">
@@ -292,7 +412,9 @@
                 </div>
                 <div class="form-row">
                     <input type="date" id="dataConsulta">
-                    <select id="horarioSelect"><option value="">Selecione médico e data</option></select>
+                    <select id="horarioSelect">
+                        <option value="">Selecione médico e data</option>
+                    </select>
                 </div>
                 <div id="msgHorarios" class="msg-horarios" style="display:none;"></div>
                 <div class="form-row">
@@ -311,18 +433,34 @@
         <!-- PÁGINA DASHBOARD -->
         <div id="pageDashboard" class="page-section">
             <h3>📊 Dashboard de Métricas</h3>
-            <div class="dashboard-grid" id="dashboardCards">
-                <div class="dashboard-card azul"><span class="icon"><i class="fas fa-calendar-check"></i></span><span class="numero" id="totalConsultas">0</span><span class="label">Total Consultas</span></div>
-                <div class="dashboard-card verde"><span class="icon"><i class="fas fa-user-md"></i></span><span class="numero" id="totalMedicos">0</span><span class="label">Médicos</span></div>
-                <div class="dashboard-card laranja"><span class="icon"><i class="fas fa-clock"></i></span><span class="numero" id="totalAgendadas">0</span><span class="label">Agendadas</span></div>
-                <div class="dashboard-card azul"><span class="icon"><i class="fas fa-check-circle"></i></span><span class="numero" id="totalConfirmadas">0</span><span class="label">Confirmadas</span></div>
-                <div class="dashboard-card roxo"><span class="icon"><i class="fas fa-check-double"></i></span><span class="numero" id="totalRealizadas">0</span><span class="label">Realizadas</span></div>
-                <div class="dashboard-card vermelho"><span class="icon"><i class="fas fa-times-circle"></i></span><span class="numero" id="totalCanceladas">0</span><span class="label">Canceladas</span></div>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:15px; margin-bottom:25px;">
+                <div class="dashboard-card" style="background:#667eea; color:white;">
+                    <span class="numero" id="totalConsultas">0</span>
+                    <span class="label" style="color:rgba(255,255,255,0.8);">Total Consultas</span>
+                </div>
+                <div class="dashboard-card" style="background:#48bb78; color:white;">
+                    <span class="numero" id="totalMedicos">0</span>
+                    <span class="label" style="color:rgba(255,255,255,0.8);">Médicos</span>
+                </div>
+                <div class="dashboard-card" style="background:#ed8936; color:white;">
+                    <span class="numero" id="totalAgendadas">0</span>
+                    <span class="label" style="color:rgba(255,255,255,0.8);">Agendadas</span>
+                </div>
+                <div class="dashboard-card" style="background:#38a169; color:white;">
+                    <span class="numero" id="totalConfirmadas">0</span>
+                    <span class="label" style="color:rgba(255,255,255,0.8);">Confirmadas</span>
+                </div>
+                <div class="dashboard-card" style="background:#9b59b6; color:white;">
+                    <span class="numero" id="totalRealizadas">0</span>
+                    <span class="label" style="color:rgba(255,255,255,0.8);">Realizadas</span>
+                </div>
+                <div class="dashboard-card" style="background:#f56565; color:white;">
+                    <span class="numero" id="totalCanceladas">0</span>
+                    <span class="label" style="color:rgba(255,255,255,0.8);">Canceladas</span>
+                </div>
             </div>
-            <div class="dashboard-tabela">
-                <h4><i class="fas fa-users"></i> Consultas por Vendedor</h4>
-                <div id="vendedoresRelatorio"></div>
-            </div>
+            <h4>📋 Consultas por Vendedor</h4>
+            <div id="vendedoresRelatorio"></div>
         </div>
 
         <!-- PÁGINA ADMIN -->
@@ -396,7 +534,9 @@
                             <option value="vendedor">Vendedor</option>
                             <option value="admin">Admin</option>
                         </select>
-                        <select id="usuarioLoja"><option value="">Selecione uma loja</option></select>
+                        <select id="usuarioLoja">
+                            <option value="">Selecione uma loja</option>
+                        </select>
                     </div>
                     <input type="hidden" id="editUsuarioId">
                     <button onclick="salvarUsuario()">Salvar</button>
@@ -435,7 +575,6 @@
                 </div>
             </div>
 
-            <!-- SUB PÁGINA LOJAS -->
             <div id="subLojas" class="sub-page">
                 <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
                     <h3>Cadastrar Loja</h3>
@@ -446,7 +585,6 @@
                     <input type="hidden" id="editLojaId">
                     <button onclick="salvarLoja()">Salvar</button>
                     <button id="cancelLojaBtn" onclick="cancelarEdicaoLoja()" style="display:none;">Cancelar</button>
-                    <div id="lojaMsg" style="margin-top:10px; width:100%;"></div>
                 </div>
                 <div style="background:white; padding:20px; border-radius:10px;">
                     <h3>Lojas Cadastradas</h3>
@@ -492,7 +630,7 @@
                 <input type="text" id="solPacienteCpf" placeholder="CPF">
                 <div style="flex:1; display:flex; flex-direction:column; gap:3px;">
                     <label for="solPacienteDataNasc" style="font-size:13px; font-weight:500; color:#4a5568;">Data de Nascimento</label>
-                    <input type="date" id="solPacienteDataNasc" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:5px;">
+                    <input type="date" id="solPacienteDataNasc" placeholder="Data Nascimento" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:5px;">
                 </div>
             </div>
             <div class="form-row">
@@ -503,9 +641,15 @@
             </div>
             <div class="form-row">
                 <input type="date" id="solDataConsulta">
-                <select id="solHorario1" style="flex:1;"><option value="">1º Horário *</option></select>
-                <select id="solHorario2" style="flex:1;"><option value="">2º Horário (opcional)</option></select>
-                <select id="solHorario3" style="flex:1;"><option value="">3º Horário (opcional)</option></select>
+                <select id="solHorario1" style="flex:1;">
+                    <option value="">1º Horário *</option>
+                </select>
+                <select id="solHorario2" style="flex:1;">
+                    <option value="">2º Horário (opcional)</option>
+                </select>
+                <select id="solHorario3" style="flex:1;">
+                    <option value="">3º Horário (opcional)</option>
+                </select>
             </div>
             <div id="solMsgHorarios" class="msg-horarios" style="display:none;"></div>
             <div class="form-row">
@@ -523,30 +667,94 @@
         <div id="pagePerfil" class="page-section">
             <h3>👤 Meu Perfil</h3>
             <div style="max-width:500px; margin:0 auto;">
-                <div class="form-row"><label style="width:100%;"><strong>Nome:</strong> <span id="perfilNome"></span></label></div>
-                <div class="form-row"><label style="width:100%;"><strong>Usuário:</strong> <span id="perfilUsername"></span></label></div>
-                <div class="form-row"><label style="width:100%;"><strong>Tipo:</strong> <span id="perfilTipo"></span></label></div>
-                <div class="form-row"><label style="width:100%;"><strong>Loja:</strong> <span id="perfilLoja"></span></label></div>
+                <div class="form-row">
+                    <label style="width:100%;"><strong>Nome:</strong> <span id="perfilNome"></span></label>
+                </div>
+                <div class="form-row">
+                    <label style="width:100%;"><strong>Usuário:</strong> <span id="perfilUsername"></span></label>
+                </div>
+                <div class="form-row">
+                    <label style="width:100%;"><strong>Tipo:</strong> <span id="perfilTipo"></span></label>
+                </div>
+                <div class="form-row">
+                    <label style="width:100%;"><strong>Loja:</strong> <span id="perfilLoja"></span></label>
+                </div>
                 <hr style="margin:20px 0;">
                 <h4>Alterar Senha</h4>
-                <div class="form-row"><input type="password" id="perfilSenhaAtual" placeholder="Senha atual *"></div>
-                <div class="form-row"><input type="password" id="perfilNovaSenha" placeholder="Nova senha * (mínimo 6 caracteres)"></div>
-                <div class="form-row"><input type="password" id="perfilConfirmarSenha" placeholder="Confirmar nova senha *"></div>
+                <div class="form-row">
+                    <input type="password" id="perfilSenhaAtual" placeholder="Senha atual *">
+                </div>
+                <div class="form-row">
+                    <input type="password" id="perfilNovaSenha" placeholder="Nova senha * (mínimo 6 caracteres)">
+                </div>
+                <div class="form-row">
+                    <input type="password" id="perfilConfirmarSenha" placeholder="Confirmar nova senha *">
+                </div>
                 <div id="perfilMsg" style="margin:10px 0;"></div>
                 <button onclick="salvarAlterarSenha()" class="btn-success">Salvar Senha</button>
             </div>
         </div>
 
         <!-- MODAIS -->
-        <div id="modalLembretes" class="modal-overlay"><div class="modal-box"><h3><i class="fas fa-bell"></i> Lembretes</h3><div id="lembretesList"></div><button onclick="fecharModalLembretes()" style="margin-top:10px;">Fechar</button></div></div>
-        <div id="modalDetalhes" class="modal-overlay"><div class="modal-box"><h3>Detalhes da Consulta</h3><div id="detalhesBody"></div><button onclick="fecharModalDetalhes()" style="margin-top:10px;">Fechar</button></div></div>
-        <div id="modalCadastroPaciente" class="modal-overlay"><div class="modal-box"><h3>Novo Paciente</h3><div class="form-row"><input type="text" id="novoPacienteNome" placeholder="Nome *"><input type="text" id="novoPacienteTelefone" placeholder="Telefone *"></div><div class="form-row"><input type="email" id="novoPacienteEmail" placeholder="E-mail"><input type="text" id="novoPacienteCpf" placeholder="CPF"><input type="date" id="novoPacienteDataNasc" placeholder="Data Nascimento"></div><div class="form-row"><label><input type="checkbox" id="novoPacienteEncaixe" checked> Encaixe</label><label><input type="checkbox" id="novoPacienteNeurodivergente" disabled> Neurodivergente</label><label><input type="checkbox" id="novoPacienteDeficienciaFisica" disabled> Deficiência Física</label></div><div style="display:flex;gap:10px;margin-top:15px;"><button onclick="salvarNovoPaciente()" class="btn-success" style="flex:1;">Salvar e Usar</button><button onclick="fecharModalCadastroPaciente()" style="flex:1; background:#ccc;">Cancelar</button></div><div id="novoPacienteMsg"></div></div></div>
-        <div id="modalImpressao" class="modal-overlay"><div class="modal-box"><h3>🖨️ Impressão do Comprovante</h3><p style="margin-bottom:10px; color:#555;">Selecione o formato:</p><div class="btn-tipo-impressao"><button class="btn-bobina" onclick="imprimirComprovanteSelecionado('bobina')">🧾 Bobina (80mm)</button><button class="btn-a4" onclick="imprimirComprovanteSelecionado('a4')">📄 A4</button><button class="btn-pdf" onclick="imprimirComprovanteSelecionado('pdf')">📁 PDF</button></div><button onclick="fecharModalImpressao()" style="display:block; margin:10px auto; background:#ccc; color:#333; padding:8px 20px;">Cancelar</button></div></div>
+        <div id="modalLembretes" class="modal-overlay">
+            <div class="modal-box">
+                <h3><i class="fas fa-bell"></i> Lembretes</h3>
+                <div id="lembretesList"></div>
+                <button onclick="fecharModalLembretes()" style="margin-top:10px;">Fechar</button>
+            </div>
+        </div>
+
+        <div id="modalDetalhes" class="modal-overlay">
+            <div class="modal-box">
+                <h3>Detalhes da Consulta</h3>
+                <div id="detalhesBody"></div>
+                <button onclick="fecharModalDetalhes()" style="margin-top:10px;">Fechar</button>
+            </div>
+        </div>
+
+        <div id="modalCadastroPaciente" class="modal-overlay">
+            <div class="modal-box">
+                <h3>Novo Paciente</h3>
+                <div class="form-row">
+                    <input type="text" id="novoPacienteNome" placeholder="Nome *">
+                    <input type="text" id="novoPacienteTelefone" placeholder="Telefone *">
+                </div>
+                <div class="form-row">
+                    <input type="email" id="novoPacienteEmail" placeholder="E-mail">
+                    <input type="text" id="novoPacienteCpf" placeholder="CPF">
+                    <input type="date" id="novoPacienteDataNasc" placeholder="Data Nascimento">
+                </div>
+                <div class="form-row">
+                    <label><input type="checkbox" id="novoPacienteEncaixe" checked> Encaixe</label>
+                    <label><input type="checkbox" id="novoPacienteNeurodivergente" disabled> Neurodivergente</label>
+                    <label><input type="checkbox" id="novoPacienteDeficienciaFisica" disabled> Deficiência Física</label>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:15px;">
+                    <button onclick="salvarNovoPaciente()" class="btn-success" style="flex:1;">Salvar e Usar</button>
+                    <button onclick="fecharModalCadastroPaciente()" style="flex:1; background:#ccc;">Cancelar</button>
+                </div>
+                <div id="novoPacienteMsg"></div>
+            </div>
+        </div>
+
+        <!-- MODAL DE IMPRESSÃO -->
+        <div id="modalImpressao" class="modal-overlay">
+            <div class="modal-box">
+                <h3>🖨️ Impressão do Comprovante</h3>
+                <p style="margin-bottom:10px; color:#555;">Selecione o formato:</p>
+                <div class="btn-tipo-impressao">
+                    <button class="btn-bobina" onclick="imprimirComprovanteSelecionado('bobina')">🧾 Bobina (80mm)</button>
+                    <button class="btn-a4" onclick="imprimirComprovanteSelecionado('a4')">📄 A4</button>
+                    <button class="btn-pdf" onclick="imprimirComprovanteSelecionado('pdf')">📁 PDF</button>
+                </div>
+                <button onclick="fecharModalImpressao()" style="display:block; margin:10px auto; background:#ccc; color:#333; padding:8px 20px;">Cancelar</button>
+            </div>
+        </div>
 
         <div id="toast" class="toast"></div>
     </div>
 
-    <!-- COMPROVANTE -->
+    <!-- COMPROVANTE (escondido) -->
     <div id="comprovante" style="display:none;"></div>
 
     <script>
@@ -790,7 +998,7 @@
         }
 
         // ========================================================================
-        // LOJAS (CRUD) – CORRIGIDO COM LOGS
+        // LOJAS (CRUD)
         // ========================================================================
         async function carregarLojas() {
             try {
@@ -835,54 +1043,51 @@
             }
         }
 
-        // FUNÇÃO SALVAR LOJA CORRIGIDA COM LOGS
         async function salvarLoja() {
-    const nomeInput = document.getElementById('lojaNome');
-    const enderecoInput = document.getElementById('lojaEndereco');
+            const nomeInput = document.getElementById('lojaNome');
+            const enderecoInput = document.getElementById('lojaEndereco');
 
-    // Verifica se os campos existem
-    if (!nomeInput || !enderecoInput) {
-        showToast('Campos de loja não encontrados.', true);
-        return;
-    }
+            if (!nomeInput || !enderecoInput) {
+                showToast('Campos de loja não encontrados.', true);
+                return;
+            }
 
-    // Pega os valores diretamente
-    const nome = nomeInput.value.trim();
-    const endereco = enderecoInput.value.trim();
+            const nome = nomeInput.value ? nomeInput.value.trim() : '';
+            const endereco = enderecoInput.value ? enderecoInput.value.trim() : '';
 
-    // Validação
-    if (nome === '') {
-        showToast('O nome da loja é obrigatório.', true);
-        return;
-    }
+            if (!nome) {
+                showToast('O nome da loja é obrigatório.', true);
+                return;
+            }
 
-    const editId = document.getElementById('editLojaId').value;
-    const url = editId ? `${API_URL}/lojas/${editId}` : `${API_URL}/lojas`;
-    const method = editId ? 'PUT' : 'POST';
+            const editId = document.getElementById('editLojaId').value;
+            const url = editId ? `${API_URL}/lojas/${editId}` : `${API_URL}/lojas`;
+            const method = editId ? 'PUT' : 'POST';
 
-    try {
-        const res = await fetch(url, {
-            method,
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({ nome, endereco })
-        });
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ nome, endereco })
+                });
 
-        const result = await res.json();
-        if (!res.ok) {
-            throw new Error(result.error || 'Erro ao salvar loja');
+                const result = await res.json();
+                if (!res.ok) {
+                    throw new Error(result.error || 'Erro ao salvar loja');
+                }
+
+                showToast(editId ? 'Loja atualizada!' : 'Loja cadastrada!');
+                cancelarEdicaoLoja();
+                await carregarLojas();
+                preencherSelectLojas();
+            } catch (err) {
+                showToast(err.message, true);
+                console.error(err);
+            }
         }
-
-        showToast(editId ? 'Loja atualizada!' : 'Loja cadastrada!');
-        cancelarEdicaoLoja();
-        await carregarLojas();
-        preencherSelectLojas();
-    } catch (err) {
-        showToast(err.message, true);
-    }
-}
 
         function editarLoja(id) {
             const l = lojas.find(loj => loj.id === id);
@@ -891,7 +1096,6 @@
             document.getElementById('lojaNome').value = l.nome || '';
             document.getElementById('lojaEndereco').value = l.endereco || '';
             document.getElementById('cancelLojaBtn').style.display = 'inline-block';
-            document.getElementById('lojaMsg').innerHTML = '';
             mostrarSubPage('lojas');
         }
 
@@ -900,7 +1104,6 @@
             document.getElementById('cancelLojaBtn').style.display = 'none';
             document.getElementById('lojaNome').value = '';
             document.getElementById('lojaEndereco').value = '';
-            document.getElementById('lojaMsg').innerHTML = '';
         }
 
         async function excluirLoja(id) {
@@ -1268,127 +1471,13 @@
         // ========================================================================
         // HORÁRIOS DOS MÉDICOS
         // ========================================================================
-        // ========================================================================
-// HORÁRIOS DOS MÉDICOS (CORRIGIDO)
-// ========================================================================
-function gerenciarHorarios(medicoId) {
-    medicoSelecionadoId = medicoId;
-    document.getElementById('horariosMedico').style.display = 'block';
-    carregarHorarios(medicoId);
-    document.getElementById('horariosMedico').scrollIntoView({ behavior: 'smooth' });
-}
-
-async function carregarHorarios(medicoId) {
-    try {
-        const res = await fetch(`${API_URL}/medicos/${medicoId}/horarios`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        const horarios = await res.json();
-        const container = document.getElementById('horariosList');
-        if (horarios.length === 0) {
-            container.innerHTML = '<p>Nenhum horário cadastrado.</p>';
-            return;
+        function gerenciarHorarios(medicoId) {
+            medicoSelecionadoId = medicoId;
+            document.getElementById('horariosMedico').style.display = 'block';
+            carregarHorarios(medicoId);
+            document.getElementById('horariosMedico').scrollIntoView({ behavior: 'smooth' });
         }
-        const dias = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-        container.innerHTML = horarios.map(h => `
-            <div class="horario-item">
-                <span>${dias[h.dia_semana]} - ${h.hora_inicio} às ${h.hora_fim} (intervalo ${h.intervalo}min) ${!h.ativo ? '(Inativo)' : ''}</span>
-                <div>
-                    <button onclick="editarHorario(${h.id})" class="btn-warning">✏️</button>
-                    <button onclick="excluirHorario(${h.id})" class="btn-danger">🗑️</button>
-                </div>
-            </div>
-        `).join('');
-    } catch (err) {
-        showToast(err.message, true);
-    }
-}
 
-async function adicionarHorarioMedico() {
-    if (!medicoSelecionadoId) {
-        showToast('Selecione um médico primeiro.', true);
-        return;
-    }
-    const data = {
-        dia_semana: parseInt(document.getElementById('horarioDiaSemana').value),
-        hora_inicio: document.getElementById('horarioInicio').value,
-        hora_fim: document.getElementById('horarioFim').value,
-        intervalo: parseInt(document.getElementById('horarioIntervalo').value) || 30
-    };
-    const editId = document.getElementById('editHorarioId').value;
-    const url = editId ? `${API_URL}/horarios/${editId}` : `${API_URL}/medicos/${medicoSelecionadoId}/horarios`;
-    const method = editId ? 'PUT' : 'POST';
-    try {
-        const res = await fetch(url, {
-            method,
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify(data)
-        });
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error || 'Erro ao salvar horário');
-        }
-        showToast(editId ? 'Atualizado!' : 'Adicionado!');
-        cancelarEdicaoHorario();
-        carregarHorarios(medicoSelecionadoId);
-    } catch (err) {
-        showToast(err.message, true);
-    }
-}
-
-async function editarHorario(id) {
-    try {
-        const res = await fetch(`${API_URL}/horarios/${id}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error || 'Erro ao buscar horário');
-        }
-        const h = await res.json();
-        if (!h) return;
-        document.getElementById('editHorarioId').value = h.id;
-        document.getElementById('horarioDiaSemana').value = h.dia_semana;
-        document.getElementById('horarioInicio').value = h.hora_inicio;
-        document.getElementById('horarioFim').value = h.hora_fim;
-        document.getElementById('horarioIntervalo').value = h.intervalo || 30;
-        document.getElementById('cancelHorarioBtn').style.display = 'inline-block';
-        // Rola até o formulário
-        document.getElementById('horariosMedico').scrollIntoView({ behavior: 'smooth' });
-    } catch (err) {
-        showToast(err.message, true);
-    }
-}
-
-function cancelarEdicaoHorario() {
-    document.getElementById('editHorarioId').value = '';
-    document.getElementById('cancelHorarioBtn').style.display = 'none';
-    document.getElementById('horarioDiaSemana').value = '0';
-    document.getElementById('horarioInicio').value = '08:00';
-    document.getElementById('horarioFim').value = '17:00';
-    document.getElementById('horarioIntervalo').value = '30';
-}
-
-async function excluirHorario(id) {
-    if (!confirm('Excluir este horário?')) return;
-    try {
-        const res = await fetch(`${API_URL}/horarios/${id}`, {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error || 'Erro ao excluir');
-        }
-        showToast('Excluído');
-        carregarHorarios(medicoSelecionadoId);
-    } catch (err) {
-        showToast(err.message, true);
-    }
-}
         async function carregarHorarios(medicoId) {
             try {
                 const res = await fetch(`${API_URL}/medicos/${medicoId}/horarios`, {
@@ -1435,7 +1524,10 @@ async function excluirHorario(id) {
                     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                     body: JSON.stringify(data)
                 });
-                if (!res.ok) throw new Error('Erro');
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Erro ao salvar horário');
+                }
                 showToast(editId ? 'Atualizado!' : 'Adicionado!');
                 cancelarEdicaoHorario();
                 carregarHorarios(medicoSelecionadoId);
@@ -1449,6 +1541,10 @@ async function excluirHorario(id) {
                 const res = await fetch(`${API_URL}/horarios/${id}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Erro ao buscar horário');
+                }
                 const h = await res.json();
                 if (!h) return;
                 document.getElementById('editHorarioId').value = h.id;
@@ -1457,6 +1553,7 @@ async function excluirHorario(id) {
                 document.getElementById('horarioFim').value = h.hora_fim;
                 document.getElementById('horarioIntervalo').value = h.intervalo || 30;
                 document.getElementById('cancelHorarioBtn').style.display = 'inline-block';
+                document.getElementById('horariosMedico').scrollIntoView({ behavior: 'smooth' });
             } catch (err) {
                 showToast(err.message, true);
             }
@@ -1474,7 +1571,14 @@ async function excluirHorario(id) {
         async function excluirHorario(id) {
             if (!confirm('Excluir este horário?')) return;
             try {
-                await fetch(`${API_URL}/horarios/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+                const res = await fetch(`${API_URL}/horarios/${id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Erro ao excluir');
+                }
                 showToast('Excluído');
                 carregarHorarios(medicoSelecionadoId);
             } catch (err) {
@@ -1881,28 +1985,28 @@ async function excluirHorario(id) {
         }
 
         // ========================================================================
-        // IMPRESSÃO
+        // IMPRESSÃO – MELHORADA
         // ========================================================================
         function abrirModalImpressao(id) {
-                    consultaParaImprimir = id;
-                    document.getElementById('modalImpressao').classList.add('show');
-                }
+            consultaParaImprimir = id;
+            document.getElementById('modalImpressao').classList.add('show');
+        }
 
-                function fecharModalImpressao() {
-                    document.getElementById('modalImpressao').classList.remove('show');
-                }
+        function fecharModalImpressao() {
+            document.getElementById('modalImpressao').classList.remove('show');
+        }
 
-                function imprimirComprovanteSelecionado(tipo) {
-                    const id = consultaParaImprimir;
-                    fecharModalImpressao();
-                    if (id) {
-                        gerarComprovante(id, tipo);
-                    } else {
-                        showToast('Erro: nenhuma consulta selecionada.', true);
-                    }
-                }
+        function imprimirComprovanteSelecionado(tipo) {
+            const id = consultaParaImprimir;
+            fecharModalImpressao();
+            if (id) {
+                gerarComprovante(id, tipo);
+            } else {
+                showToast('Erro: nenhuma consulta selecionada.', true);
+            }
+        }
 
-                function gerarComprovante(id, tipo) {
+        function gerarComprovante(id, tipo) {
             const c = consultas.find(cons => cons.id === id);
             if (!c) {
                 showToast('Consulta não encontrada.', true);
@@ -1926,6 +2030,7 @@ async function excluirHorario(id) {
 
             const medico = medicos.find(m => m.id === c.medico_id);
             const enderecoMedico = medico ? medico.endereco : 'Endereço não informado';
+
             const lojaNome = c.loja_nome || user.loja_nome || 'Ótica Macaé';
             const lojaEndereco = c.loja_endereco || user.loja_endereco || '';
             const vendedorNome = c.vendedor_nome || user.nome || 'Não informado';
@@ -1935,33 +2040,39 @@ async function excluirHorario(id) {
             const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
             const pedido = c.numero_pedido || 'Não informado';
 
-            const html = `
+            // HTML do comprovante com layout melhorado
+            let html = `
                 <div class="comprovante-container">
                     <div class="comprovante-conteudo">
-                        <div class="header-loja"><strong>${escapeHtml(lojaNome)}</strong></div>
-                        ${lojaEndereco ? `<div class="header-loja" style="font-size:12px;">${escapeHtml(lojaEndereco)}</div>` : ''}
+                        <!-- Cabeçalho: Nome da Loja -->
+                        <div class="header-loja">${escapeHtml(lojaNome)}</div>
+                        ${lojaEndereco ? `<div class="header-endereco-loja">${escapeHtml(lojaEndereco)}</div>` : ''}
                         <div class="header-vendedor">Vendedor: ${escapeHtml(vendedorNome)}</div>
                         <h2>Comprovante de Consulta</h2>
-                        <hr style="margin: 6px 0;">
-                        <div class="detalhe"><span class="label">Paciente:</span> <span>${escapeHtml(c.paciente_nome)}</span></div>
-                        <div class="detalhe"><span class="label">Data:</span> <span>${dataFormatada}</span></div>
-                        <div class="detalhe"><span class="label">Horário:</span> <span>${c.horario}</span></div>
-                        <div class="detalhe"><span class="label">Médico:</span> <span>Dr. ${escapeHtml(c.medico_nome)}</span></div>
-                        <div class="detalhe"><span class="label">Status:</span> <span>${statusLabel}</span></div>
-                        <div class="detalhe"><span class="label">Condição:</span> <span>${condicao}</span></div>
-                        <div class="detalhe"><span class="label">Pedido:</span> <span>${pedido}</span></div>
-                        ${c.observacoes ? `<div class="detalhe"><span class="label">Observações:</span> <span>${escapeHtml(c.observacoes)}</span></div>` : ''}
-                        <hr style="margin: 6px 0;">
-                        <div style="text-align:center; font-size:11px; color:#666; margin-top:8px;">
-                            Endereço do médico: ${escapeHtml(enderecoMedico)}
+                        <div class="detalhe"><span class="label">Paciente:</span> <span class="valor">${escapeHtml(c.paciente_nome)}</span></div>
+                        <div class="detalhe"><span class="label">Data:</span> <span class="valor">${dataFormatada}</span></div>
+                        <div class="detalhe"><span class="label">Horário:</span> <span class="valor">${c.horario}</span></div>
+                        <div class="detalhe"><span class="label">Médico:</span> <span class="valor">Dr. ${escapeHtml(c.medico_nome)}</span></div>
+                        <div class="detalhe"><span class="label">Status:</span> <span class="valor">${statusLabel}</span></div>
+                        <div class="detalhe"><span class="label">Condição:</span> <span class="valor">${condicao}</span></div>
+                        <div class="detalhe"><span class="label">Pedido:</span> <span class="valor">${pedido}</span></div>
+                        ${c.observacoes ? `<div class="detalhe"><span class="label">Observações:</span> <span class="valor">${escapeHtml(c.observacoes)}</span></div>` : ''}
+                        
+                        <!-- Rodapé: Endereço do Médico (mais visível) -->
+                        <div class="rodape-medico">
+                            <div>Endereço do médico:</div>
+                            <div class="endereco-medico">${escapeHtml(enderecoMedico)}</div>
                         </div>
-                        <div style="text-align:center; font-size:10px; color:#999; margin-top:4px;">
-                            Este comprovante é válido como comprovação de agendamento.
-                        </div>
+                        <div class="rodape-final">Este comprovante é válido como comprovação de agendamento.</div>
                     </div>
-                    <button onclick="fecharComprovante()" class="no-print" style="display:block; margin:10px auto; padding:6px 16px; background:#e53e3e; color:white; border:none; border-radius:4px; cursor:pointer;">Fechar</button>
+                    <button onclick="fecharComprovante()" class="no-print">Fechar</button>
                 </div>
             `;
+
+            // Aplica estilo específico para bobina
+            if (tipo === 'bobina') {
+                html = html.replace('comprovante-container', 'comprovante-container comprovante-bobina');
+            }
 
             const comprovanteDiv = document.getElementById('comprovante');
             comprovanteDiv.innerHTML = html;
@@ -1997,6 +2108,9 @@ async function excluirHorario(id) {
             document.querySelectorAll(`.view-buttons button[onclick*="${currentView}"]`).forEach(btn => btn.classList.add('active'));
         }
 
+        // ========================================================================
+        // RENDERIZAR MÊS
+        // ========================================================================
         function renderizarMes(container) {
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth();
@@ -2035,6 +2149,9 @@ async function excluirHorario(id) {
             container.innerHTML = html;
         }
 
+        // ========================================================================
+        // RENDERIZAR SEMANA
+        // ========================================================================
         function renderizarSemana(container) {
             let start = new Date(currentDate);
             start.setDate(currentDate.getDate() - currentDate.getDay());
@@ -2077,6 +2194,9 @@ async function excluirHorario(id) {
             container.innerHTML = html;
         }
 
+        // ========================================================================
+        // RENDERIZAR DIA
+        // ========================================================================
         function renderizarDia(container) {
             let dateStr = formatDate(currentDate);
             let dayEvents = consultas.filter(c => c.data_consulta === dateStr).sort((a,b) => a.horario.localeCompare(b.horario));
@@ -2182,7 +2302,7 @@ async function excluirHorario(id) {
         }
 
         // ========================================================================
-        // ENVIO DE WHATSAPP
+        // ENVIO DE WHATSAPP – versão profissional sem emojis
         // ========================================================================
         async function enviarWhatsAppPaciente(id) {
             if (user.tipo !== 'admin') { showToast('Apenas administradores podem enviar.', true); return; }
@@ -2255,17 +2375,17 @@ async function excluirHorario(id) {
                 else if (paciente.deficiencia_fisica) condicao = 'Deficiência Física';
                 else if (paciente.encaixe) condicao = 'Encaixe';
             }
-            let msg = `*Nova consulta agendada*\n`;
-            msg += `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n`;
-            msg += `*${lojaNome}*\n`;
-            msg += `*Paciente:* ${e.paciente_nome}\n`;
-            msg += `*Data:* ${formatDisplay(e.data_consulta)}\n`;
-            msg += `*Horário:* ${e.horario}\n`;
-            msg += `*Telefone:* ${e.paciente_telefone}\n`;
-            msg += `*Local:* ${endereco}\n`;
-            msg += `*Condição:* ${condicao}\n`;
+            let msg = `Nova consulta agendada\n`;
+            msg += `----------------------------------------\n`;
+            msg += `${lojaNome}\n`;
+            msg += `Paciente: ${e.paciente_nome}\n`;
+            msg += `Data: ${formatDisplay(e.data_consulta)}\n`;
+            msg += `Horário: ${e.horario}\n`;
+            msg += `Telefone: ${e.paciente_telefone}\n`;
+            msg += `Local: ${endereco}\n`;
+            msg += `Condição: ${condicao}\n`;
             if (e.numero_pedido) {
-                msg += `*Pedido:* #${e.numero_pedido}\n`;
+                msg += `Pedido: #${e.numero_pedido}\n`;
             }
 
             const phone = medico.whatsapp.replace(/\D/g, '');
@@ -2714,7 +2834,7 @@ async function excluirHorario(id) {
         }
 
         // ========================================================================
-        // PERFIL - ALTERAR SENHA
+        // PERFIL
         // ========================================================================
         function abrirModalPerfil() {
             document.getElementById('pagePerfil').classList.add('active');
@@ -2995,7 +3115,7 @@ async function excluirHorario(id) {
             if (e.target === this) fecharModalImpressao();
         });
 
-        console.log('✅ Sistema completo com Lojas, Vínculo de Vendedor, Impressão no topo e card WhatsApp.');
+        console.log('✅ Sistema completo com Lojas, Vínculo de Vendedor, Impressão melhorada e card WhatsApp profissional.');
     </script>
 </body>
 </html>
