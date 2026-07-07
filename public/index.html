@@ -491,6 +491,7 @@
         <div id="pageAdmin" class="page-section">
             <h3>⚙️ Painel Administrativo</h3>
             <div id="subMedicos" class="sub-page active">
+                <!-- Cadastro de Médicos -->
                 <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
                     <h3>Cadastrar Médico</h3>
                     <div class="form-row">
@@ -599,6 +600,7 @@
                 </div>
             </div>
 
+            <!-- SUB PÁGINA LOJAS -->
             <div id="subLojas" class="sub-page">
                 <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
                     <h3>Cadastrar Loja</h3>
@@ -1086,7 +1088,7 @@
         }
 
         // ========================================================================
-        // LOJAS (CRUD)
+        // LOJAS (CRUD) – FUNÇÃO CORRIGIDA COM FALLBACK
         // ========================================================================
         async function carregarLojas() {
             try {
@@ -1131,35 +1133,34 @@
             }
         }
 
+        // ===== FUNÇÃO SALVAR LOJA CORRIGIDA (com fallback) =====
         async function salvarLoja() {
-    // Captura os elementos
-            const nomeInput = document.getElementById('lojaNome');
-            const enderecoInput = document.getElementById('lojaEndereco');
-
-            // Verifica se os campos existem
+            // Tenta buscar pelo ID
+            let nomeInput = document.getElementById('lojaNome');
             if (!nomeInput) {
-                showToast('Campo "Nome" não encontrado no formulário.', true);
+                // Fallback: busca por name (caso o ID esteja duplicado ou incorreto)
+                nomeInput = document.querySelector('input[name="lojaNome"]');
+            }
+            if (!nomeInput) {
+                showToast('Erro: campo Nome não encontrado. Verifique o HTML.', true);
                 console.error('Elemento lojaNome não encontrado!');
                 return;
             }
+
+            let enderecoInput = document.getElementById('lojaEndereco');
             if (!enderecoInput) {
-                showToast('Campo "Endereço" não encontrado no formulário.', true);
-                console.error('Elemento lojaEndereco não encontrado!');
+                enderecoInput = document.querySelector('input[name="lojaEndereco"]');
+            }
+            if (!enderecoInput) {
+                showToast('Erro: campo Endereço não encontrado.', true);
                 return;
             }
 
-            // Pega os valores e remove espaços
             const nome = nomeInput.value.trim();
             const endereco = enderecoInput.value.trim();
 
-            // Log para depuração
-            console.log('📝 Valor capturado do campo Nome:', `"${nome}"`);
-            console.log('📝 Valor capturado do campo Endereço:', `"${endereco}"`);
-
-            // Validação
             if (nome === '') {
                 showToast('O nome da loja é obrigatório.', true);
-                console.warn('⚠️ Nome está vazio!');
                 return;
             }
 
@@ -1176,12 +1177,10 @@
                     },
                     body: JSON.stringify({ nome, endereco })
                 });
-
                 const result = await res.json();
                 if (!res.ok) {
                     throw new Error(result.error || 'Erro ao salvar loja');
                 }
-
                 showToast(editId ? 'Loja atualizada!' : 'Loja cadastrada!');
                 cancelarEdicaoLoja();
                 await carregarLojas();
@@ -1318,7 +1317,7 @@
         }
 
         // ========================================================================
-        // CRUD DE PACIENTES
+        // CRUD DE PACIENTES (mantido)
         // ========================================================================
         async function salvarPaciente() {
             const data = {
@@ -1478,7 +1477,7 @@
         }
 
         // ========================================================================
-        // CRUD DE MÉDICOS
+        // CRUD DE MÉDICOS (mantido)
         // ========================================================================
         async function salvarMedico() {
             const data = {
@@ -1805,7 +1804,7 @@
         document.getElementById('solDataConsulta').addEventListener('change', carregarHorariosDisponiveisSol);
 
         // ========================================================================
-        // CONSULTAS (CRUD)
+        // CONSULTAS (CRUD) – resumido para não repetir todo o código
         // ========================================================================
         async function salvarConsulta() {
             if (user.tipo !== 'admin') { showToast('Apenas administradores podem agendar.', true); return; }
@@ -1948,7 +1947,7 @@
         }
 
         // ========================================================================
-        // AÇÕES DE CONSULTAS
+        // AÇÕES DE CONSULTAS (confirmar, processar, cancelar, excluir, editar)
         // ========================================================================
         async function confirmarConsulta(id) {
             if (user.tipo !== 'admin') { showToast('Apenas administradores podem confirmar.', true); return; }
@@ -2088,7 +2087,7 @@
         }
 
         // ========================================================================
-        // IMPRESSÃO – COM CONFIGURAÇÕES DO USUÁRIO
+        // IMPRESSÃO
         // ========================================================================
         function abrirModalImpressao(id) {
             consultaParaImprimir = id;
@@ -2151,10 +2150,8 @@
             const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
             const pedido = c.numero_pedido || 'Não informado';
 
-            // Carrega configurações do usuário
             const config = getPrintConfig();
 
-            // HTML do comprovante com estilos aplicados via JS
             let html = `
                 <div class="comprovante-container" style="padding-left:${config.marginLeft}px; padding-right:${config.marginRight}px; padding-top:${config.marginTop}px;">
                     <div class="comprovante-conteudo">
@@ -2205,7 +2202,6 @@
                 </div>
             `;
 
-            // Aplica estilo específico para bobina
             if (tipo === 'bobina') {
                 html = html.replace('comprovante-container', 'comprovante-container comprovante-bobina');
                 html = html.replace(/font-size:22px/g, 'font-size:18px');
@@ -2250,9 +2246,6 @@
             document.querySelectorAll(`.view-buttons button[onclick*="${currentView}"]`).forEach(btn => btn.classList.add('active'));
         }
 
-        // ========================================================================
-        // RENDERIZAR MÊS
-        // ========================================================================
         function renderizarMes(container) {
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth();
@@ -2291,9 +2284,6 @@
             container.innerHTML = html;
         }
 
-        // ========================================================================
-        // RENDERIZAR SEMANA
-        // ========================================================================
         function renderizarSemana(container) {
             let start = new Date(currentDate);
             start.setDate(currentDate.getDate() - currentDate.getDay());
@@ -2336,9 +2326,6 @@
             container.innerHTML = html;
         }
 
-        // ========================================================================
-        // RENDERIZAR DIA
-        // ========================================================================
         function renderizarDia(container) {
             let dateStr = formatDate(currentDate);
             let dayEvents = consultas.filter(c => c.data_consulta === dateStr).sort((a,b) => a.horario.localeCompare(b.horario));
@@ -2444,7 +2431,7 @@
         }
 
         // ========================================================================
-        // ENVIO DE WHATSAPP – versão profissional sem emojis
+        // ENVIO DE WHATSAPP (profissional sem emojis)
         // ========================================================================
         async function enviarWhatsAppPaciente(id) {
             if (user.tipo !== 'admin') { showToast('Apenas administradores podem enviar.', true); return; }
