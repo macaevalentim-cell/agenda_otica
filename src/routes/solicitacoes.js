@@ -5,7 +5,7 @@ const { toNull, formatDateToYYYYMMDD } = require('../utils/helpers');
 const { agendarLembrete } = require('../services/lembreteService');
 const router = express.Router();
 
-// ==================== LISTAR SOLICITAÇÕES ====================
+// Listar solicitações
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const isAdmin = req.user.tipo === 'admin';
@@ -16,30 +16,30 @@ router.get('/', authenticateToken, async (req, res) => {
     `;
     const params = [];
     if (!isAdmin) {
-      query += ' WHERE s.solicitado_por = $1';
+      query += ' WHERE s.solicitado_por = ?';
       params.push(req.user.id);
     }
     query += ' ORDER BY s.criado_em DESC';
-    const result = await pool.query(query, params);
-    res.json(result.rows.map(s => ({ ...s, data_consulta: formatDateToYYYYMMDD(s.data_consulta) })));
+    const [rows] = await pool.query(query, params);
+    res.json(rows.map(s => ({ ...s, data_consulta: formatDateToYYYYMMDD(s.data_consulta) })));
   } catch (error) {
     console.error('❌ Erro ao listar solicitações:', error);
     res.status(500).json({ error: 'Erro interno ao listar solicitações' });
   }
 });
 
-// ==================== CONTAR PENDENTES ====================
+// Contar pendentes
 router.get('/pendentes/count', authenticateToken, isAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT COUNT(*) as total FROM solicitacoes_consultas WHERE status = $1', ['pendente']);
-    res.json({ total: parseInt(result.rows[0].total) });
+    const [rows] = await pool.query('SELECT COUNT(*) as total FROM solicitacoes_consultas WHERE status = ?', ['pendente']);
+    res.json({ total: parseInt(rows[0].total) });
   } catch (error) {
     console.error('❌ Erro ao contar pendentes:', error);
     res.status(500).json({ error: 'Erro interno ao contar pendentes' });
   }
 });
 
-// ==================== CRIAR SOLICITAÇÃO ====================
+// Criar solicitação (vendedor)
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const {
@@ -49,20 +49,29 @@ router.post('/', authenticateToken, async (req, res) => {
       medico_id, medico_nome, observacoes, numero_pedido
     } = req.body;
 
-    // Valida horários
+    // Validações
+    if (!paciente_nome || !paciente_telefone) {
+      return res.status(400).json({ error: 'Nome e telefone do paciente são obrigatórios.' });
+    }
+    if (!data_consulta || !horario1 || !medico_id) {
+      return res.status(400).json({ error: 'Data, 1º horário e médico são obrigatórios.' });
+    }
+
+    // Verifica se o médico atende no dia
     const diaSemana = new Date(data_consulta).getDay();
-    const horariosConfig = await pool.query(
-      `SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
+    const [horariosConfig] = await pool.query(
+      'SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = ? AND dia_semana = ? AND ativo = true',
       [medico_id, diaSemana]
     );
-    if (horariosConfig.rows.length === 0) {
+    if (horariosConfig.length === 0) {
       return res.status(400).json({ error: 'Médico não atende neste dia da semana.' });
     }
 
+    // Valida os horários sugeridos
     const horariosSugeridos = [horario1, horario2, horario3].filter(h => h);
     for (const hor of horariosSugeridos) {
       let valido = false;
-      for (const config of horariosConfig.rows) {
+      for (const config of horariosConfig) {
         if (hor >= config.hora_inicio && hor < config.hora_fim) {
           valido = true;
           break;
@@ -75,52 +84,53 @@ router.post('/', authenticateToken, async (req, res) => {
 
     // Evita conflitos com solicitações pendentes
     for (const hor of horariosSugeridos) {
-      const conflito = await pool.query(
+      const [conflito] = await pool.query(
         `SELECT id FROM solicitacoes_consultas
-         WHERE data_consulta = $1 AND medico_id = $2 AND status = $3
-         AND (horario_sugerido1 = $4 OR horario_sugerido2 = $5 OR horario_sugerido3 = $6)`,
+         WHERE data_consulta = ? AND medico_id = ? AND status = ?
+         AND (horario_sugerido1 = ? OR horario_sugerido2 = ? OR horario_sugerido3 = ?)`,
         [data_consulta, medico_id, 'pendente', hor, hor, hor]
       );
-      if (conflito.rows.length > 0) {
+      if (conflito.length > 0) {
         return res.status(400).json({ error: `Horário ${hor} já possui solicitação pendente para este médico.` });
       }
     }
 
     // Cria paciente se CPF for fornecido
     if (paciente_cpf) {
-      const existente = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [paciente_cpf]);
-      if (existente.rows.length === 0) {
+      const [existente] = await pool.query('SELECT id FROM clientes WHERE cpf = ?', [paciente_cpf]);
+      if (existente.length === 0) {
         await pool.query(
           `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [paciente_nome, paciente_telefone, toNull(paciente_email), paciente_cpf, toNull(data_nascimento),
-           neurodivergente ? 1 : 0, deficiencia_fisica ? 1 : 0, encaixe ? 1 : 0, req.user.id]
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [paciente_nome, paciente_telefone, paciente_email || null, paciente_cpf, data_nascimento || null,
+           neurodivergente || 0, deficiencia_fisica || 0, encaixe || 1, req.user.id]
         );
       }
     }
 
-    // Insere a solicitação
-    const result = await pool.query(
+    // Insere solicitação
+    const [result] = await pool.query(
       `INSERT INTO solicitacoes_consultas
        (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta,
         horario_sugerido1, horario_sugerido2, horario_sugerido3,
         medico_id, medico_nome, observacoes, numero_pedido, solicitado_por)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        paciente_nome, paciente_telefone, toNull(paciente_email), toNull(paciente_cpf),
-        data_consulta, horario1, toNull(horario2), toNull(horario3),
-        medico_id, medico_nome, toNull(observacoes), toNull(numero_pedido),
+        paciente_nome, paciente_telefone, paciente_email || null, paciente_cpf || null,
+        data_consulta, horario1, horario2 || null, horario3 || null,
+        medico_id, medico_nome, observacoes || null, numero_pedido || null,
         req.user.id
       ]
     );
-    res.status(201).json({ id: result.rows[0].id, message: 'Solicitação enviada com sucesso!' });
+
+    res.status(201).json({ id: result.insertId, message: 'Solicitação enviada com sucesso!' });
   } catch (error) {
     console.error('❌ Erro ao criar solicitação:', error);
     res.status(500).json({ error: 'Erro interno ao criar solicitação' });
   }
 });
 
-// ==================== APROVAR/REJEITAR SOLICITAÇÃO ====================
+// Aprovar/rejeitar solicitação (admin)
 router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
     const { status, horario_escolhido } = req.body;
@@ -128,11 +138,11 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Status inválido' });
     }
 
-    const solic = await pool.query('SELECT * FROM solicitacoes_consultas WHERE id = $1', [req.params.id]);
-    if (solic.rows.length === 0) {
+    const [solic] = await pool.query('SELECT * FROM solicitacoes_consultas WHERE id = ?', [req.params.id]);
+    if (solic.length === 0) {
       return res.status(404).json({ error: 'Solicitação não encontrada' });
     }
-    const s = solic.rows[0];
+    const s = solic[0];
 
     if (status === 'aprovado') {
       if (!horario_escolhido) {
@@ -145,46 +155,47 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
 
       // Validar horário
       const diaSemana = new Date(s.data_consulta).getDay();
-      const horariosConfig = await pool.query(
-        `SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
+      const [horariosConfig] = await pool.query(
+        'SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = ? AND dia_semana = ? AND ativo = true',
         [s.medico_id, diaSemana]
       );
       let valido = false;
-      for (const config of horariosConfig.rows) {
+      for (const config of horariosConfig) {
         if (horario_escolhido >= config.hora_inicio && horario_escolhido < config.hora_fim) {
           valido = true;
           break;
         }
       }
       if (!valido) {
-        return res.status(400).json({ error: 'Horário fora do expediente do médico.' });
+        return res.status(400).json({ error: 'Horário escolhido não está no expediente do médico.' });
       }
 
       // Verifica conflito com consultas existentes
-      const conflito = await pool.query(
-        `SELECT id FROM consultas WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 AND status NOT IN ($4, $5)`,
+      const [conflito] = await pool.query(
+        'SELECT id FROM consultas WHERE data_consulta = ? AND horario = ? AND medico_id = ? AND status NOT IN (?, ?)',
         [s.data_consulta, horario_escolhido, s.medico_id, 'cancelada', 'realizada']
       );
-      if (conflito.rows.length > 0) {
+      if (conflito.length > 0) {
         return res.status(400).json({ error: 'Horário já ocupado para este médico.' });
       }
 
-      // Cria a consulta
-      const consultaResult = await pool.query(
+      // Cria consulta
+      const [result] = await pool.query(
         `INSERT INTO consultas
-         (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta, horario, medico_id, medico_nome, observacoes, numero_pedido, criado_por)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+         (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta, horario,
+          medico_id, medico_nome, observacoes, numero_pedido, criado_por)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [s.paciente_nome, s.paciente_telefone, s.paciente_email, s.paciente_cpf,
          s.data_consulta, horario_escolhido, s.medico_id, s.medico_nome,
          s.observacoes, s.numero_pedido, s.solicitado_por]
       );
-      const consultaId = consultaResult.rows[0].id;
+      const consultaId = result.insertId;
       await agendarLembrete(consultaId, s.paciente_nome, s.paciente_telefone, s.data_consulta,
         horario_escolhido, s.medico_nome, s.medico_id, s.solicitado_por, s.numero_pedido);
-      await pool.query('UPDATE solicitacoes_consultas SET horario_escolhido = $1 WHERE id = $2', [horario_escolhido, req.params.id]);
+      await pool.query('UPDATE solicitacoes_consultas SET horario_escolhido = ? WHERE id = ?', [horario_escolhido, req.params.id]);
     }
 
-    await pool.query('UPDATE solicitacoes_consultas SET status = $1 WHERE id = $2', [status, req.params.id]);
+    await pool.query('UPDATE solicitacoes_consultas SET status = ? WHERE id = ?', [status, req.params.id]);
     res.json({ message: `Solicitação ${status} com sucesso` });
   } catch (error) {
     console.error('❌ Erro ao atualizar solicitação:', error);
