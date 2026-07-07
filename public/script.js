@@ -79,12 +79,18 @@ function atualizarIdadeDisplay() {
     const idade = calcularIdade(dataNasc);
     document.getElementById('idadeDisplay').innerHTML = idade !== null ? `Idade: ${idade} anos` : '';
 }
+document.addEventListener('change', function(e) {
+    if (e.target.id === 'pacienteDataNasc') atualizarIdadeDisplay();
+});
 
 function atualizarIdadeSol() {
     const dataNasc = document.getElementById('solPacienteDataNasc')?.value;
     const idade = calcularIdade(dataNasc);
     document.getElementById('solIdadeDisplay').innerHTML = idade !== null ? `Idade: ${idade} anos` : '';
 }
+document.addEventListener('change', function(e) {
+    if (e.target.id === 'solPacienteDataNasc') atualizarIdadeSol();
+});
 
 // Lógica dos checkboxes Encaixe/Neurodivergente/Deficiência Física
 function setupEncaixeLogic(encaixeId, neuroId, defId) {
@@ -121,6 +127,134 @@ function setupEncaixeLogic(encaixeId, neuroId, defId) {
 
     update();
 }
+
+// ========================================================================
+// NAVEGAÇÃO ENTRE PÁGINAS E SUB-PÁGINAS
+// ========================================================================
+
+// Navegar para uma página principal (Lista, Calendário, etc.)
+function navegarPara(pageId) {
+    // Ocultar todas as páginas
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const target = document.getElementById(pageId);
+    if (target) target.classList.add('active');
+
+    // Atualizar menu lateral
+    document.querySelectorAll('.menu-item').forEach(btn => btn.classList.remove('active'));
+    const menuBtn = document.querySelector(`.menu-item[data-page="${pageId}"]`);
+    if (menuBtn) menuBtn.classList.add('active');
+
+    // Se for página admin, mostrar a primeira sub-página (Médicos) por padrão
+    if (pageId === 'pageAdmin') {
+        mostrarSubPage('medicos');
+    }
+
+    // Se for página de perfil, carregar dados
+    if (pageId === 'pagePerfil') {
+        document.getElementById('perfilNome').textContent = user.nome;
+        document.getElementById('perfilUsername').textContent = user.username;
+        document.getElementById('perfilTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+        document.getElementById('perfilLoja').textContent = user.loja_nome || 'Não vinculado';
+    }
+
+    // Recarregar listas conforme a página
+    if (pageId === 'pageLista') renderizarLista();
+    if (pageId === 'pageCalendario') renderizarCalendario();
+    if (pageId === 'pageDashboard' && user.tipo === 'admin') carregarDashboard();
+
+    fecharMenu();
+}
+
+// Mostrar uma sub-página dentro do admin
+function mostrarSubPage(subId) {
+    if (user.tipo !== 'admin') {
+        showToast('Acesso negado.', true);
+        return;
+    }
+
+    // Ocultar todas as sub-páginas
+    document.querySelectorAll('#pageAdmin .sub-page').forEach(el => el.classList.remove('active'));
+    const target = document.getElementById('sub' + subId.charAt(0).toUpperCase() + subId.slice(1));
+    if (target) target.classList.add('active');
+
+    // Atualizar abas do admin
+    document.querySelectorAll('.admin-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
+    const tabBtn = document.querySelector(`.admin-tabs .tab-btn[data-sub="${subId}"]`);
+    if (tabBtn) tabBtn.classList.add('active');
+
+    // Carregar dados específicos
+    if (subId === 'solicitacoes') carregarSolicitacoes();
+    if (subId === 'whatsapp') carregarConfigWhatsapp();
+    if (subId === 'usuarios') {
+        renderUsuarios();
+        preencherSelectLojas();
+    }
+    if (subId === 'lojas') carregarLojas();
+    if (subId === 'configImpressao') carregarConfigImpressao();
+    if (subId === 'medicos') {
+        renderMedicos();
+        // Ocultar horários de médico
+        document.getElementById('horariosMedico').style.display = 'none';
+    }
+    if (subId === 'pacientes') renderPacientes();
+}
+
+// ========================================================================
+// MENU LATERAL (Hamburger)
+// ========================================================================
+function abrirMenu() {
+    document.getElementById('sideMenu').classList.add('open');
+    document.getElementById('menuOverlay').classList.add('show');
+}
+
+function fecharMenu() {
+    document.getElementById('sideMenu').classList.remove('open');
+    document.getElementById('menuOverlay').classList.remove('show');
+}
+
+// Inicializar eventos do menu
+document.addEventListener('DOMContentLoaded', function() {
+    const hamburger = document.getElementById('hamburgerBtn');
+    const closeBtn = document.getElementById('closeMenuBtn');
+    const overlay = document.getElementById('menuOverlay');
+
+    if (hamburger) {
+        hamburger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            abrirMenu();
+        });
+    }
+    if (closeBtn) {
+        closeBtn.addEventListener('click', fecharMenu);
+    }
+    if (overlay) {
+        overlay.addEventListener('click', fecharMenu);
+    }
+
+    // Eventos dos itens do menu
+    document.querySelectorAll('.menu-item').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const page = this.getAttribute('data-page');
+            const sub = this.getAttribute('data-sub');
+            if (sub) {
+                // Se tem sub, navega para página admin e mostra sub
+                navegarPara('pageAdmin');
+                mostrarSubPage(sub);
+            } else if (page) {
+                navegarPara(page);
+            }
+            fecharMenu();
+        });
+    });
+
+    // Eventos das abas do admin (clique nas tabs)
+    document.querySelectorAll('.admin-tabs .tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const sub = this.getAttribute('data-sub');
+            if (sub) mostrarSubPage(sub);
+        });
+    });
+});
 
 // ========================================================================
 // LOGIN
@@ -179,7 +313,6 @@ async function fazerLogin() {
         fecharMenu();
         navegarPara('pageLista');
 
-        // Configurar lógica de encaixe após carregar
         setTimeout(() => {
             setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
             setupEncaixeLogic('pacienteCadEncaixe', 'pacienteCadNeurodivergente', 'pacienteCadDeficienciaFisica');
@@ -880,6 +1013,12 @@ async function carregarHorariosDisponiveis() {
     }
 }
 
+document.addEventListener('change', function(e) {
+    if (e.target.id === 'medicoSelect' || e.target.id === 'dataConsulta') {
+        carregarHorariosDisponiveis();
+    }
+});
+
 // ========================================================================
 // CARREGAR HORÁRIOS DISPONÍVEIS (SOLICITAÇÃO)
 // ========================================================================
@@ -936,6 +1075,12 @@ async function carregarHorariosDisponiveisSol() {
         msgDiv.innerHTML = `⚠️ ${err.message}`;
     }
 }
+
+document.addEventListener('change', function(e) {
+    if (e.target.id === 'solMedicoSelect' || e.target.id === 'solDataConsulta') {
+        carregarHorariosDisponiveisSol();
+    }
+});
 
 // ========================================================================
 // CONSULTAS (CRUD)
@@ -1002,6 +1147,7 @@ function renderizarLista() {
     }
     const isAdmin = user.tipo === 'admin';
     container.innerHTML = consultas.map(c => {
+        const isOwn = c.is_own;
         const status = c.status || 'agendada';
         let statusClass = 'status-agendada';
         if (status === 'cancelada') statusClass = 'status-cancelada';
@@ -1012,13 +1158,14 @@ function renderizarLista() {
         const podeEditar = isAdmin && !isRealizada && status !== 'cancelada';
 
         let actions = '';
+        let extraClass = '';
         let infoHtml = '';
         const hasPedido = c.numero_pedido ? `<br><small>📦 Pedido: ${escapeHtml(c.numero_pedido)}</small>` : '';
         const lojaStr = c.loja_nome ? `<br><small>🏢 ${escapeHtml(c.loja_nome)}</small>` : '';
 
         if (isAdmin) {
             actions = `
-                <div class="actions">
+                <div style="display:flex; gap:5px; flex-wrap:wrap;">
                     ${podeEditar ? `<button onclick="editarConsulta(${c.id})" class="btn-warning">✏️</button>` : ''}
                     ${podeEditar ? `<button onclick="cancelarConsulta(${c.id})" class="btn-danger">🚫</button>` : ''}
                     ${podeEditar ? `<button onclick="excluirConsulta(${c.id})" class="btn-danger">🗑️</button>` : ''}
@@ -1028,7 +1175,7 @@ function renderizarLista() {
                         `<button onclick="processarConsulta(${c.id})" class="btn-process">🔄 Processar</button>` : ''}
                     <button onclick="enviarWhatsAppPaciente(${c.id})" class="btn-whatsapp">📱 WhatsApp</button>
                     <button onclick="enviarWhatsAppMedico(${c.id})" class="btn-medico">📱 Médico</button>
-                    <button onclick="abrirModalImpressao(${c.id})" class="btn-print">🖨️ Imprimir</button>
+                    <button onclick="abrirModalImpressao(${c.id})" class="btn-print">🖨️ Imprimir Comprovante</button>
                 </div>
             `;
             infoHtml = `
@@ -1041,10 +1188,9 @@ function renderizarLista() {
                 <br><small>👤 Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
             `;
         } else {
-            // Vendedor
-            if (c.is_own) {
+            if (isOwn) {
                 actions = `
-                    <div class="actions">
+                    <div style="display:flex; gap:5px; flex-wrap:wrap;">
                         <button onclick="mostrarDetalhes(${c.id})" class="btn-primary">👁️ Ver</button>
                     </div>
                 `;
@@ -1058,10 +1204,10 @@ function renderizarLista() {
                     <br><small>👤 Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
                 `;
             } else {
-                // Consulta de outro vendedor - apenas visualização básica
+                extraClass = 'other-vendor';
                 infoHtml = `
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <span style="font-weight:bold; color:#a0aec0;">⏰ Horário agendado</span>
+                        <span style="font-weight:bold; color:#a0aec0;">⏰ Horário já agendado</span>
                         <span style="font-size:12px; color:#718096;">(${formatDisplay(c.data_consulta)} ${c.horario})</span>
                     </div>
                     <small style="color:#a0aec0;">Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
@@ -1070,8 +1216,10 @@ function renderizarLista() {
         }
 
         const isRealizadaClass = isRealizada ? 'consulta-realizada' : '';
-        return `<div class="consulta-card ${isRealizadaClass}" onclick="mostrarDetalhes(${c.id})" style="cursor:pointer;">
-            <div class="info">${infoHtml}</div>
+        return `<div class="consulta-card ${extraClass} ${isRealizadaClass}" onclick="mostrarDetalhes(${c.id})" style="cursor:pointer;">
+            <div class="info">
+                ${infoHtml}
+            </div>
             ${actions}
         </div>`;
     }).join('');
@@ -1288,30 +1436,61 @@ function gerarComprovante(id, tipo) {
     let html = `
         <div class="comprovante-container" style="padding-left:${config.marginLeft}px; padding-right:${config.marginRight}px; padding-top:${config.marginTop}px;">
             <div class="comprovante-conteudo">
-                <div class="header-loja">${escapeHtml(lojaNome)}</div>
-                ${lojaEndereco ? `<div class="header-endereco-loja">${escapeHtml(lojaEndereco)}</div>` : ''}
-                <div class="header-vendedor">Vendedor: ${escapeHtml(vendedorNome)}</div>
-                <h2>Comprovante de Consulta</h2>
-                <div class="detalhe"><span class="label">Paciente:</span><span class="valor">${escapeHtml(c.paciente_nome)}</span></div>
-                <div class="detalhe"><span class="label">Data:</span><span class="valor">${dataFormatada}</span></div>
-                <div class="detalhe"><span class="label">Horário:</span><span class="valor">${c.horario}</span></div>
-                <div class="detalhe"><span class="label">Médico:</span><span class="valor">Dr. ${escapeHtml(c.medico_nome)}</span></div>
-                <div class="detalhe"><span class="label">Status:</span><span class="valor">${statusLabel}</span></div>
-                <div class="detalhe"><span class="label">Condição:</span><span class="valor">${condicao}</span></div>
-                <div class="detalhe"><span class="label">Pedido:</span><span class="valor">${pedido}</span></div>
-                ${c.observacoes ? `<div class="detalhe"><span class="label">Observações:</span><span class="valor">${escapeHtml(c.observacoes)}</span></div>` : ''}
-                <div class="rodape-medico">
-                    <div>Endereço do médico:</div>
-                    <div class="endereco-medico">${escapeHtml(enderecoMedico)}</div>
+                <div class="header-loja" style="font-size:22px; font-weight:700; margin-bottom:4px;">${escapeHtml(lojaNome)}</div>
+                ${lojaEndereco ? `<div class="header-endereco-loja" style="font-size:14px; color:#4a5568; margin-bottom:12px;">${escapeHtml(lojaEndereco)}</div>` : ''}
+                <div class="header-vendedor" style="font-size:14px; color:#4a5568; margin-bottom:16px; font-weight:500;">Vendedor: ${escapeHtml(vendedorNome)}</div>
+                <h2 style="text-align:center; border-bottom:2px solid #2d3748; padding-bottom:10px; font-size:20px; font-weight:600; color:#2d3748; margin-bottom:16px; word-wrap:break-word; overflow-wrap:break-word;">Comprovante de Consulta</h2>
+                <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                    <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Paciente:</span>
+                    <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${escapeHtml(c.paciente_nome)}</span>
                 </div>
-                <div class="rodape-final">Este comprovante é válido como comprovação de agendamento.</div>
+                <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                    <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Data:</span>
+                    <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${dataFormatada}</span>
+                </div>
+                <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                    <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Horário:</span>
+                    <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${c.horario}</span>
+                </div>
+                <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                    <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Médico:</span>
+                    <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">Dr. ${escapeHtml(c.medico_nome)}</span>
+                </div>
+                <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                    <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Status:</span>
+                    <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${statusLabel}</span>
+                </div>
+                <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                    <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Condição:</span>
+                    <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${condicao}</span>
+                </div>
+                <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                    <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Pedido:</span>
+                    <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${pedido}</span>
+                </div>
+                ${c.observacoes ? `<div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                    <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Observações:</span>
+                    <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${escapeHtml(c.observacoes)}</span>
+                </div>` : ''}
+                
+                <div class="rodape-medico" style="margin-top:16px; padding-top:12px; border-top:2px solid #2d3748; text-align:center; font-size:15px; font-weight:500; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                    <div>Endereço do médico:</div>
+                    <div class="endereco-medico" style="font-weight:400; color:#4a5568; font-size:15px; word-wrap:break-word; overflow-wrap:break-word;">${escapeHtml(enderecoMedico)}</div>
+                </div>
+                <div class="rodape-final" style="text-align:center; font-size:12px; color:#a0aec0; margin-top:12px; border-top:1px solid #e2e8f0; padding-top:10px; word-wrap:break-word; overflow-wrap:break-word;">Este comprovante é válido como comprovação de agendamento.</div>
             </div>
-            <button onclick="fecharComprovante()" class="no-print">Fechar</button>
+            <button onclick="fecharComprovante()" class="no-print" style="display:block; margin:16px auto 0 auto; padding:8px 24px; background:#e53e3e; color:white; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Fechar</button>
         </div>
     `;
 
     if (tipo === 'bobina') {
         html = html.replace('comprovante-container', 'comprovante-container comprovante-bobina');
+        html = html.replace(/font-size:22px/g, 'font-size:18px');
+        html = html.replace(/font-size:14px/g, 'font-size:11px');
+        html = html.replace(/font-size:15px/g, 'font-size:11px');
+        html = html.replace(/padding:6px 0/g, 'padding:3px 0');
+        html = html.replace(/font-size:20px/g, 'font-size:15px');
+        html = html.replace(/font-size:16px/g, 'font-size:13px');
     }
 
     const comprovanteDiv = document.getElementById('comprovante');
@@ -1953,10 +2132,11 @@ async function atualizarBadgeSolicitacoes() {
                 b.style.display = data.total > 0 ? 'inline' : 'none';
             }
         });
-        if (data.total > _ultimoContadorSolic && data.total > 0) {
+        if (window._ultimoContadorSolic === undefined) window._ultimoContadorSolic = 0;
+        if (data.total > window._ultimoContadorSolic && data.total > 0) {
             showToast(`📩 ${data.total} nova(s) solicitação(ões)`);
         }
-        _ultimoContadorSolic = data.total;
+        window._ultimoContadorSolic = data.total;
     } catch (err) { console.error(err); }
 }
 
@@ -2143,7 +2323,7 @@ function salvarConfigImpressao() {
 }
 
 // ========================================================================
-// NAVEGAÇÃO
+// NAVEGAÇÃO DO CALENDÁRIO
 // ========================================================================
 function mudarView(view) { currentView = view; renderizarCalendario(); }
 function hoje() { currentDate = new Date(); renderizarCalendario(); }
@@ -2158,82 +2338,6 @@ function proximo() {
     else if (currentView === 'week') currentDate.setDate(currentDate.getDate() + 7);
     else currentDate.setDate(currentDate.getDate() + 1);
     renderizarCalendario();
-}
-
-function navegarPara(pageId) {
-    // Esconde todas as páginas
-    document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
-    const target = document.getElementById(pageId);
-    if (target) target.classList.add('active');
-
-    // Remove active de todos os itens do menu
-    document.querySelectorAll('.menu-item').forEach(btn => btn.classList.remove('active'));
-    // Ativa o item do menu correspondente
-    const menuBtn = document.querySelector(`.menu-item[data-page="${pageId}"]`);
-    if (menuBtn) menuBtn.classList.add('active');
-
-    // Se for página de admin, mostra a primeira sub-página (médicos) por padrão
-    if (pageId === 'pageAdmin') {
-        mostrarSubPage('medicos');
-    }
-
-    // Carrega conteúdos específicos
-    if (pageId === 'pageLista') renderizarLista();
-    else if (pageId === 'pageCalendario') renderizarCalendario();
-    else if (pageId === 'pageDashboard' && user.tipo === 'admin') carregarDashboard();
-    else if (pageId === 'pagePerfil') {
-        document.getElementById('perfilNome').textContent = user.nome;
-        document.getElementById('perfilUsername').textContent = user.username;
-        document.getElementById('perfilTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
-        document.getElementById('perfilLoja').textContent = user.loja_nome || 'Não vinculado';
-    }
-
-    fecharMenu();
-}
-
-function mostrarSubPage(subId) {
-    if (user.tipo !== 'admin') { showToast('Acesso negado.', true); return; }
-    // Esconde todas as sub-páginas
-    document.querySelectorAll('#pageAdmin .sub-page').forEach(el => el.classList.remove('active'));
-    const target = document.getElementById('sub' + subId.charAt(0).toUpperCase() + subId.slice(1));
-    if (target) target.classList.add('active');
-
-    // Atualiza as tabs
-    document.querySelectorAll('#pageAdmin .tab-btn').forEach(btn => btn.classList.remove('active'));
-    const tabBtn = document.querySelector(`#pageAdmin .tab-btn[data-sub="${subId}"]`);
-    if (tabBtn) tabBtn.classList.add('active');
-
-    // Carrega dados específicos
-    if (subId === 'solicitacoes') carregarSolicitacoes();
-    if (subId === 'whatsapp') carregarConfigWhatsapp();
-    if (subId === 'usuarios') {
-        renderUsuarios();
-        preencherSelectLojas();
-    }
-    if (subId === 'lojas') carregarLojas();
-    if (subId === 'configImpressao') carregarConfigImpressao();
-
-    // Garante que a página Admin está ativa
-    document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
-    document.getElementById('pageAdmin').classList.add('active');
-    // Ativa o item do menu Admin
-    document.querySelectorAll('.menu-item').forEach(btn => btn.classList.remove('active'));
-    const menuBtn = document.querySelector(`.menu-item[data-page="pageAdmin"]`);
-    if (menuBtn) menuBtn.classList.add('active');
-
-    fecharMenu();
-}
-
-// ========================================================================
-// MENU LATERAL
-// ========================================================================
-function abrirMenu() {
-    document.getElementById('sideMenu').classList.add('open');
-    document.getElementById('menuOverlay').classList.add('show');
-}
-function fecharMenu() {
-    document.getElementById('sideMenu').classList.remove('open');
-    document.getElementById('menuOverlay').classList.remove('show');
 }
 
 // ========================================================================
@@ -2311,65 +2415,9 @@ function logout() {
 }
 
 // ========================================================================
-// INICIALIZAÇÃO
+// AUTO LOGIN
 // ========================================================================
-document.addEventListener('DOMContentLoaded', function() {
-    // Menu hambúrguer
-    const hamburger = document.getElementById('hamburgerBtn');
-    const closeBtn = document.getElementById('closeMenuBtn');
-    const overlay = document.getElementById('menuOverlay');
-
-    if (hamburger) {
-        hamburger.addEventListener('click', function(e) {
-            e.stopPropagation();
-            abrirMenu();
-        });
-    }
-    if (closeBtn) {
-        closeBtn.addEventListener('click', fecharMenu);
-    }
-    if (overlay) {
-        overlay.addEventListener('click', fecharMenu);
-    }
-
-    // Eventos dos itens do menu (sidebar)
-    document.querySelectorAll('.menu-item').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const page = this.getAttribute('data-page');
-            const sub = this.getAttribute('data-sub');
-            if (sub) {
-                mostrarSubPage(sub);
-            } else if (page) {
-                navegarPara(page);
-            }
-            fecharMenu();
-        });
-    });
-
-    // Tabs do admin
-    document.querySelectorAll('#pageAdmin .tab-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const sub = this.getAttribute('data-sub');
-            if (sub) {
-                mostrarSubPage(sub);
-            }
-        });
-    });
-
-    // Eventos de change para horários
-    document.getElementById('medicoSelect')?.addEventListener('change', carregarHorariosDisponiveis);
-    document.getElementById('dataConsulta')?.addEventListener('change', carregarHorariosDisponiveis);
-    document.getElementById('solMedicoSelect')?.addEventListener('change', carregarHorariosDisponiveisSol);
-    document.getElementById('solDataConsulta')?.addEventListener('change', carregarHorariosDisponiveisSol);
-
-    // Fechar modais ao clicar fora
-    document.querySelectorAll('.modal-overlay').forEach(modal => {
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) modal.classList.remove('show');
-        });
-    });
-
-    // Auto-login
+(function() {
     const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
     if (savedToken && savedUser) {
@@ -2426,6 +2474,13 @@ document.addEventListener('DOMContentLoaded', function() {
             localStorage.clear();
         });
     }
+})();
 
-    console.log('✅ Sistema Agenda Médica - carregado com sucesso!');
+// Fechar modais ao clicar fora
+document.querySelectorAll('.modal-overlay').forEach(modal => {
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.remove('show');
+    });
 });
+
+console.log('✅ Sistema completo com configurações de impressão personalizáveis.');
