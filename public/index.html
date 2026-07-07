@@ -6,7 +6,7 @@
     <title>Ótica Macaé - Agenda Médica</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* ======= RESET E ESTILOS GERAIS (mesmo de antes) ======= */
+        /* ======= RESET ======= */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; }
         .login-box { max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -599,13 +599,32 @@
                 </div>
             </div>
 
-            <!-- SUB PÁGINA LOJAS – SEM FORMULÁRIO, SEM BOTÃO SALVAR -->
+            <!-- SUB PÁGINA LOJAS – COM CRUD -->
             <div id="subLojas" class="sub-page">
-                <div style="background:white; padding:20px; border-radius:10px;">
-                    <h3>Lojas Cadastradas</h3>
-                    <p style="font-size:13px; color:#666; margin-bottom:15px;">
-                        Para cadastrar novas lojas, utilize o banco de dados (script SQL fornecido).
-                    </p>
+                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h3 style="margin:0;">Gerenciar Lojas</h3>
+                        <button onclick="abrirFormLoja()" class="btn-success" id="btnNovaLoja">
+                            <i class="fas fa-plus"></i> Nova Loja
+                        </button>
+                    </div>
+
+                    <!-- Formulário de cadastro/edição (escondido inicialmente) -->
+                    <div id="formLoja" style="display:none; background:#f7fafc; padding:15px; border-radius:8px; margin-bottom:20px; border:1px solid #e2e8f0;">
+                        <h4 id="formLojaTitulo">Nova Loja</h4>
+                        <div class="form-row">
+                            <input type="text" id="lojaNome" placeholder="Nome *" style="flex:2;">
+                            <input type="text" id="lojaEndereco" placeholder="Endereço" style="flex:3;">
+                        </div>
+                        <input type="hidden" id="editLojaId">
+                        <div style="display:flex; gap:10px; margin-top:10px;">
+                            <button onclick="salvarLoja()" class="btn-success" id="btnSalvarLoja">Salvar</button>
+                            <button onclick="cancelarFormLoja()" style="background:#ccc; color:#333;">Cancelar</button>
+                        </div>
+                        <div id="lojaMsg" style="margin-top:10px;"></div>
+                    </div>
+
+                    <!-- Lista de lojas -->
                     <div id="lojasList"></div>
                 </div>
             </div>
@@ -1080,8 +1099,29 @@
         }
 
         // ========================================================================
-        // LOJAS – APENAS LISTAGEM E EXCLUSÃO (SEM FORMULÁRIO)
+        // LOJAS – CRUD COMPLETO COM FORMULÁRIO
         // ========================================================================
+
+        // Abrir formulário para nova loja
+        function abrirFormLoja() {
+            document.getElementById('formLoja').style.display = 'block';
+            document.getElementById('formLojaTitulo').textContent = 'Nova Loja';
+            document.getElementById('editLojaId').value = '';
+            document.getElementById('lojaNome').value = '';
+            document.getElementById('lojaEndereco').value = '';
+            document.getElementById('lojaMsg').innerHTML = '';
+            document.getElementById('btnNovaLoja').style.display = 'none';
+            document.getElementById('formLoja').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Cancelar formulário
+        function cancelarFormLoja() {
+            document.getElementById('formLoja').style.display = 'none';
+            document.getElementById('btnNovaLoja').style.display = 'inline-block';
+            document.getElementById('lojaMsg').innerHTML = '';
+        }
+
+        // Carregar lojas da API
         async function carregarLojas() {
             try {
                 const res = await fetch(`${API_URL}/lojas`, {
@@ -1096,10 +1136,11 @@
             }
         }
 
+        // Renderizar lista de lojas
         function renderLojas() {
             const container = document.getElementById('lojasList');
             if (!container) return;
-            if (lojas.length === 0) {
+            if (!lojas || lojas.length === 0) {
                 container.innerHTML = '<p class="no-data">Nenhuma loja cadastrada.</p>';
                 return;
             }
@@ -1107,29 +1148,95 @@
                 <div style="border-bottom:1px solid #ddd; padding:10px; display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <strong>${escapeHtml(l.nome)}</strong><br>
-                        ${l.endereco || ''}
+                        ${l.endereco ? escapeHtml(l.endereco) : ''}
                     </div>
                     <div>
+                        <button onclick="editarLoja(${l.id})" class="btn-warning" style="margin-right:5px;">✏️</button>
                         <button onclick="excluirLoja(${l.id})" class="btn-danger">🗑️</button>
                     </div>
                 </div>
             `).join('');
         }
 
+        // Preencher select de lojas (para usuários)
         function preencherSelectLojas() {
             const select = document.getElementById('usuarioLoja');
-            if (select) {
-                select.innerHTML = '<option value="">Selecione uma loja</option>' +
-                    lojas.map(l => `<option value="${l.id}">${l.nome}</option>`).join('');
+            if (!select) return;
+            select.innerHTML = '<option value="">Selecione uma loja</option>' +
+                lojas.map(l => `<option value="${l.id}">${l.nome}</option>`).join('');
+        }
+
+        // Salvar loja (nova ou edição)
+        async function salvarLoja() {
+            const nomeInput = document.getElementById('lojaNome');
+            const enderecoInput = document.getElementById('lojaEndereco');
+            const msgDiv = document.getElementById('lojaMsg');
+
+            const nome = nomeInput.value.trim();
+            const endereco = enderecoInput.value.trim();
+
+            if (!nome) {
+                msgDiv.innerHTML = '<p style="color:red;">O nome da loja é obrigatório.</p>';
+                return;
+            }
+
+            const editId = document.getElementById('editLojaId').value;
+            const url = editId ? `${API_URL}/lojas/${editId}` : `${API_URL}/lojas`;
+            const method = editId ? 'PUT' : 'POST';
+
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ nome, endereco })
+                });
+
+                const result = await res.json();
+                if (!res.ok) {
+                    throw new Error(result.error || 'Erro ao salvar loja');
+                }
+
+                showToast(editId ? 'Loja atualizada!' : 'Loja cadastrada!');
+                cancelarFormLoja();
+                await carregarLojas();
+                preencherSelectLojas();
+            } catch (err) {
+                msgDiv.innerHTML = `<p style="color:red;">${err.message}</p>`;
+                showToast(err.message, true);
             }
         }
 
-        // Função para excluir (mantida)
+        // Editar loja (preenche o formulário com os dados)
+        function editarLoja(id) {
+            const l = lojas.find(loj => loj.id === id);
+            if (!l) return;
+
+            document.getElementById('formLoja').style.display = 'block';
+            document.getElementById('formLojaTitulo').textContent = 'Editar Loja';
+            document.getElementById('editLojaId').value = l.id;
+            document.getElementById('lojaNome').value = l.nome || '';
+            document.getElementById('lojaEndereco').value = l.endereco || '';
+            document.getElementById('lojaMsg').innerHTML = '';
+            document.getElementById('btnNovaLoja').style.display = 'none';
+            document.getElementById('formLoja').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Excluir loja
         async function excluirLoja(id) {
             if (!confirm('Excluir esta loja?')) return;
             try {
-                await fetch(`${API_URL}/lojas/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-                showToast('Excluída');
+                const res = await fetch(`${API_URL}/lojas/${id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Erro ao excluir');
+                }
+                showToast('Loja excluída!');
                 await carregarLojas();
                 preencherSelectLojas();
             } catch (err) {
@@ -3163,7 +3270,7 @@
             if (e.target === this) fecharModalImpressao();
         });
 
-        console.log('✅ Sistema completo com configurações de impressão personalizáveis.');
+        console.log('✅ Sistema completo com CRUD de lojas e configurações de impressão.');
     </script>
 </body>
 </html>
