@@ -6,7 +6,7 @@
     <title>Ótica Macaé - Agenda Médica</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* ======= RESET ======= */
+        /* ======= RESET E ESTILOS GERAIS (mesmo de antes) ======= */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; }
         .login-box { max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -425,7 +425,7 @@
                     <input type="text" id="pacienteCpf" placeholder="CPF">
                     <div style="flex:1; display:flex; flex-direction:column; gap:3px;">
                         <label for="pacienteDataNasc" style="font-size:13px; font-weight:500; color:#4a5568;">Data de Nascimento</label>
-                        <input type="date" id="pacienteDataNasc" placeholder="Data Nascimento" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:5px;">
+                        <input type="date" id="pacienteDataNasc" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:5px;">
                     </div>
                 </div>
                 <div class="form-row">
@@ -599,11 +599,13 @@
                 </div>
             </div>
 
-            <!-- SUB PÁGINA LOJAS – SEM FORMULÁRIO DE CADASTRO, APENAS LISTAGEM -->
+            <!-- SUB PÁGINA LOJAS – SEM FORMULÁRIO, SEM BOTÃO SALVAR -->
             <div id="subLojas" class="sub-page">
                 <div style="background:white; padding:20px; border-radius:10px;">
                     <h3>Lojas Cadastradas</h3>
-                    <p style="font-size:13px; color:#666; margin-bottom:15px;">Para cadastrar novas lojas, utilize o banco de dados diretamente (SQL).</p>
+                    <p style="font-size:13px; color:#666; margin-bottom:15px;">
+                        Para cadastrar novas lojas, utilize o banco de dados (script SQL fornecido).
+                    </p>
                     <div id="lojasList"></div>
                 </div>
             </div>
@@ -674,7 +676,7 @@
                 <input type="text" id="solPacienteCpf" placeholder="CPF">
                 <div style="flex:1; display:flex; flex-direction:column; gap:3px;">
                     <label for="solPacienteDataNasc" style="font-size:13px; font-weight:500; color:#4a5568;">Data de Nascimento</label>
-                    <input type="date" id="solPacienteDataNasc" placeholder="Data Nascimento" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:5px;">
+                    <input type="date" id="solPacienteDataNasc" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:5px;">
                 </div>
             </div>
             <div class="form-row">
@@ -1078,7 +1080,7 @@
         }
 
         // ========================================================================
-        // LOJAS (CRUD) – APENAS LISTAGEM E EDIÇÃO/EXCLUSÃO (SEM CADASTRO)
+        // LOJAS – APENAS LISTAGEM E EXCLUSÃO (SEM FORMULÁRIO)
         // ========================================================================
         async function carregarLojas() {
             try {
@@ -1108,8 +1110,7 @@
                         ${l.endereco || ''}
                     </div>
                     <div>
-                        <button onclick="editarLoja(${l.id})">✏️</button>
-                        <button onclick="excluirLoja(${l.id})">🗑️</button>
+                        <button onclick="excluirLoja(${l.id})" class="btn-danger">🗑️</button>
                     </div>
                 </div>
             `).join('');
@@ -1123,20 +1124,7 @@
             }
         }
 
-        // Função para editar (mantida, pois o botão de editar existe)
-        async function salvarLoja() {
-            // Esta função não é mais usada para cadastro, mas mantida para edição se for chamada.
-            // Mas como não há formulário, não deve ser chamada.
-            showToast('Cadastro de lojas desabilitado. Use o banco de dados.', true);
-        }
-
-        function editarLoja(id) {
-            // Como não há formulário de cadastro, a edição não será possível pelo front-end.
-            // Mas se você quiser implementar edição, pode adicionar um formulário inline.
-            // Por enquanto, apenas exibimos uma mensagem.
-            showToast('Edição de lojas não disponível via front-end. Use o banco de dados.', true);
-        }
-
+        // Função para excluir (mantida)
         async function excluirLoja(id) {
             if (!confirm('Excluir esta loja?')) return;
             try {
