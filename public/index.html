@@ -64,8 +64,8 @@
                 </div>
             </div>
             <ul class="menu-list">
-                <li><button class="menu-item active" data-page="pageLista"><i class="fas fa-list"></i> Lista de Consultas</button></li>
-                <li><button class="menu-item" data-page="pageCalendario"><i class="fas fa-calendar-alt"></i> Calendário</button></li>
+                <li><button class="menu-item" data-page="pageLista"><i class="fas fa-list"></i> Lista de Consultas</button></li>
+                <li><button class="menu-item active" data-page="pageCalendario"><i class="fas fa-calendar-alt"></i> Calendário</button></li>
                 <li><button class="menu-item" data-page="pageAgendar" id="menuAgendar"><i class="fas fa-pen"></i> Agendar</button></li>
                 <li><button class="menu-item" data-page="pageSolicitar" style="background:#48bb78; color:white;"><i class="fas fa-paper-plane"></i> Solicitar</button></li>
                 <li><button class="menu-item" data-page="pageDashboard" id="menuDashboard"><i class="fas fa-chart-bar"></i> Dashboard</button></li>
@@ -88,13 +88,13 @@
         <main class="main-content">
 
             <!-- ===== PÁGINA: LISTA DE CONSULTAS ===== -->
-            <section id="pageLista" class="page active">
+            <section id="pageLista" class="page">
                 <h2><i class="fas fa-list"></i> Lista de Consultas</h2>
                 <div id="consultasListMain"></div>
             </section>
 
-            <!-- ===== PÁGINA: CALENDÁRIO ===== -->
-            <section id="pageCalendario" class="page">
+            <!-- ===== PÁGINA: CALENDÁRIO (INICIAL) ===== -->
+            <section id="pageCalendario" class="page active">
                 <h2><i class="fas fa-calendar-alt"></i> Calendário de Consultas</h2>
                 <div class="calendar-toolbar">
                     <div class="view-buttons">
@@ -182,7 +182,7 @@
                 <div id="vendedoresRelatorio" class="table-wrapper"></div>
             </section>
 
-            <!-- ===== PÁGINA: ADMIN (com sub-páginas separadas) ===== -->
+            <!-- ===== PÁGINA: ADMIN ===== -->
             <section id="pageAdmin" class="page">
                 <h2><i class="fas fa-cogs"></i> Painel Administrativo</h2>
                 <div class="admin-tabs">
@@ -195,7 +195,7 @@
                     <button class="tab-btn" data-sub="whatsapp">WhatsApp</button>
                 </div>
 
-                <!-- ======= SUB-PÁGINA: MÉDICOS ======= -->
+                <!-- SUB: MÉDICOS -->
                 <div id="subMedicos" class="sub-page active" style="display:block;">
                     <div class="form-card">
                         <h3>Cadastrar Médico</h3>
@@ -246,7 +246,7 @@
                     </div>
                 </div>
 
-                <!-- ======= SUB-PÁGINA: USUÁRIOS ======= -->
+                <!-- SUB: USUÁRIOS -->
                 <div id="subUsuarios" class="sub-page" style="display:none;">
                     <div class="form-card">
                         <h3>Cadastrar Usuário</h3>
@@ -274,7 +274,7 @@
                     </div>
                 </div>
 
-                <!-- ======= SUB-PÁGINA: PACIENTES ======= -->
+                <!-- SUB: PACIENTES -->
                 <div id="subPacientes" class="sub-page" style="display:none;">
                     <div class="form-card">
                         <h3>Cadastrar Paciente</h3>
@@ -304,7 +304,7 @@
                     </div>
                 </div>
 
-                <!-- ======= SUB-PÁGINA: LOJAS ======= -->
+                <!-- SUB: LOJAS -->
                 <div id="subLojas" class="sub-page" style="display:none;">
                     <div class="form-card">
                         <h3>Cadastrar Loja</h3>
@@ -324,7 +324,7 @@
                     </div>
                 </div>
 
-                <!-- ======= SUB-PÁGINA: CONFIGURAÇÃO DE IMPRESSÃO ======= -->
+                <!-- SUB: CONFIG IMPRESSÃO -->
                 <div id="subConfigImpressao" class="sub-page" style="display:none;">
                     <div class="form-card">
                         <h3>🖨️ Configurações de Impressão</h3>
@@ -343,7 +343,7 @@
                     </div>
                 </div>
 
-                <!-- ======= SUB-PÁGINA: SOLICITAÇÕES ======= -->
+                <!-- SUB: SOLICITAÇÕES -->
                 <div id="subSolicitacoes" class="sub-page" style="display:none;">
                     <div class="list-card">
                         <h3>Solicitações de Consulta</h3>
@@ -351,7 +351,7 @@
                     </div>
                 </div>
 
-                <!-- ======= SUB-PÁGINA: WHATSAPP ======= -->
+                <!-- SUB: WHATSAPP -->
                 <div id="subWhatsapp" class="sub-page" style="display:none;">
                     <div class="form-card">
                         <h3>Configurar WhatsApp</h3>

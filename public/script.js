@@ -144,7 +144,7 @@ function navegarPara(pageId) {
     const menuBtn = document.querySelector(`.menu-item[data-page="${pageId}"]`);
     if (menuBtn) menuBtn.classList.add('active');
 
-    // Se for página admin, mostrar a primeira sub-página (Médicos) por padrão
+    // Se for página admin, mostrar a primeira sub-página (Médicos)
     if (pageId === 'pageAdmin') {
         mostrarSubPage('medicos');
     }
@@ -322,7 +322,7 @@ async function fazerLogin() {
             carregarConfigImpressao();
         }
         fecharMenu();
-        navegarPara('pageLista');
+        navegarPara('pageCalendario');
 
         setTimeout(() => {
             setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
