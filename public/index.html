@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ótica Macaé - Agenda Médica</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <link rel="stylesheet" href="style.css" />
@@ -10,499 +10,499 @@
 <body>
 
     <!-- ========== LOGIN ========== -->
-    <div id="loginDiv" class="login-box">
-        <h2 style="text-align:center;">Ótica Macaé</h2>
-        <p style="text-align:center;">Sistema de Agenda Médica</p>
-        <input type="text" id="username" placeholder="Usuário" value="admin" />
-        <input type="password" id="password" placeholder="Senha" value="admin123" />
-        <button onclick="fazerLogin()">Entrar</button>
-        <p style="text-align:center; font-size:12px; margin-top:15px;">
-            Admin: admin / admin123 | Vendedor: vendedor / vender123
-        </p>
-        <div id="loginMsg"></div>
+    <div id="loginDiv" class="login-wrapper">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo-icon"><i class="fas fa-eye"></i></div>
+                <h2>Ótica Macaé</h2>
+                <p>Sistema de Agenda Médica</p>
+            </div>
+            <div class="login-form">
+                <input type="text" id="username" placeholder="Usuário" value="admin" />
+                <input type="password" id="password" placeholder="Senha" value="admin123" />
+                <button onclick="fazerLogin()">Entrar</button>
+                <div id="loginMsg" class="login-msg"></div>
+                <div class="login-footer">
+                    <small>Admin: admin / admin123</small>
+                    <small>Vendedor: vendedor / vender123</small>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- ========== DASHBOARD ========== -->
     <div id="dashboardDiv" class="dashboard" style="display:none;">
 
-        <!-- HEADER -->
-        <div class="header">
+        <!-- TOP HEADER -->
+        <header class="main-header">
             <div class="header-left">
-                <button class="hamburger" id="hamburgerBtn">☰</button>
-                <div class="header-title"><h2>📅 Agenda Médica</h2></div>
+                <button id="hamburgerBtn" class="hamburger"><i class="fas fa-bars"></i></button>
+                <h1>📅 Agenda Médica</h1>
             </div>
             <div class="header-right">
-                <span id="userName"></span>
-                <span id="lojaNome" style="font-size:13px; color:#718096; margin-left:10px;"></span>
-                <button onclick="abrirModalLembretes()" style="background:transparent; border:none; font-size:20px; position:relative; color:#2d3748;">
+                <span id="userName" class="user-badge"></span>
+                <span id="lojaNome" class="loja-badge"></span>
+                <button onclick="abrirModalLembretes()" class="icon-btn" title="Lembretes">
                     <i class="fas fa-bell"></i>
-                    <span id="badgeLembretes" class="badge" style="display:none;">0</span>
+                    <span id="badgeLembretes" class="badge">0</span>
                 </button>
-                <button onclick="abrirModalPerfil()" style="background:transparent; border:none; font-size:20px; color:#2d3748;" title="Alterar Senha">
+                <button onclick="abrirModalPerfil()" class="icon-btn" title="Perfil">
                     <i class="fas fa-user-cog"></i>
                 </button>
-                <button class="btn-sair" onclick="logout()">Sair</button>
+                <button onclick="logout()" class="btn-logout">Sair</button>
             </div>
-        </div>
+        </header>
 
-        <!-- MENU LATERAL -->
-        <div class="menu-overlay" id="menuOverlay"></div>
-        <div class="side-menu" id="sideMenu">
-            <button class="close-menu" id="closeMenuBtn">&times;</button>
-            <div class="user-info">
-                <span class="nome" id="menuUserName">Usuário</span>
-                <span class="tipo" id="menuUserTipo">tipo</span>
-                <span class="tipo" id="menuLojaNome" style="font-size:12px; opacity:0.7;"></span>
-            </div>
-            <hr style="border-color: #4a5568; margin: 10px 0;" />
-            <button class="menu-item active" data-page="pageLista">📋 Lista de Consultas</button>
-            <button class="menu-item" data-page="pageCalendario">📅 Calendário</button>
-            <button class="menu-item" data-page="pageAgendar" id="menuAgendar">📝 Agendar</button>
-            <button class="menu-item" data-page="pageSolicitar" style="background:#48bb78; color:white;">📝 Solicitar</button>
-            <button class="menu-item" data-page="pageDashboard" id="menuDashboard">📊 Dashboard</button>
-            <button class="menu-item" data-page="pageAdmin" id="menuAdmin">⚙️ Admin</button>
-            <hr style="border-color: #4a5568; margin: 10px 0;" />
-            <button class="menu-item" data-page="pageAdmin" data-sub="medicos">👨‍⚕️ Médicos</button>
-            <button class="menu-item" data-page="pageAdmin" data-sub="usuarios">👥 Usuários</button>
-            <button class="menu-item" data-page="pageAdmin" data-sub="pacientes">🧑‍⚕️ Pacientes</button>
-            <button class="menu-item" data-page="pageAdmin" data-sub="lojas">🏢 Lojas</button>
-            <button class="menu-item" data-page="pageAdmin" data-sub="configImpressao">🖨️ Configurar Impressão</button>
-            <button class="menu-item" data-page="pageAdmin" data-sub="solicitacoes">📩 Solicitações <span id="badgeSolicitacoesMenu" class="badge" style="display:none;">0</span></button>
-            <button class="menu-item" data-page="pageAdmin" data-sub="whatsapp">📱 WhatsApp</button>
-            <hr style="border-color: #4a5568; margin: 10px 0;" />
-            <button class="menu-item" data-page="pagePerfil">👤 Meu Perfil</button>
-        </div>
-
-        <!-- PÁGINAS -->
-        <div id="pageLista" class="page-section active">
-            <h3>📋 Lista de Consultas</h3>
-            <div id="consultasListMain"></div>
-        </div>
-
-        <div id="pageCalendario" class="page-section">
-            <h3>📅 Calendário de Consultas</h3>
-            <div style="margin-bottom:20px;">
-                <div class="view-buttons">
-                    <button onclick="mudarView('month')">📅 Mês</button>
-                    <button onclick="mudarView('week')" class="active">📆 Semana</button>
-                    <button onclick="mudarView('day')">📋 Dia</button>
-                    <button onclick="hoje()">Hoje</button>
-                    <button onclick="anterior()">◀</button>
-                    <button onclick="proximo()">▶</button>
-                </div>
-                <div id="tituloCalendario" class="calendario-titulo"></div>
-                <div id="calendarioContainer"></div>
-            </div>
-        </div>
-
-        <div id="pageAgendar" class="page-section">
-            <h3>📝 Agendar Consulta (Admin)</h3>
-            <div class="admin-panel">
-                <!-- Formulário de agendamento (mantido igual) -->
-                <div class="form-row">
-                    <div style="flex:1; display:flex; gap:5px;">
-                        <input type="text" id="buscarCpf" placeholder="Buscar paciente por CPF" style="flex:1;" />
-                        <button onclick="buscarPacientePorCpf()" style="background:#48bb78;">🔍</button>
-                    </div>
-                    <button onclick="limparBuscaPaciente()" style="background:#f56565;">Limpar</button>
-                </div>
-                <div class="form-row">
-                    <div style="flex:2; display:flex; gap:5px; align-items:center;">
-                        <select id="pacienteSelect" style="flex:1;">
-                            <option value="">Selecione um paciente</option>
-                        </select>
-                        <button onclick="abrirModalCadastroPaciente()" style="background:#48bb78; padding:10px 15px;">+</button>
-                    </div>
-                    <input type="text" id="pacienteNome" placeholder="Nome *" style="flex:1;" />
-                    <input type="text" id="pacienteTelefone" placeholder="Telefone *" style="flex:1;" />
-                </div>
-                <div class="form-row">
-                    <input type="email" id="pacienteEmail" placeholder="E-mail" />
-                    <input type="text" id="pacienteCpf" placeholder="CPF" />
-                    <div style="flex:1; display:flex; flex-direction:column; gap:3px;">
-                        <label for="pacienteDataNasc" style="font-size:13px; font-weight:500; color:#4a5568;">Data de Nascimento</label>
-                        <input type="date" id="pacienteDataNasc" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:5px;" />
-                    </div>
-                </div>
-                <div class="form-row">
-                    <label><input type="checkbox" id="pacienteEncaixe" checked /> Encaixe</label>
-                    <label><input type="checkbox" id="pacienteNeurodivergente" disabled /> Neurodivergente</label>
-                    <label><input type="checkbox" id="pacienteDeficienciaFisica" disabled /> Deficiência Física</label>
-                    <span id="idadeDisplay" style="font-size:14px; padding:10px; background:#f7fafc; border-radius:5px;"></span>
-                </div>
-                <div class="form-row">
-                    <input type="date" id="dataConsulta" />
-                    <select id="horarioSelect">
-                        <option value="">Selecione médico e data</option>
-                    </select>
-                </div>
-                <div id="msgHorarios" class="msg-horarios" style="display:none;"></div>
-                <div class="form-row">
-                    <select id="medicoSelect"></select>
-                    <input type="text" id="observacoes" placeholder="Observações" />
-                </div>
-                <div class="form-row">
-                    <input type="text" id="numeroPedido" placeholder="Número do Pedido (opcional)" style="flex:1;" />
-                </div>
-                <input type="hidden" id="editConsultaId" />
-                <button onclick="salvarConsulta()">💾 Salvar</button>
-                <button id="cancelEditBtn" onclick="cancelarEdicao()" style="display:none;">Cancelar</button>
-            </div>
-        </div>
-
-        <div id="pageDashboard" class="page-section">
-            <h3>📊 Dashboard de Métricas</h3>
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:15px; margin-bottom:25px;">
-                <div class="dashboard-card" style="background:#667eea; color:white;">
-                    <span class="numero" id="totalConsultas">0</span>
-                    <span class="label" style="color:rgba(255,255,255,0.8);">Total Consultas</span>
-                </div>
-                <div class="dashboard-card" style="background:#48bb78; color:white;">
-                    <span class="numero" id="totalMedicos">0</span>
-                    <span class="label" style="color:rgba(255,255,255,0.8);">Médicos</span>
-                </div>
-                <div class="dashboard-card" style="background:#ed8936; color:white;">
-                    <span class="numero" id="totalAgendadas">0</span>
-                    <span class="label" style="color:rgba(255,255,255,0.8);">Agendadas</span>
-                </div>
-                <div class="dashboard-card" style="background:#38a169; color:white;">
-                    <span class="numero" id="totalConfirmadas">0</span>
-                    <span class="label" style="color:rgba(255,255,255,0.8);">Confirmadas</span>
-                </div>
-                <div class="dashboard-card" style="background:#9b59b6; color:white;">
-                    <span class="numero" id="totalRealizadas">0</span>
-                    <span class="label" style="color:rgba(255,255,255,0.8);">Realizadas</span>
-                </div>
-                <div class="dashboard-card" style="background:#f56565; color:white;">
-                    <span class="numero" id="totalCanceladas">0</span>
-                    <span class="label" style="color:rgba(255,255,255,0.8);">Canceladas</span>
+        <!-- SIDEBAR -->
+        <nav class="sidebar" id="sideMenu">
+            <div class="sidebar-header">
+                <button id="closeMenuBtn" class="close-btn"><i class="fas fa-times"></i></button>
+                <div class="user-card">
+                    <span id="menuUserName" class="user-name">Usuário</span>
+                    <span id="menuUserTipo" class="user-role">tipo</span>
+                    <span id="menuLojaNome" class="user-store"></span>
                 </div>
             </div>
-            <h4>📋 Consultas por Vendedor</h4>
-            <div id="vendedoresRelatorio"></div>
-        </div>
+            <ul class="menu-list">
+                <li><button class="menu-item active" data-page="pageLista"><i class="fas fa-list"></i> Lista de Consultas</button></li>
+                <li><button class="menu-item" data-page="pageCalendario"><i class="fas fa-calendar-alt"></i> Calendário</button></li>
+                <li><button class="menu-item" data-page="pageAgendar" id="menuAgendar"><i class="fas fa-pen"></i> Agendar</button></li>
+                <li><button class="menu-item" data-page="pageSolicitar" style="background:#48bb78; color:white;"><i class="fas fa-paper-plane"></i> Solicitar</button></li>
+                <li><button class="menu-item" data-page="pageDashboard" id="menuDashboard"><i class="fas fa-chart-bar"></i> Dashboard</button></li>
+                <li><button class="menu-item" data-page="pageAdmin" id="menuAdmin"><i class="fas fa-cogs"></i> Admin</button></li>
+                <hr />
+                <li><button class="menu-item" data-page="pageAdmin" data-sub="medicos"><i class="fas fa-user-md"></i> Médicos</button></li>
+                <li><button class="menu-item" data-page="pageAdmin" data-sub="usuarios"><i class="fas fa-users"></i> Usuários</button></li>
+                <li><button class="menu-item" data-page="pageAdmin" data-sub="pacientes"><i class="fas fa-user-injured"></i> Pacientes</button></li>
+                <li><button class="menu-item" data-page="pageAdmin" data-sub="lojas"><i class="fas fa-store"></i> Lojas</button></li>
+                <li><button class="menu-item" data-page="pageAdmin" data-sub="configImpressao"><i class="fas fa-print"></i> Config. Impressão</button></li>
+                <li><button class="menu-item" data-page="pageAdmin" data-sub="solicitacoes"><i class="fas fa-inbox"></i> Solicitações <span id="badgeSolicitacoesMenu" class="badge">0</span></button></li>
+                <li><button class="menu-item" data-page="pageAdmin" data-sub="whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</button></li>
+                <hr />
+                <li><button class="menu-item" data-page="pagePerfil"><i class="fas fa-id-card"></i> Meu Perfil</button></li>
+            </ul>
+        </nav>
+        <div class="sidebar-overlay" id="menuOverlay"></div>
 
-        <div id="pageAdmin" class="page-section">
-            <h3>⚙️ Painel Administrativo</h3>
-            <!-- Sub-páginas (medicos, usuarios, pacientes, lojas, configImpressao, solicitacoes, whatsapp) -->
-            <!-- Mantenha todo o conteúdo original dentro de cada sub-page -->
-            <div id="subMedicos" class="sub-page active">
-                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
-                    <h3>Cadastrar Médico</h3>
-                    <div class="form-row">
-                        <input type="text" id="medicoNome" placeholder="Nome *" />
-                        <input type="text" id="medicoCrm" placeholder="CRM *" />
-                    </div>
-                    <div class="form-row">
-                        <input type="text" id="medicoTelefone" placeholder="Telefone" />
-                        <input type="email" id="medicoEmail" placeholder="E-mail" />
-                        <input type="text" id="medicoWhatsapp" placeholder="WhatsApp" />
-                    </div>
-                    <div class="form-row">
-                        <input type="text" id="medicoEspecialidade" placeholder="Especialidade *" style="flex:1;" />
-                    </div>
-                    <div class="form-row">
-                        <textarea id="medicoEndereco" placeholder="Endereço" rows="2" style="flex:1;"></textarea>
-                    </div>
-                    <div class="form-row">
-                        <textarea id="medicoMensagemPadrao" placeholder="Mensagem padrão para paciente" rows="3" style="flex:1;"></textarea>
-                    </div>
-                    <input type="hidden" id="editMedicoId" />
-                    <button onclick="salvarMedico()">Salvar</button>
-                    <button id="cancelMedicoBtn" onclick="cancelarEdicaoMedico()" style="display:none;">Cancelar</button>
-                </div>
-                <div style="background:white; padding:20px; border-radius:10px;">
-                    <h3>Médicos Cadastrados</h3>
-                    <div id="medicosList"></div>
-                </div>
-                <div id="horariosMedico" style="display:none; background:#f8f9fa; padding:20px; border-radius:10px; margin-top:20px;">
-                    <h4>Gerenciar Horários de Atendimento</h4>
-                    <div id="horariosList"></div>
-                    <div style="margin-top:15px; display:flex; flex-wrap:wrap; gap:10px;">
-                        <select id="horarioDiaSemana" style="flex:1; min-width:120px;">
-                            <option value="0">Domingo</option>
-                            <option value="1">Segunda</option>
-                            <option value="2">Terça</option>
-                            <option value="3">Quarta</option>
-                            <option value="4">Quinta</option>
-                            <option value="5">Sexta</option>
-                            <option value="6">Sábado</option>
-                        </select>
-                        <input type="time" id="horarioInicio" value="08:00" style="flex:1;" />
-                        <input type="time" id="horarioFim" value="17:00" style="flex:1;" />
-                        <input type="number" id="horarioIntervalo" value="30" min="10" max="60" step="5" style="width:80px;" />
-                        <button onclick="adicionarHorarioMedico()" class="btn-success">Adicionar</button>
-                        <button onclick="cancelarEdicaoHorario()" id="cancelHorarioBtn" style="display:none;">Cancelar</button>
-                    </div>
-                    <input type="hidden" id="editHorarioId" />
-                </div>
-            </div>
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
 
-            <div id="subUsuarios" class="sub-page">
-                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
-                    <h3>Cadastrar Usuário</h3>
-                    <div class="form-row">
-                        <input type="text" id="usuarioNome" placeholder="Nome *" />
-                        <input type="text" id="usuarioUsername" placeholder="Username *" />
-                    </div>
-                    <div class="form-row">
-                        <input type="password" id="usuarioSenha" placeholder="Senha *" />
-                        <input type="text" id="usuarioTelefone" placeholder="Telefone * (obrigatório p/ vendedor)" />
-                    </div>
-                    <div class="form-row">
-                        <select id="usuarioTipo">
-                            <option value="vendedor">Vendedor</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                        <select id="usuarioLoja">
-                            <option value="">Selecione uma loja</option>
-                        </select>
-                    </div>
-                    <input type="hidden" id="editUsuarioId" />
-                    <button onclick="salvarUsuario()">Salvar</button>
-                    <button id="cancelUsuarioBtn" onclick="cancelarEdicaoUsuario()" style="display:none;">Cancelar</button>
-                </div>
-                <div style="background:white; padding:20px; border-radius:10px;">
-                    <h3>Usuários Cadastrados</h3>
-                    <div id="usuariosList"></div>
-                </div>
-            </div>
+            <!-- PÁGINA: LISTA DE CONSULTAS -->
+            <section id="pageLista" class="page active">
+                <h2><i class="fas fa-list"></i> Lista de Consultas</h2>
+                <div id="consultasListMain"></div>
+            </section>
 
-            <div id="subPacientes" class="sub-page">
-                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
-                    <h3>Cadastrar Paciente</h3>
-                    <div class="form-row">
-                        <input type="text" id="pacienteCadNome" placeholder="Nome *" />
-                        <input type="text" id="pacienteCadTelefone" placeholder="Telefone *" />
+            <!-- PÁGINA: CALENDÁRIO -->
+            <section id="pageCalendario" class="page">
+                <h2><i class="fas fa-calendar-alt"></i> Calendário de Consultas</h2>
+                <div class="calendar-toolbar">
+                    <div class="view-buttons">
+                        <button onclick="mudarView('month')">Mês</button>
+                        <button onclick="mudarView('week')" class="active">Semana</button>
+                        <button onclick="mudarView('day')">Dia</button>
                     </div>
-                    <div class="form-row">
-                        <input type="email" id="pacienteCadEmail" placeholder="E-mail" />
-                        <input type="text" id="pacienteCadCpf" placeholder="CPF" />
-                        <input type="date" id="pacienteCadDataNasc" placeholder="Data Nascimento" />
+                    <div class="nav-buttons">
+                        <button onclick="anterior()"><i class="fas fa-chevron-left"></i></button>
+                        <button onclick="hoje()">Hoje</button>
+                        <button onclick="proximo()"><i class="fas fa-chevron-right"></i></button>
                     </div>
-                    <div class="form-row">
-                        <label><input type="checkbox" id="pacienteCadEncaixe" checked /> Encaixe</label>
-                        <label><input type="checkbox" id="pacienteCadNeurodivergente" disabled /> Neurodivergente</label>
-                        <label><input type="checkbox" id="pacienteCadDeficienciaFisica" disabled /> Deficiência Física</label>
-                    </div>
-                    <input type="hidden" id="editPacienteId" />
-                    <button onclick="salvarPaciente()">Salvar</button>
-                    <button id="cancelPacienteBtn" onclick="cancelarEdicaoPaciente()" style="display:none;">Cancelar</button>
+                    <span id="tituloCalendario" class="calendar-title"></span>
                 </div>
-                <div style="background:white; padding:20px; border-radius:10px;">
-                    <h3>Pacientes Cadastrados</h3>
-                    <div id="pacientesList"></div>
-                </div>
-            </div>
+                <div id="calendarioContainer" class="calendar-container"></div>
+            </section>
 
-            <div id="subLojas" class="sub-page">
-                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
-                    <h3>Cadastrar Loja</h3>
+            <!-- PÁGINA: AGENDAR (admin) -->
+            <section id="pageAgendar" class="page">
+                <h2><i class="fas fa-pen"></i> Agendar Consulta</h2>
+                <div class="form-card">
+                    <!-- Campos do formulário... (mantido) -->
+                    <!-- Inclua todo o conteúdo do formulário igual ao anterior -->
                     <div class="form-row">
-                        <input type="text" id="lojaNome" placeholder="Nome *" />
-                        <input type="text" id="lojaEndereco" placeholder="Endereço" />
-                    </div>
-                    <input type="hidden" id="editLojaId" />
-                    <button onclick="salvarLoja()">Salvar</button>
-                    <button id="cancelLojaBtn" onclick="cancelarEdicaoLoja()" style="display:none;">Cancelar</button>
-                </div>
-                <div style="background:white; padding:20px; border-radius:10px;">
-                    <h3>Lojas Cadastradas</h3>
-                    <div id="lojasList"></div>
-                </div>
-            </div>
-
-            <div id="subConfigImpressao" class="sub-page">
-                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
-                    <h3>🖨️ Configurações de Impressão</h3>
-                    <p style="color:#666; font-size:14px; margin-bottom:15px;">Ajuste as margens e a altura do cabeçalho do comprovante.</p>
-                    <div class="form-row">
-                        <div style="flex:1; min-width:120px;">
-                            <label style="display:block; font-size:13px; color:#4a5568;">Margem Esquerda (px)</label>
-                            <input type="number" id="printMarginLeft" value="20" min="0" max="100" style="width:100%;" />
-                        </div>
-                        <div style="flex:1; min-width:120px;">
-                            <label style="display:block; font-size:13px; color:#4a5568;">Margem Direita (px)</label>
-                            <input type="number" id="printMarginRight" value="20" min="0" max="100" style="width:100%;" />
-                        </div>
-                        <div style="flex:1; min-width:120px;">
-                            <label style="display:block; font-size:13px; color:#4a5568;">Margem Superior (px)</label>
-                            <input type="number" id="printMarginTop" value="20" min="0" max="100" style="width:100%;" />
-                        </div>
-                        <div style="flex:1; min-width:120px;">
-                            <label style="display:block; font-size:13px; color:#4a5568;">Altura do Cabeçalho (px)</label>
-                            <input type="number" id="printHeaderHeight" value="80" min="40" max="200" style="width:100%;" />
+                        <div class="form-group" style="flex:2; display:flex; gap:5px;">
+                            <input type="text" id="buscarCpf" placeholder="Buscar paciente por CPF" style="flex:1;" />
+                            <button onclick="buscarPacientePorCpf()" class="btn-secondary">🔍</button>
+                            <button onclick="limparBuscaPaciente()" class="btn-danger">Limpar</button>
                         </div>
                     </div>
-                    <button onclick="salvarConfigImpressao()" class="btn-success">Salvar Configurações</button>
-                    <button onclick="carregarConfigImpressao()" style="background:#718096;">Restaurar Padrão</button>
-                    <div id="configImpressaoMsg" style="margin-top:10px;"></div>
-                </div>
-            </div>
-
-            <div id="subSolicitacoes" class="sub-page">
-                <div style="background:white; padding:20px; border-radius:10px;">
-                    <h3>Solicitações de Consulta</h3>
-                    <div id="solicitacoesList"></div>
-                </div>
-            </div>
-
-            <div id="subWhatsapp" class="sub-page">
-                <div style="background:white; padding:20px; border-radius:10px;">
-                    <h3>Configurar WhatsApp</h3>
                     <div class="form-row">
-                        <input type="text" id="whatsappNumero" placeholder="Número da Ótica" />
-                        <input type="text" id="whatsappEndereco" placeholder="Endereço" />
+                        <div class="form-group" style="flex:2; display:flex; gap:5px; align-items:center;">
+                            <select id="pacienteSelect" style="flex:1;">
+                                <option value="">Selecione um paciente</option>
+                            </select>
+                            <button onclick="abrirModalCadastroPaciente()" class="btn-success">+</button>
+                        </div>
+                        <div class="form-group">
+                            <input type="text" id="pacienteNome" placeholder="Nome *" />
+                        </div>
+                        <div class="form-group">
+                            <input type="text" id="pacienteTelefone" placeholder="Telefone *" />
+                        </div>
                     </div>
-                    <button onclick="salvarConfigWhatsapp()">Salvar</button>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <input type="email" id="pacienteEmail" placeholder="E-mail" />
+                        </div>
+                        <div class="form-group">
+                            <input type="text" id="pacienteCpf" placeholder="CPF" />
+                        </div>
+                        <div class="form-group">
+                            <label for="pacienteDataNasc">Data Nascimento</label>
+                            <input type="date" id="pacienteDataNasc" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group check-group">
+                            <label><input type="checkbox" id="pacienteEncaixe" checked /> Encaixe</label>
+                            <label><input type="checkbox" id="pacienteNeurodivergente" disabled /> Neurodivergente</label>
+                            <label><input type="checkbox" id="pacienteDeficienciaFisica" disabled /> Deficiência Física</label>
+                        </div>
+                        <div class="form-group">
+                            <span id="idadeDisplay" class="idade-display"></span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <input type="date" id="dataConsulta" />
+                        </div>
+                        <div class="form-group">
+                            <select id="horarioSelect">
+                                <option value="">Selecione médico e data</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="msgHorarios" class="msg-horarios"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <select id="medicoSelect"></select>
+                        </div>
+                        <div class="form-group">
+                            <input type="text" id="observacoes" placeholder="Observações" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <input type="text" id="numeroPedido" placeholder="Número do Pedido (opcional)" />
+                        </div>
+                    </div>
+                    <input type="hidden" id="editConsultaId" />
+                    <div class="form-actions">
+                        <button onclick="salvarConsulta()" class="btn-primary">💾 Salvar</button>
+                        <button id="cancelEditBtn" onclick="cancelarEdicao()" class="btn-secondary" style="display:none;">Cancelar</button>
+                    </div>
                 </div>
-            </div>
-        </div>
+            </section>
 
-        <div id="pageSolicitar" class="page-section">
-            <h3>📝 Solicitar Consulta</h3>
-            <p style="font-size:13px; color:#666;">Preencha os dados. Se o CPF não estiver cadastrado, o paciente será criado automaticamente.</p>
-            <div class="form-row">
-                <div style="flex:1; display:flex; gap:5px;">
-                    <input type="text" id="solBuscarCpf" placeholder="Buscar por CPF" style="flex:1;" />
-                    <button onclick="buscarPacienteSol()" style="background:#48bb78;">🔍</button>
+            <!-- PÁGINA: DASHBOARD -->
+            <section id="pageDashboard" class="page">
+                <h2><i class="fas fa-chart-bar"></i> Dashboard</h2>
+                <div class="dashboard-grid">
+                    <div class="stat-card primary"><span class="numero" id="totalConsultas">0</span><span class="label">Total Consultas</span></div>
+                    <div class="stat-card success"><span class="numero" id="totalMedicos">0</span><span class="label">Médicos</span></div>
+                    <div class="stat-card warning"><span class="numero" id="totalAgendadas">0</span><span class="label">Agendadas</span></div>
+                    <div class="stat-card info"><span class="numero" id="totalConfirmadas">0</span><span class="label">Confirmadas</span></div>
+                    <div class="stat-card purple"><span class="numero" id="totalRealizadas">0</span><span class="label">Realizadas</span></div>
+                    <div class="stat-card danger"><span class="numero" id="totalCanceladas">0</span><span class="label">Canceladas</span></div>
                 </div>
-            </div>
-            <div class="form-row">
-                <input type="text" id="solPacienteNome" placeholder="Nome *" />
-                <input type="text" id="solPacienteTelefone" placeholder="Telefone *" />
-            </div>
-            <div class="form-row">
-                <input type="email" id="solPacienteEmail" placeholder="E-mail" />
-                <input type="text" id="solPacienteCpf" placeholder="CPF" />
-                <div style="flex:1; display:flex; flex-direction:column; gap:3px;">
-                    <label for="solPacienteDataNasc" style="font-size:13px; font-weight:500; color:#4a5568;">Data de Nascimento</label>
-                    <input type="date" id="solPacienteDataNasc" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:5px;" />
-                </div>
-            </div>
-            <div class="form-row">
-                <label><input type="checkbox" id="solEncaixe" checked /> Encaixe</label>
-                <label><input type="checkbox" id="solNeurodivergente" disabled /> Neurodivergente</label>
-                <label><input type="checkbox" id="solDeficienciaFisica" disabled /> Deficiência Física</label>
-                <span id="solIdadeDisplay" style="font-size:14px; padding:10px; background:#f7fafc; border-radius:5px;"></span>
-            </div>
-            <div class="form-row">
-                <input type="date" id="solDataConsulta" />
-                <select id="solHorario1" style="flex:1;">
-                    <option value="">1º Horário *</option>
-                </select>
-                <select id="solHorario2" style="flex:1;">
-                    <option value="">2º Horário (opcional)</option>
-                </select>
-                <select id="solHorario3" style="flex:1;">
-                    <option value="">3º Horário (opcional)</option>
-                </select>
-            </div>
-            <div id="solMsgHorarios" class="msg-horarios" style="display:none;"></div>
-            <div class="form-row">
-                <select id="solMedicoSelect"></select>
-                <input type="text" id="solObservacoes" placeholder="Observações" />
-            </div>
-            <div class="form-row">
-                <input type="text" id="solNumeroPedido" placeholder="Número do Pedido (opcional)" style="flex:1;" />
-            </div>
-            <button onclick="enviarSolicitacao()" class="btn-success" id="btnEnviarSolicitacao">Enviar Solicitação</button>
-            <div id="solMsg" style="margin-top:10px;"></div>
-        </div>
+                <h3>Consultas por Vendedor</h3>
+                <div id="vendedoresRelatorio" class="table-wrapper"></div>
+            </section>
 
-        <div id="pagePerfil" class="page-section">
-            <h3>👤 Meu Perfil</h3>
-            <div style="max-width:500px; margin:0 auto;">
-                <div class="form-row">
-                    <label style="width:100%;"><strong>Nome:</strong> <span id="perfilNome"></span></label>
+            <!-- PÁGINA: ADMIN (painel com sub-abas) -->
+            <section id="pageAdmin" class="page">
+                <h2><i class="fas fa-cogs"></i> Painel Administrativo</h2>
+                <div class="admin-tabs">
+                    <button class="tab-btn active" data-sub="medicos">Médicos</button>
+                    <button class="tab-btn" data-sub="usuarios">Usuários</button>
+                    <button class="tab-btn" data-sub="pacientes">Pacientes</button>
+                    <button class="tab-btn" data-sub="lojas">Lojas</button>
+                    <button class="tab-btn" data-sub="configImpressao">Impressão</button>
+                    <button class="tab-btn" data-sub="solicitacoes">Solicitações</button>
+                    <button class="tab-btn" data-sub="whatsapp">WhatsApp</button>
                 </div>
-                <div class="form-row">
-                    <label style="width:100%;"><strong>Usuário:</strong> <span id="perfilUsername"></span></label>
+                <!-- Conteúdo das sub-páginas (mantido) -->
+                <div id="subMedicos" class="sub-page active">
+                    <!-- Conteúdo igual ao anterior -->
+                    <div class="form-card">
+                        <h3>Cadastrar Médico</h3>
+                        <div class="form-row">
+                            <div class="form-group"><input type="text" id="medicoNome" placeholder="Nome *" /></div>
+                            <div class="form-group"><input type="text" id="medicoCrm" placeholder="CRM *" /></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><input type="text" id="medicoTelefone" placeholder="Telefone" /></div>
+                            <div class="form-group"><input type="email" id="medicoEmail" placeholder="E-mail" /></div>
+                            <div class="form-group"><input type="text" id="medicoWhatsapp" placeholder="WhatsApp" /></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><input type="text" id="medicoEspecialidade" placeholder="Especialidade *" /></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><textarea id="medicoEndereco" placeholder="Endereço" rows="2"></textarea></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><textarea id="medicoMensagemPadrao" placeholder="Mensagem padrão" rows="3"></textarea></div>
+                        </div>
+                        <input type="hidden" id="editMedicoId" />
+                        <div class="form-actions">
+                            <button onclick="salvarMedico()" class="btn-primary">Salvar</button>
+                            <button id="cancelMedicoBtn" onclick="cancelarEdicaoMedico()" class="btn-secondary" style="display:none;">Cancelar</button>
+                        </div>
+                    </div>
+                    <div class="list-card">
+                        <h3>Médicos Cadastrados</h3>
+                        <div id="medicosList"></div>
+                    </div>
+                    <div id="horariosMedico" class="horarios-card" style="display:none;">
+                        <h4>Gerenciar Horários</h4>
+                        <div id="horariosList"></div>
+                        <div class="form-row">
+                            <select id="horarioDiaSemana">
+                                <option value="0">Domingo</option><option value="1">Segunda</option><option value="2">Terça</option>
+                                <option value="3">Quarta</option><option value="4">Quinta</option><option value="5">Sexta</option>
+                                <option value="6">Sábado</option>
+                            </select>
+                            <input type="time" id="horarioInicio" value="08:00" />
+                            <input type="time" id="horarioFim" value="17:00" />
+                            <input type="number" id="horarioIntervalo" value="30" min="10" max="60" step="5" style="width:80px;" />
+                            <button onclick="adicionarHorarioMedico()" class="btn-success">Adicionar</button>
+                            <button id="cancelHorarioBtn" onclick="cancelarEdicaoHorario()" class="btn-secondary" style="display:none;">Cancelar</button>
+                        </div>
+                        <input type="hidden" id="editHorarioId" />
+                    </div>
                 </div>
-                <div class="form-row">
-                    <label style="width:100%;"><strong>Tipo:</strong> <span id="perfilTipo"></span></label>
+                <div id="subUsuarios" class="sub-page">
+                    <div class="form-card">
+                        <h3>Cadastrar Usuário</h3>
+                        <div class="form-row">
+                            <div class="form-group"><input type="text" id="usuarioNome" placeholder="Nome *" /></div>
+                            <div class="form-group"><input type="text" id="usuarioUsername" placeholder="Username *" /></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><input type="password" id="usuarioSenha" placeholder="Senha *" /></div>
+                            <div class="form-group"><input type="text" id="usuarioTelefone" placeholder="Telefone * (vendedor)" /></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><select id="usuarioTipo"><option value="vendedor">Vendedor</option><option value="admin">Admin</option></select></div>
+                            <div class="form-group"><select id="usuarioLoja"><option value="">Selecione uma loja</option></select></div>
+                        </div>
+                        <input type="hidden" id="editUsuarioId" />
+                        <div class="form-actions">
+                            <button onclick="salvarUsuario()" class="btn-primary">Salvar</button>
+                            <button id="cancelUsuarioBtn" onclick="cancelarEdicaoUsuario()" class="btn-secondary" style="display:none;">Cancelar</button>
+                        </div>
+                    </div>
+                    <div class="list-card">
+                        <h3>Usuários Cadastrados</h3>
+                        <div id="usuariosList"></div>
+                    </div>
                 </div>
-                <div class="form-row">
-                    <label style="width:100%;"><strong>Loja:</strong> <span id="perfilLoja"></span></label>
+                <div id="subPacientes" class="sub-page">
+                    <div class="form-card">
+                        <h3>Cadastrar Paciente</h3>
+                        <div class="form-row">
+                            <div class="form-group"><input type="text" id="pacienteCadNome" placeholder="Nome *" /></div>
+                            <div class="form-group"><input type="text" id="pacienteCadTelefone" placeholder="Telefone *" /></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><input type="email" id="pacienteCadEmail" placeholder="E-mail" /></div>
+                            <div class="form-group"><input type="text" id="pacienteCadCpf" placeholder="CPF" /></div>
+                            <div class="form-group"><input type="date" id="pacienteCadDataNasc" placeholder="Data Nascimento" /></div>
+                        </div>
+                        <div class="form-row check-group">
+                            <label><input type="checkbox" id="pacienteCadEncaixe" checked /> Encaixe</label>
+                            <label><input type="checkbox" id="pacienteCadNeurodivergente" disabled /> Neurodivergente</label>
+                            <label><input type="checkbox" id="pacienteCadDeficienciaFisica" disabled /> Deficiência Física</label>
+                        </div>
+                        <input type="hidden" id="editPacienteId" />
+                        <div class="form-actions">
+                            <button onclick="salvarPaciente()" class="btn-primary">Salvar</button>
+                            <button id="cancelPacienteBtn" onclick="cancelarEdicaoPaciente()" class="btn-secondary" style="display:none;">Cancelar</button>
+                        </div>
+                    </div>
+                    <div class="list-card">
+                        <h3>Pacientes Cadastrados</h3>
+                        <div id="pacientesList"></div>
+                    </div>
                 </div>
-                <hr style="margin:20px 0;" />
-                <h4>Alterar Senha</h4>
-                <div class="form-row">
-                    <input type="password" id="perfilSenhaAtual" placeholder="Senha atual *" />
+                <div id="subLojas" class="sub-page">
+                    <div class="form-card">
+                        <h3>Cadastrar Loja</h3>
+                        <div class="form-row">
+                            <div class="form-group"><input type="text" id="lojaNome" placeholder="Nome *" /></div>
+                            <div class="form-group"><input type="text" id="lojaEndereco" placeholder="Endereço" /></div>
+                        </div>
+                        <input type="hidden" id="editLojaId" />
+                        <div class="form-actions">
+                            <button onclick="salvarLoja()" class="btn-primary">Salvar</button>
+                            <button id="cancelLojaBtn" onclick="cancelarEdicaoLoja()" class="btn-secondary" style="display:none;">Cancelar</button>
+                        </div>
+                    </div>
+                    <div class="list-card">
+                        <h3>Lojas Cadastradas</h3>
+                        <div id="lojasList"></div>
+                    </div>
                 </div>
-                <div class="form-row">
-                    <input type="password" id="perfilNovaSenha" placeholder="Nova senha * (mínimo 6 caracteres)" />
+                <div id="subConfigImpressao" class="sub-page">
+                    <div class="form-card">
+                        <h3>🖨️ Configurações de Impressão</h3>
+                        <p>Ajuste margens e cabeçalho do comprovante.</p>
+                        <div class="form-row">
+                            <div class="form-group"><label>Margem Esquerda (px)</label><input type="number" id="printMarginLeft" value="20" /></div>
+                            <div class="form-group"><label>Margem Direita (px)</label><input type="number" id="printMarginRight" value="20" /></div>
+                            <div class="form-group"><label>Margem Superior (px)</label><input type="number" id="printMarginTop" value="20" /></div>
+                            <div class="form-group"><label>Altura Cabeçalho (px)</label><input type="number" id="printHeaderHeight" value="80" /></div>
+                        </div>
+                        <div class="form-actions">
+                            <button onclick="salvarConfigImpressao()" class="btn-success">Salvar</button>
+                            <button onclick="carregarConfigImpressao()" class="btn-secondary">Restaurar Padrão</button>
+                        </div>
+                        <div id="configImpressaoMsg"></div>
+                    </div>
                 </div>
-                <div class="form-row">
-                    <input type="password" id="perfilConfirmarSenha" placeholder="Confirmar nova senha *" />
+                <div id="subSolicitacoes" class="sub-page">
+                    <div class="list-card">
+                        <h3>Solicitações de Consulta</h3>
+                        <div id="solicitacoesList"></div>
+                    </div>
                 </div>
-                <div id="perfilMsg" style="margin:10px 0;"></div>
-                <button onclick="salvarAlterarSenha()" class="btn-success">Salvar Senha</button>
-            </div>
-        </div>
+                <div id="subWhatsapp" class="sub-page">
+                    <div class="form-card">
+                        <h3>Configurar WhatsApp</h3>
+                        <div class="form-row">
+                            <div class="form-group"><input type="text" id="whatsappNumero" placeholder="Número da Ótica" /></div>
+                            <div class="form-group"><input type="text" id="whatsappEndereco" placeholder="Endereço" /></div>
+                        </div>
+                        <button onclick="salvarConfigWhatsapp()" class="btn-primary">Salvar</button>
+                    </div>
+                </div>
+            </section>
 
-        <!-- MODAIS -->
+            <!-- PÁGINA: SOLICITAR CONSULTA -->
+            <section id="pageSolicitar" class="page">
+                <h2><i class="fas fa-paper-plane"></i> Solicitar Consulta</h2>
+                <p class="subtitle">Preencha os dados. Se o CPF não estiver cadastrado, o paciente será criado automaticamente.</p>
+                <div class="form-card">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1; display:flex; gap:5px;">
+                            <input type="text" id="solBuscarCpf" placeholder="Buscar por CPF" style="flex:1;" />
+                            <button onclick="buscarPacienteSol()" class="btn-secondary">🔍</button>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><input type="text" id="solPacienteNome" placeholder="Nome *" /></div>
+                        <div class="form-group"><input type="text" id="solPacienteTelefone" placeholder="Telefone *" /></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><input type="email" id="solPacienteEmail" placeholder="E-mail" /></div>
+                        <div class="form-group"><input type="text" id="solPacienteCpf" placeholder="CPF" /></div>
+                        <div class="form-group">
+                            <label for="solPacienteDataNasc">Data Nascimento</label>
+                            <input type="date" id="solPacienteDataNasc" />
+                        </div>
+                    </div>
+                    <div class="form-row check-group">
+                        <label><input type="checkbox" id="solEncaixe" checked /> Encaixe</label>
+                        <label><input type="checkbox" id="solNeurodivergente" disabled /> Neurodivergente</label>
+                        <label><input type="checkbox" id="solDeficienciaFisica" disabled /> Deficiência Física</label>
+                        <span id="solIdadeDisplay" class="idade-display"></span>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><input type="date" id="solDataConsulta" /></div>
+                        <div class="form-group"><select id="solHorario1"><option value="">1º Horário *</option></select></div>
+                        <div class="form-group"><select id="solHorario2"><option value="">2º Horário (opcional)</option></select></div>
+                        <div class="form-group"><select id="solHorario3"><option value="">3º Horário (opcional)</option></select></div>
+                    </div>
+                    <div id="solMsgHorarios" class="msg-horarios"></div>
+                    <div class="form-row">
+                        <div class="form-group"><select id="solMedicoSelect"></select></div>
+                        <div class="form-group"><input type="text" id="solObservacoes" placeholder="Observações" /></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><input type="text" id="solNumeroPedido" placeholder="Número do Pedido (opcional)" /></div>
+                    </div>
+                    <div class="form-actions">
+                        <button onclick="enviarSolicitacao()" class="btn-success" id="btnEnviarSolicitacao">Enviar Solicitação</button>
+                    </div>
+                    <div id="solMsg" class="form-msg"></div>
+                </div>
+            </section>
+
+            <!-- PÁGINA: PERFIL -->
+            <section id="pagePerfil" class="page">
+                <h2><i class="fas fa-id-card"></i> Meu Perfil</h2>
+                <div class="form-card" style="max-width:500px;">
+                    <div class="info-row"><strong>Nome:</strong> <span id="perfilNome"></span></div>
+                    <div class="info-row"><strong>Usuário:</strong> <span id="perfilUsername"></span></div>
+                    <div class="info-row"><strong>Tipo:</strong> <span id="perfilTipo"></span></div>
+                    <div class="info-row"><strong>Loja:</strong> <span id="perfilLoja"></span></div>
+                    <hr />
+                    <h3>Alterar Senha</h3>
+                    <div class="form-group"><input type="password" id="perfilSenhaAtual" placeholder="Senha atual *" /></div>
+                    <div class="form-group"><input type="password" id="perfilNovaSenha" placeholder="Nova senha * (mín. 6 caracteres)" /></div>
+                    <div class="form-group"><input type="password" id="perfilConfirmarSenha" placeholder="Confirmar nova senha *" /></div>
+                    <div id="perfilMsg" class="form-msg"></div>
+                    <button onclick="salvarAlterarSenha()" class="btn-primary">Salvar Senha</button>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- ========== MODAIS ========== -->
         <div id="modalLembretes" class="modal-overlay">
             <div class="modal-box">
                 <h3><i class="fas fa-bell"></i> Lembretes</h3>
                 <div id="lembretesList"></div>
-                <button onclick="fecharModalLembretes()" style="margin-top:10px;">Fechar</button>
+                <button onclick="fecharModalLembretes()" class="btn-secondary">Fechar</button>
             </div>
         </div>
-
         <div id="modalDetalhes" class="modal-overlay">
             <div class="modal-box">
                 <h3>Detalhes da Consulta</h3>
                 <div id="detalhesBody"></div>
-                <button onclick="fecharModalDetalhes()" style="margin-top:10px;">Fechar</button>
+                <button onclick="fecharModalDetalhes()" class="btn-secondary">Fechar</button>
             </div>
         </div>
-
         <div id="modalCadastroPaciente" class="modal-overlay">
             <div class="modal-box">
                 <h3>Novo Paciente</h3>
                 <div class="form-row">
-                    <input type="text" id="novoPacienteNome" placeholder="Nome *" />
-                    <input type="text" id="novoPacienteTelefone" placeholder="Telefone *" />
+                    <div class="form-group"><input type="text" id="novoPacienteNome" placeholder="Nome *" /></div>
+                    <div class="form-group"><input type="text" id="novoPacienteTelefone" placeholder="Telefone *" /></div>
                 </div>
                 <div class="form-row">
-                    <input type="email" id="novoPacienteEmail" placeholder="E-mail" />
-                    <input type="text" id="novoPacienteCpf" placeholder="CPF" />
-                    <input type="date" id="novoPacienteDataNasc" placeholder="Data Nascimento" />
+                    <div class="form-group"><input type="email" id="novoPacienteEmail" placeholder="E-mail" /></div>
+                    <div class="form-group"><input type="text" id="novoPacienteCpf" placeholder="CPF" /></div>
+                    <div class="form-group"><input type="date" id="novoPacienteDataNasc" placeholder="Data Nascimento" /></div>
                 </div>
-                <div class="form-row">
+                <div class="form-row check-group">
                     <label><input type="checkbox" id="novoPacienteEncaixe" checked /> Encaixe</label>
                     <label><input type="checkbox" id="novoPacienteNeurodivergente" disabled /> Neurodivergente</label>
                     <label><input type="checkbox" id="novoPacienteDeficienciaFisica" disabled /> Deficiência Física</label>
                 </div>
-                <div style="display:flex;gap:10px;margin-top:15px;">
-                    <button onclick="salvarNovoPaciente()" class="btn-success" style="flex:1;">Salvar e Usar</button>
-                    <button onclick="fecharModalCadastroPaciente()" style="flex:1; background:#ccc;">Cancelar</button>
+                <div class="form-actions">
+                    <button onclick="salvarNovoPaciente()" class="btn-success">Salvar e Usar</button>
+                    <button onclick="fecharModalCadastroPaciente()" class="btn-secondary">Cancelar</button>
                 </div>
-                <div id="novoPacienteMsg"></div>
+                <div id="novoPacienteMsg" class="form-msg"></div>
             </div>
         </div>
-
         <div id="modalImpressao" class="modal-overlay">
             <div class="modal-box">
                 <h3>🖨️ Impressão do Comprovante</h3>
-                <p style="margin-bottom:10px; color:#555;">Selecione o formato:</p>
-                <div class="btn-tipo-impressao">
-                    <button class="btn-bobina" onclick="imprimirComprovanteSelecionado('bobina')">🧾 Bobina (80mm)</button>
-                    <button class="btn-a4" onclick="imprimirComprovanteSelecionado('a4')">📄 A4</button>
-                    <button class="btn-pdf" onclick="imprimirComprovanteSelecionado('pdf')">📁 PDF</button>
+                <p>Selecione o formato:</p>
+                <div class="print-options">
+                    <button onclick="imprimirComprovanteSelecionado('bobina')" class="btn-bobina">🧾 Bobina (80mm)</button>
+                    <button onclick="imprimirComprovanteSelecionado('a4')" class="btn-a4">📄 A4</button>
+                    <button onclick="imprimirComprovanteSelecionado('pdf')" class="btn-pdf">📁 PDF</button>
                 </div>
-                <button onclick="fecharModalImpressao()" style="display:block; margin:10px auto; background:#ccc; color:#333; padding:8px 20px;">Cancelar</button>
+                <button onclick="fecharModalImpressao()" class="btn-secondary">Cancelar</button>
             </div>
         </div>
-
+        <div id="comprovante" style="display:none;"></div>
         <div id="toast" class="toast"></div>
     </div>
 
-    <!-- COMPROVANTE (escondido) -->
-    <div id="comprovante" style="display:none;"></div>
-
-    <!-- ========== CARREGA O JAVASCRIPT ========== -->
     <script src="script.js"></script>
 </body>
 </html>
