@@ -1132,19 +1132,34 @@
         }
 
         async function salvarLoja() {
+    // Captura os elementos
             const nomeInput = document.getElementById('lojaNome');
             const enderecoInput = document.getElementById('lojaEndereco');
 
-            if (!nomeInput || !enderecoInput) {
-                showToast('Campos de loja não encontrados.', true);
+            // Verifica se os campos existem
+            if (!nomeInput) {
+                showToast('Campo "Nome" não encontrado no formulário.', true);
+                console.error('Elemento lojaNome não encontrado!');
+                return;
+            }
+            if (!enderecoInput) {
+                showToast('Campo "Endereço" não encontrado no formulário.', true);
+                console.error('Elemento lojaEndereco não encontrado!');
                 return;
             }
 
-            const nome = nomeInput.value ? nomeInput.value.trim() : '';
-            const endereco = enderecoInput.value ? enderecoInput.value.trim() : '';
+            // Pega os valores e remove espaços
+            const nome = nomeInput.value.trim();
+            const endereco = enderecoInput.value.trim();
 
-            if (!nome) {
+            // Log para depuração
+            console.log('📝 Valor capturado do campo Nome:', `"${nome}"`);
+            console.log('📝 Valor capturado do campo Endereço:', `"${endereco}"`);
+
+            // Validação
+            if (nome === '') {
                 showToast('O nome da loja é obrigatório.', true);
+                console.warn('⚠️ Nome está vazio!');
                 return;
             }
 
@@ -1173,7 +1188,7 @@
                 preencherSelectLojas();
             } catch (err) {
                 showToast(err.message, true);
-                console.error(err);
+                console.error('Erro ao salvar loja:', err);
             }
         }
 
