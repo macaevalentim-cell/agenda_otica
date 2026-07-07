@@ -6,7 +6,7 @@ const router = express.Router();
 router.get('/medicos/:id/horarios', authenticateToken, isAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, medico_id, dia_semana, hora_inicio, hora_fim, intervalo_minutos as intervalo, ativo
+      `SELECT id, medico_id, dia_semana, hora_inicio, hora_fim, intervalo as intervalo, ativo
        FROM medico_horarios WHERE medico_id = $1 ORDER BY dia_semana, hora_inicio`,
       [req.params.id]
     );
@@ -20,7 +20,7 @@ router.get('/medicos/:id/horarios', authenticateToken, isAdmin, async (req, res)
 router.get('/horarios/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, medico_id, dia_semana, hora_inicio, hora_fim, intervalo_minutos as intervalo, ativo
+      `SELECT id, medico_id, dia_semana, hora_inicio, hora_fim, intervalo as intervalo, ativo
        FROM medico_horarios WHERE id = $1`,
       [req.params.id]
     );
@@ -37,7 +37,7 @@ router.get('/horarios/:id', authenticateToken, isAdmin, async (req, res) => {
 router.post('/medicos/:id/horarios', authenticateToken, isAdmin, async (req, res) => {
   try {
     const medicoId = req.params.id;
-    const { dia_semana, hora_inicio, hora_fim, intervalo, intervalo_minutos } = req.body;
+    const { dia_semana, hora_inicio, hora_fim, intervalo, intervalo } = req.body;
     if (dia_semana === undefined || !hora_inicio || !hora_fim) {
       return res.status(400).json({ error: 'Dia, hora início e fim são obrigatórios.' });
     }
@@ -45,7 +45,7 @@ router.post('/medicos/:id/horarios', authenticateToken, isAdmin, async (req, res
     if (isNaN(dia) || dia < 0 || dia > 6) {
       return res.status(400).json({ error: 'Dia inválido (0-6).' });
     }
-    const intervaloFinal = parseInt(intervalo || intervalo_minutos || 30);
+    const intervaloFinal = parseInt(intervalo || intervalo || 30);
     if (isNaN(intervaloFinal) || intervaloFinal < 5) {
       return res.status(400).json({ error: 'Intervalo inválido (mínimo 5).' });
     }
@@ -54,7 +54,7 @@ router.post('/medicos/:id/horarios', authenticateToken, isAdmin, async (req, res
       return res.status(404).json({ error: 'Médico não encontrado.' });
     }
     const result = await pool.query(
-      'INSERT INTO medico_horarios (medico_id, dia_semana, hora_inicio, hora_fim, intervalo_minutos) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      'INSERT INTO medico_horarios (medico_id, dia_semana, hora_inicio, hora_fim, intervalo) VALUES ($1, $2, $3, $4, $5) RETURNING id',
       [medicoId, dia, hora_inicio, hora_fim, intervaloFinal]
     );
     res.status(201).json({ id: result.rows[0].id, message: 'Horário adicionado com sucesso!' });
@@ -66,15 +66,15 @@ router.post('/medicos/:id/horarios', authenticateToken, isAdmin, async (req, res
 
 router.put('/horarios/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
-    const { dia_semana, hora_inicio, hora_fim, intervalo, intervalo_minutos, ativo } = req.body;
+    const { dia_semana, hora_inicio, hora_fim, intervalo, intervalo, ativo } = req.body;
     const dia = parseInt(dia_semana);
     if (isNaN(dia) || dia < 0 || dia > 6) {
       return res.status(400).json({ error: 'Dia inválido (0-6).' });
     }
-    const intervaloFinal = parseInt(intervalo || intervalo_minutos || 30);
+    const intervaloFinal = parseInt(intervalo || intervalo || 30);
     const ativoFinal = (ativo !== undefined) ? (ativo ? 1 : 0) : 1;
     const result = await pool.query(
-      `UPDATE medico_horarios SET dia_semana=$1, hora_inicio=$2, hora_fim=$3, intervalo_minutos=$4, ativo=$5 WHERE id=$6`,
+      `UPDATE medico_horarios SET dia_semana=$1, hora_inicio=$2, hora_fim=$3, intervalo=$4, ativo=$5 WHERE id=$6`,
       [dia, hora_inicio, hora_fim, intervaloFinal, ativoFinal, req.params.id]
     );
     if (result.rowCount === 0) {
@@ -107,7 +107,7 @@ router.get('/medicos/:id/horarios/disponiveis', authenticateToken, async (req, r
     if (!data) return res.status(400).json({ error: 'Data obrigatória' });
     const diaSemana = new Date(data).getDay();
     const result = await pool.query(
-      `SELECT hora_inicio, hora_fim, intervalo_minutos as intervalo
+      `SELECT hora_inicio, hora_fim, intervalo as intervalo
        FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
       [medicoId, diaSemana]
     );
