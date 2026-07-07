@@ -151,6 +151,8 @@
             page-break-inside: avoid;
             max-height: 100vh;
             overflow: hidden;
+            box-sizing: border-box;
+            width: 100%;
         }
         .comprovante-container .header-loja {
             text-align: center;
@@ -159,12 +161,16 @@
             color: #1a202c;
             margin-bottom: 4px;
             letter-spacing: 0.5px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .comprovante-container .header-endereco-loja {
             text-align: center;
             font-size: 14px;
             color: #4a5568;
             margin-bottom: 12px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .comprovante-container .header-vendedor {
             text-align: center;
@@ -172,6 +178,8 @@
             color: #4a5568;
             margin-bottom: 16px;
             font-weight: 500;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .comprovante-container h2 {
             text-align: center;
@@ -181,6 +189,8 @@
             font-weight: 600;
             color: #2d3748;
             margin-bottom: 16px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .comprovante-container .detalhe {
             display: flex;
@@ -189,14 +199,20 @@
             border-bottom: 1px dashed #e2e8f0;
             font-size: 15px;
             color: #2d3748;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .comprovante-container .detalhe .label {
             font-weight: 600;
             color: #4a5568;
+            flex-shrink: 0;
         }
         .comprovante-container .detalhe .valor {
             font-weight: 500;
             text-align: right;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 60%;
         }
         .comprovante-container .rodape-medico {
             margin-top: 16px;
@@ -206,11 +222,15 @@
             font-size: 15px;
             font-weight: 500;
             color: #2d3748;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .comprovante-container .rodape-medico .endereco-medico {
             font-weight: 400;
             color: #4a5568;
             font-size: 15px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .comprovante-container .rodape-final {
             text-align: center;
@@ -219,6 +239,8 @@
             margin-top: 12px;
             border-top: 1px solid #e2e8f0;
             padding-top: 10px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .comprovante-container .no-print {
             display: block;
@@ -264,6 +286,7 @@
                 margin: 0;
                 border: none;
                 box-shadow: none;
+                box-sizing: border-box;
             }
             .comprovante-container .comprovante-conteudo {
                 width: 100%;
@@ -346,6 +369,7 @@
             <button class="menu-item" data-page="pageAdmin" data-sub="usuarios">👥 Usuários</button>
             <button class="menu-item" data-page="pageAdmin" data-sub="pacientes">🧑‍⚕️ Pacientes</button>
             <button class="menu-item" data-page="pageAdmin" data-sub="lojas">🏢 Lojas</button>
+            <button class="menu-item" data-page="pageAdmin" data-sub="configImpressao">🖨️ Configurar Impressão</button>
             <button class="menu-item" data-page="pageAdmin" data-sub="solicitacoes">📩 Solicitações <span id="badgeSolicitacoesMenu" class="badge" style="display:none;">0</span></button>
             <button class="menu-item" data-page="pageAdmin" data-sub="whatsapp">📱 WhatsApp</button>
             <hr style="border-color: #4a5568; margin: 10px 0;">
@@ -592,6 +616,34 @@
                 </div>
             </div>
 
+            <div id="subConfigImpressao" class="sub-page">
+                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
+                    <h3>🖨️ Configurações de Impressão</h3>
+                    <p style="color:#666; font-size:14px; margin-bottom:15px;">Ajuste as margens e a altura do cabeçalho do comprovante.</p>
+                    <div class="form-row">
+                        <div style="flex:1; min-width:120px;">
+                            <label style="display:block; font-size:13px; color:#4a5568;">Margem Esquerda (px)</label>
+                            <input type="number" id="printMarginLeft" value="20" min="0" max="100" style="width:100%;">
+                        </div>
+                        <div style="flex:1; min-width:120px;">
+                            <label style="display:block; font-size:13px; color:#4a5568;">Margem Direita (px)</label>
+                            <input type="number" id="printMarginRight" value="20" min="0" max="100" style="width:100%;">
+                        </div>
+                        <div style="flex:1; min-width:120px;">
+                            <label style="display:block; font-size:13px; color:#4a5568;">Margem Superior (px)</label>
+                            <input type="number" id="printMarginTop" value="20" min="0" max="100" style="width:100%;">
+                        </div>
+                        <div style="flex:1; min-width:120px;">
+                            <label style="display:block; font-size:13px; color:#4a5568;">Altura do Cabeçalho (px)</label>
+                            <input type="number" id="printHeaderHeight" value="80" min="40" max="200" style="width:100%;">
+                        </div>
+                    </div>
+                    <button onclick="salvarConfigImpressao()" class="btn-success">Salvar Configurações</button>
+                    <button onclick="carregarConfigImpressao()" style="background:#718096;">Restaurar Padrão</button>
+                    <div id="configImpressaoMsg" style="margin-top:10px;"></div>
+                </div>
+            </div>
+
             <div id="subSolicitacoes" class="sub-page">
                 <div style="background:white; padding:20px; border-radius:10px;">
                     <h3>Solicitações de Consulta</h3>
@@ -776,6 +828,41 @@
         let consultaParaImprimir = null;
 
         // ========================================================================
+        // CONFIGURAÇÕES DE IMPRESSÃO (localStorage)
+        // ========================================================================
+        function carregarConfigImpressao() {
+            const config = localStorage.getItem('printConfig');
+            if (config) {
+                const parsed = JSON.parse(config);
+                document.getElementById('printMarginLeft').value = parsed.marginLeft || 20;
+                document.getElementById('printMarginRight').value = parsed.marginRight || 20;
+                document.getElementById('printMarginTop').value = parsed.marginTop || 20;
+                document.getElementById('printHeaderHeight').value = parsed.headerHeight || 80;
+                document.getElementById('configImpressaoMsg').innerHTML = '<p style="color:green;">Configurações carregadas.</p>';
+            } else {
+                document.getElementById('printMarginLeft').value = 20;
+                document.getElementById('printMarginRight').value = 20;
+                document.getElementById('printMarginTop').value = 20;
+                document.getElementById('printHeaderHeight').value = 80;
+                document.getElementById('configImpressaoMsg').innerHTML = '<p style="color:#999;">Configurações padrão carregadas.</p>';
+            }
+        }
+
+        function salvarConfigImpressao() {
+            const config = {
+                marginLeft: parseInt(document.getElementById('printMarginLeft').value) || 20,
+                marginRight: parseInt(document.getElementById('printMarginRight').value) || 20,
+                marginTop: parseInt(document.getElementById('printMarginTop').value) || 20,
+                headerHeight: parseInt(document.getElementById('printHeaderHeight').value) || 80
+            };
+            localStorage.setItem('printConfig', JSON.stringify(config));
+            document.getElementById('configImpressaoMsg').innerHTML = '<p style="color:green;">Configurações salvas com sucesso!</p>';
+            setTimeout(() => {
+                document.getElementById('configImpressaoMsg').innerHTML = '';
+            }, 3000);
+        }
+
+        // ========================================================================
         // UTILITÁRIOS
         // ========================================================================
         function showToast(msg, isError = false) {
@@ -937,6 +1024,7 @@
                     iniciarPollingSolicitacoes();
                     carregarDashboard();
                     carregarLojas();
+                    carregarConfigImpressao();
                 }
                 fecharMenu();
                 navegarPara('pageLista');
@@ -1985,7 +2073,7 @@
         }
 
         // ========================================================================
-        // IMPRESSÃO – MELHORADA
+        // IMPRESSÃO – COM CONFIGURAÇÕES DO USUÁRIO
         // ========================================================================
         function abrirModalImpressao(id) {
             consultaParaImprimir = id;
@@ -2004,6 +2092,14 @@
             } else {
                 showToast('Erro: nenhuma consulta selecionada.', true);
             }
+        }
+
+        function getPrintConfig() {
+            const config = localStorage.getItem('printConfig');
+            if (config) {
+                return JSON.parse(config);
+            }
+            return { marginLeft: 20, marginRight: 20, marginTop: 20, headerHeight: 80 };
         }
 
         function gerarComprovante(id, tipo) {
@@ -2040,38 +2136,69 @@
             const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
             const pedido = c.numero_pedido || 'Não informado';
 
-            // HTML do comprovante com layout melhorado
+            // Carrega configurações do usuário
+            const config = getPrintConfig();
+
+            // HTML do comprovante com estilos aplicados via JS
             let html = `
-                <div class="comprovante-container">
+                <div class="comprovante-container" style="padding-left:${config.marginLeft}px; padding-right:${config.marginRight}px; padding-top:${config.marginTop}px;">
                     <div class="comprovante-conteudo">
-                        <!-- Cabeçalho: Nome da Loja -->
-                        <div class="header-loja">${escapeHtml(lojaNome)}</div>
-                        ${lojaEndereco ? `<div class="header-endereco-loja">${escapeHtml(lojaEndereco)}</div>` : ''}
-                        <div class="header-vendedor">Vendedor: ${escapeHtml(vendedorNome)}</div>
-                        <h2>Comprovante de Consulta</h2>
-                        <div class="detalhe"><span class="label">Paciente:</span> <span class="valor">${escapeHtml(c.paciente_nome)}</span></div>
-                        <div class="detalhe"><span class="label">Data:</span> <span class="valor">${dataFormatada}</span></div>
-                        <div class="detalhe"><span class="label">Horário:</span> <span class="valor">${c.horario}</span></div>
-                        <div class="detalhe"><span class="label">Médico:</span> <span class="valor">Dr. ${escapeHtml(c.medico_nome)}</span></div>
-                        <div class="detalhe"><span class="label">Status:</span> <span class="valor">${statusLabel}</span></div>
-                        <div class="detalhe"><span class="label">Condição:</span> <span class="valor">${condicao}</span></div>
-                        <div class="detalhe"><span class="label">Pedido:</span> <span class="valor">${pedido}</span></div>
-                        ${c.observacoes ? `<div class="detalhe"><span class="label">Observações:</span> <span class="valor">${escapeHtml(c.observacoes)}</span></div>` : ''}
-                        
-                        <!-- Rodapé: Endereço do Médico (mais visível) -->
-                        <div class="rodape-medico">
-                            <div>Endereço do médico:</div>
-                            <div class="endereco-medico">${escapeHtml(enderecoMedico)}</div>
+                        <div class="header-loja" style="font-size:22px; font-weight:700; margin-bottom:4px;">${escapeHtml(lojaNome)}</div>
+                        ${lojaEndereco ? `<div class="header-endereco-loja" style="font-size:14px; color:#4a5568; margin-bottom:12px;">${escapeHtml(lojaEndereco)}</div>` : ''}
+                        <div class="header-vendedor" style="font-size:14px; color:#4a5568; margin-bottom:16px; font-weight:500;">Vendedor: ${escapeHtml(vendedorNome)}</div>
+                        <h2 style="text-align:center; border-bottom:2px solid #2d3748; padding-bottom:10px; font-size:20px; font-weight:600; color:#2d3748; margin-bottom:16px; word-wrap:break-word; overflow-wrap:break-word;">Comprovante de Consulta</h2>
+                        <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                            <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Paciente:</span>
+                            <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${escapeHtml(c.paciente_nome)}</span>
                         </div>
-                        <div class="rodape-final">Este comprovante é válido como comprovação de agendamento.</div>
+                        <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                            <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Data:</span>
+                            <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${dataFormatada}</span>
+                        </div>
+                        <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                            <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Horário:</span>
+                            <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${c.horario}</span>
+                        </div>
+                        <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                            <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Médico:</span>
+                            <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">Dr. ${escapeHtml(c.medico_nome)}</span>
+                        </div>
+                        <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                            <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Status:</span>
+                            <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${statusLabel}</span>
+                        </div>
+                        <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                            <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Condição:</span>
+                            <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${condicao}</span>
+                        </div>
+                        <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                            <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Pedido:</span>
+                            <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${pedido}</span>
+                        </div>
+                        ${c.observacoes ? `<div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                            <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Observações:</span>
+                            <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${escapeHtml(c.observacoes)}</span>
+                        </div>` : ''}
+                        
+                        <div class="rodape-medico" style="margin-top:16px; padding-top:12px; border-top:2px solid #2d3748; text-align:center; font-size:15px; font-weight:500; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
+                            <div>Endereço do médico:</div>
+                            <div class="endereco-medico" style="font-weight:400; color:#4a5568; font-size:15px; word-wrap:break-word; overflow-wrap:break-word;">${escapeHtml(enderecoMedico)}</div>
+                        </div>
+                        <div class="rodape-final" style="text-align:center; font-size:12px; color:#a0aec0; margin-top:12px; border-top:1px solid #e2e8f0; padding-top:10px; word-wrap:break-word; overflow-wrap:break-word;">Este comprovante é válido como comprovação de agendamento.</div>
                     </div>
-                    <button onclick="fecharComprovante()" class="no-print">Fechar</button>
+                    <button onclick="fecharComprovante()" class="no-print" style="display:block; margin:16px auto 0 auto; padding:8px 24px; background:#e53e3e; color:white; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Fechar</button>
                 </div>
             `;
 
             // Aplica estilo específico para bobina
             if (tipo === 'bobina') {
                 html = html.replace('comprovante-container', 'comprovante-container comprovante-bobina');
+                html = html.replace(/font-size:22px/g, 'font-size:18px');
+                html = html.replace(/font-size:14px/g, 'font-size:11px');
+                html = html.replace(/font-size:15px/g, 'font-size:11px');
+                html = html.replace(/padding:6px 0/g, 'padding:3px 0');
+                html = html.replace(/font-size:20px/g, 'font-size:15px');
+                html = html.replace(/font-size:16px/g, 'font-size:13px');
             }
 
             const comprovanteDiv = document.getElementById('comprovante');
@@ -2942,6 +3069,7 @@
                 preencherSelectLojas();
             }
             if (subId === 'lojas') carregarLojas();
+            if (subId === 'configImpressao') carregarConfigImpressao();
             navegarPara('pageAdmin');
         }
 
@@ -3088,6 +3216,7 @@
                             iniciarPollingSolicitacoes();
                             carregarDashboard();
                             carregarLojas();
+                            carregarConfigImpressao();
                         }
                         setTimeout(() => {
                             setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
@@ -3115,7 +3244,7 @@
             if (e.target === this) fecharModalImpressao();
         });
 
-        console.log('✅ Sistema completo com Lojas, Vínculo de Vendedor, Impressão melhorada e card WhatsApp profissional.');
+        console.log('✅ Sistema completo com configurações de impressão personalizáveis.');
     </script>
 </body>
 </html>
