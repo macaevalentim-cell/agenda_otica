@@ -1168,15 +1168,35 @@
 
         // Salvar loja (nova ou edição)
         async function salvarLoja() {
+            // Captura os elementos
             const nomeInput = document.getElementById('lojaNome');
             const enderecoInput = document.getElementById('lojaEndereco');
             const msgDiv = document.getElementById('lojaMsg');
 
+            // Verifica se os campos existem
+            if (!nomeInput) {
+                msgDiv.innerHTML = '<p style="color:red;">Erro: campo Nome não encontrado. Recarregue a página.</p>';
+                showToast('Erro: campo Nome não encontrado.', true);
+                return;
+            }
+            if (!enderecoInput) {
+                msgDiv.innerHTML = '<p style="color:red;">Erro: campo Endereço não encontrado.</p>';
+                showToast('Erro: campo Endereço não encontrado.', true);
+                return;
+            }
+
+            // Pega os valores e remove espaços
             const nome = nomeInput.value.trim();
             const endereco = enderecoInput.value.trim();
 
+            // LOG para depuração
+            console.log('🔍 Nome capturado:', `"${nome}"`);
+            console.log('🔍 Endereço capturado:', `"${endereco}"`);
+
+            // Validação
             if (!nome) {
                 msgDiv.innerHTML = '<p style="color:red;">O nome da loja é obrigatório.</p>';
+                showToast('O nome da loja é obrigatório.', true);
                 return;
             }
 
