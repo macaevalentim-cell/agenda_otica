@@ -425,7 +425,7 @@
                     <input type="text" id="pacienteCpf" placeholder="CPF">
                     <div style="flex:1; display:flex; flex-direction:column; gap:3px;">
                         <label for="pacienteDataNasc" style="font-size:13px; font-weight:500; color:#4a5568;">Data de Nascimento</label>
-                        <input type="date" id="pacienteDataNasc" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:5px;">
+                        <input type="date" id="pacienteDataNasc" placeholder="Data Nascimento" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:5px;">
                     </div>
                 </div>
                 <div class="form-row">
@@ -491,6 +491,7 @@
         <div id="pageAdmin" class="page-section">
             <h3>⚙️ Painel Administrativo</h3>
             <div id="subMedicos" class="sub-page active">
+                <!-- Cadastro de Médicos -->
                 <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
                     <h3>Cadastrar Médico</h3>
                     <div class="form-row">
@@ -599,32 +600,20 @@
                 </div>
             </div>
 
-            <!-- SUB PÁGINA LOJAS – COM CRUD -->
+            <!-- SUB PÁGINA LOJAS -->
             <div id="subLojas" class="sub-page">
                 <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                        <h3 style="margin:0;">Gerenciar Lojas</h3>
-                        <button onclick="abrirFormLoja()" class="btn-success" id="btnNovaLoja">
-                            <i class="fas fa-plus"></i> Nova Loja
-                        </button>
+                    <h3>Cadastrar Loja</h3>
+                    <div class="form-row">
+                        <input type="text" id="lojaNome" placeholder="Nome *">
+                        <input type="text" id="lojaEndereco" placeholder="Endereço">
                     </div>
-
-                    <!-- Formulário de cadastro/edição (escondido inicialmente) -->
-                    <div id="formLoja" style="display:none; background:#f7fafc; padding:15px; border-radius:8px; margin-bottom:20px; border:1px solid #e2e8f0;">
-                        <h4 id="formLojaTitulo">Nova Loja</h4>
-                        <div class="form-row">
-                            <input type="text" id="lojaNome" placeholder="Nome *" style="flex:2;">
-                            <input type="text" id="lojaEndereco" placeholder="Endereço" style="flex:3;">
-                        </div>
-                        <input type="hidden" id="editLojaId">
-                        <div style="display:flex; gap:10px; margin-top:10px;">
-                            <button onclick="salvarLoja()" class="btn-success" id="btnSalvarLoja">Salvar</button>
-                            <button onclick="cancelarFormLoja()" style="background:#ccc; color:#333;">Cancelar</button>
-                        </div>
-                        <div id="lojaMsg" style="margin-top:10px;"></div>
-                    </div>
-
-                    <!-- Lista de lojas -->
+                    <input type="hidden" id="editLojaId">
+                    <button onclick="salvarLoja()">Salvar</button>
+                    <button id="cancelLojaBtn" onclick="cancelarEdicaoLoja()" style="display:none;">Cancelar</button>
+                </div>
+                <div style="background:white; padding:20px; border-radius:10px;">
+                    <h3>Lojas Cadastradas</h3>
                     <div id="lojasList"></div>
                 </div>
             </div>
@@ -695,7 +684,7 @@
                 <input type="text" id="solPacienteCpf" placeholder="CPF">
                 <div style="flex:1; display:flex; flex-direction:column; gap:3px;">
                     <label for="solPacienteDataNasc" style="font-size:13px; font-weight:500; color:#4a5568;">Data de Nascimento</label>
-                    <input type="date" id="solPacienteDataNasc" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:5px;">
+                    <input type="date" id="solPacienteDataNasc" placeholder="Data Nascimento" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:5px;">
                 </div>
             </div>
             <div class="form-row">
@@ -1099,29 +1088,8 @@
         }
 
         // ========================================================================
-        // LOJAS – CRUD COMPLETO COM FORMULÁRIO
+        // LOJAS (CRUD) – FUNÇÃO CORRIGIDA COM FALLBACK
         // ========================================================================
-
-        // Abrir formulário para nova loja
-        function abrirFormLoja() {
-            document.getElementById('formLoja').style.display = 'block';
-            document.getElementById('formLojaTitulo').textContent = 'Nova Loja';
-            document.getElementById('editLojaId').value = '';
-            document.getElementById('lojaNome').value = '';
-            document.getElementById('lojaEndereco').value = '';
-            document.getElementById('lojaMsg').innerHTML = '';
-            document.getElementById('btnNovaLoja').style.display = 'none';
-            document.getElementById('formLoja').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        // Cancelar formulário
-        function cancelarFormLoja() {
-            document.getElementById('formLoja').style.display = 'none';
-            document.getElementById('btnNovaLoja').style.display = 'inline-block';
-            document.getElementById('lojaMsg').innerHTML = '';
-        }
-
-        // Carregar lojas da API
         async function carregarLojas() {
             try {
                 const res = await fetch(`${API_URL}/lojas`, {
@@ -1136,11 +1104,10 @@
             }
         }
 
-        // Renderizar lista de lojas
         function renderLojas() {
             const container = document.getElementById('lojasList');
             if (!container) return;
-            if (!lojas || lojas.length === 0) {
+            if (lojas.length === 0) {
                 container.innerHTML = '<p class="no-data">Nenhuma loja cadastrada.</p>';
                 return;
             }
@@ -1148,54 +1115,51 @@
                 <div style="border-bottom:1px solid #ddd; padding:10px; display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <strong>${escapeHtml(l.nome)}</strong><br>
-                        ${l.endereco ? escapeHtml(l.endereco) : ''}
+                        ${l.endereco || ''}
                     </div>
                     <div>
-                        <button onclick="editarLoja(${l.id})" class="btn-warning" style="margin-right:5px;">✏️</button>
-                        <button onclick="excluirLoja(${l.id})" class="btn-danger">🗑️</button>
+                        <button onclick="editarLoja(${l.id})">✏️</button>
+                        <button onclick="excluirLoja(${l.id})">🗑️</button>
                     </div>
                 </div>
             `).join('');
         }
 
-        // Preencher select de lojas (para usuários)
         function preencherSelectLojas() {
             const select = document.getElementById('usuarioLoja');
-            if (!select) return;
-            select.innerHTML = '<option value="">Selecione uma loja</option>' +
-                lojas.map(l => `<option value="${l.id}">${l.nome}</option>`).join('');
+            if (select) {
+                select.innerHTML = '<option value="">Selecione uma loja</option>' +
+                    lojas.map(l => `<option value="${l.id}">${l.nome}</option>`).join('');
+            }
         }
 
-        // Salvar loja (nova ou edição)
+        // ===== FUNÇÃO SALVAR LOJA CORRIGIDA (com fallback) =====
         async function salvarLoja() {
-            // Captura os elementos
-            const nomeInput = document.getElementById('lojaNome');
-            const enderecoInput = document.getElementById('lojaEndereco');
-            const msgDiv = document.getElementById('lojaMsg');
-
-            // Verifica se os campos existem
+            // Tenta buscar pelo ID
+            let nomeInput = document.getElementById('lojaNome');
             if (!nomeInput) {
-                msgDiv.innerHTML = '<p style="color:red;">Erro: campo Nome não encontrado. Recarregue a página.</p>';
-                showToast('Erro: campo Nome não encontrado.', true);
+                // Fallback: busca por name (caso o ID esteja duplicado ou incorreto)
+                nomeInput = document.querySelector('input[name="lojaNome"]');
+            }
+            if (!nomeInput) {
+                showToast('Erro: campo Nome não encontrado. Verifique o HTML.', true);
+                console.error('Elemento lojaNome não encontrado!');
                 return;
             }
+
+            let enderecoInput = document.getElementById('lojaEndereco');
             if (!enderecoInput) {
-                msgDiv.innerHTML = '<p style="color:red;">Erro: campo Endereço não encontrado.</p>';
+                enderecoInput = document.querySelector('input[name="lojaEndereco"]');
+            }
+            if (!enderecoInput) {
                 showToast('Erro: campo Endereço não encontrado.', true);
                 return;
             }
 
-            // Pega os valores e remove espaços
             const nome = nomeInput.value.trim();
             const endereco = enderecoInput.value.trim();
 
-            // LOG para depuração
-            console.log('🔍 Nome capturado:', `"${nome}"`);
-            console.log('🔍 Endereço capturado:', `"${endereco}"`);
-
-            // Validação
-            if (!nome) {
-                msgDiv.innerHTML = '<p style="color:red;">O nome da loja é obrigatório.</p>';
+            if (nome === '') {
                 showToast('O nome da loja é obrigatório.', true);
                 return;
             }
@@ -1213,50 +1177,42 @@
                     },
                     body: JSON.stringify({ nome, endereco })
                 });
-
                 const result = await res.json();
                 if (!res.ok) {
                     throw new Error(result.error || 'Erro ao salvar loja');
                 }
-
                 showToast(editId ? 'Loja atualizada!' : 'Loja cadastrada!');
-                cancelarFormLoja();
+                cancelarEdicaoLoja();
                 await carregarLojas();
                 preencherSelectLojas();
             } catch (err) {
-                msgDiv.innerHTML = `<p style="color:red;">${err.message}</p>`;
                 showToast(err.message, true);
+                console.error('Erro ao salvar loja:', err);
             }
         }
 
-        // Editar loja (preenche o formulário com os dados)
         function editarLoja(id) {
             const l = lojas.find(loj => loj.id === id);
             if (!l) return;
-
-            document.getElementById('formLoja').style.display = 'block';
-            document.getElementById('formLojaTitulo').textContent = 'Editar Loja';
             document.getElementById('editLojaId').value = l.id;
             document.getElementById('lojaNome').value = l.nome || '';
             document.getElementById('lojaEndereco').value = l.endereco || '';
-            document.getElementById('lojaMsg').innerHTML = '';
-            document.getElementById('btnNovaLoja').style.display = 'none';
-            document.getElementById('formLoja').scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('cancelLojaBtn').style.display = 'inline-block';
+            mostrarSubPage('lojas');
         }
 
-        // Excluir loja
+        function cancelarEdicaoLoja() {
+            document.getElementById('editLojaId').value = '';
+            document.getElementById('cancelLojaBtn').style.display = 'none';
+            document.getElementById('lojaNome').value = '';
+            document.getElementById('lojaEndereco').value = '';
+        }
+
         async function excluirLoja(id) {
             if (!confirm('Excluir esta loja?')) return;
             try {
-                const res = await fetch(`${API_URL}/lojas/${id}`, {
-                    method: 'DELETE',
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error || 'Erro ao excluir');
-                }
-                showToast('Loja excluída!');
+                await fetch(`${API_URL}/lojas/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+                showToast('Excluída');
                 await carregarLojas();
                 preencherSelectLojas();
             } catch (err) {
@@ -1848,7 +1804,7 @@
         document.getElementById('solDataConsulta').addEventListener('change', carregarHorariosDisponiveisSol);
 
         // ========================================================================
-        // CONSULTAS (CRUD) – resumido
+        // CONSULTAS (CRUD) – resumido para não repetir todo o código
         // ========================================================================
         async function salvarConsulta() {
             if (user.tipo !== 'admin') { showToast('Apenas administradores podem agendar.', true); return; }
@@ -3290,7 +3246,7 @@
             if (e.target === this) fecharModalImpressao();
         });
 
-        console.log('✅ Sistema completo com CRUD de lojas e configurações de impressão.');
+        console.log('✅ Sistema completo com configurações de impressão personalizáveis.');
     </script>
 </body>
 </html>
