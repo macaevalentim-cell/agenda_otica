@@ -79,18 +79,12 @@ function atualizarIdadeDisplay() {
     const idade = calcularIdade(dataNasc);
     document.getElementById('idadeDisplay').innerHTML = idade !== null ? `Idade: ${idade} anos` : '';
 }
-document.addEventListener('change', function(e) {
-    if (e.target.id === 'pacienteDataNasc') atualizarIdadeDisplay();
-});
 
 function atualizarIdadeSol() {
     const dataNasc = document.getElementById('solPacienteDataNasc')?.value;
     const idade = calcularIdade(dataNasc);
     document.getElementById('solIdadeDisplay').innerHTML = idade !== null ? `Idade: ${idade} anos` : '';
 }
-document.addEventListener('change', function(e) {
-    if (e.target.id === 'solPacienteDataNasc') atualizarIdadeSol();
-});
 
 // Lógica dos checkboxes Encaixe/Neurodivergente/Deficiência Física
 function setupEncaixeLogic(encaixeId, neuroId, defId) {
@@ -127,6 +121,12 @@ function setupEncaixeLogic(encaixeId, neuroId, defId) {
 
     update();
 }
+
+// Inicializar listeners de data de nascimento
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('pacienteDataNasc')?.addEventListener('change', atualizarIdadeDisplay);
+    document.getElementById('solPacienteDataNasc')?.addEventListener('change', atualizarIdadeSol);
+});
 
 // ========================================================================
 // LOGIN
@@ -2225,11 +2225,11 @@ function proximo() {
 }
 
 function navegarPara(pageId) {
-    document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
     const target = document.getElementById(pageId);
     if (target) target.classList.add('active');
-    document.querySelectorAll('.side-menu .menu-item').forEach(btn => btn.classList.remove('active'));
-    const menuBtn = document.querySelector(`.side-menu .menu-item[data-page="${pageId}"]`);
+    document.querySelectorAll('.menu-item').forEach(btn => btn.classList.remove('active'));
+    const menuBtn = document.querySelector(`.menu-item[data-page="${pageId}"]`);
     if (menuBtn) menuBtn.classList.add('active');
 
     if (pageId === 'pageLista') renderizarLista();
@@ -2247,9 +2247,13 @@ function navegarPara(pageId) {
 
 function mostrarSubPage(subId) {
     if (user.tipo !== 'admin') { showToast('Acesso negado.', true); return; }
-    document.querySelectorAll('#pageAdmin .sub-page').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.sub-page').forEach(el => el.classList.remove('active'));
     const target = document.getElementById('sub' + subId.charAt(0).toUpperCase() + subId.slice(1));
     if (target) target.classList.add('active');
+    // Atualizar tabs
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.tab-btn[data-sub="${subId}"]`)?.classList.add('active');
+    
     if (subId === 'solicitacoes') carregarSolicitacoes();
     if (subId === 'whatsapp') carregarConfigWhatsapp();
     if (subId === 'usuarios') {
@@ -2258,7 +2262,10 @@ function mostrarSubPage(subId) {
     }
     if (subId === 'lojas') carregarLojas();
     if (subId === 'configImpressao') carregarConfigImpressao();
-    navegarPara('pageAdmin');
+    // Manter a página admin ativa
+    document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+    document.getElementById('pageAdmin').classList.add('active');
+    fecharMenu();
 }
 
 // ========================================================================
@@ -2272,24 +2279,6 @@ function fecharMenu() {
     document.getElementById('sideMenu').classList.remove('open');
     document.getElementById('menuOverlay').classList.remove('show');
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('hamburgerBtn').addEventListener('click', abrirMenu);
-    document.getElementById('closeMenuBtn').addEventListener('click', fecharMenu);
-    document.getElementById('menuOverlay').addEventListener('click', fecharMenu);
-
-    document.querySelectorAll('.side-menu .menu-item').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const page = this.getAttribute('data-page');
-            const sub = this.getAttribute('data-sub');
-            if (sub) {
-                mostrarSubPage(sub);
-            } else if (page) {
-                navegarPara(page);
-            }
-        });
-    });
-});
 
 // ========================================================================
 // MODAL DE DETALHES
@@ -2368,7 +2357,51 @@ function logout() {
 // ========================================================================
 // AUTO LOGIN
 // ========================================================================
-(function() {
+document.addEventListener('DOMContentLoaded', function() {
+    // Configurar eventos de menu
+    const hamburger = document.getElementById('hamburgerBtn');
+    const closeBtn = document.getElementById('closeMenuBtn');
+    const overlay = document.getElementById('menuOverlay');
+    if (hamburger) {
+        hamburger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            abrirMenu();
+        });
+    }
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function() {
+            fecharMenu();
+        });
+    }
+    if (overlay) {
+        overlay.addEventListener('click', function() {
+            fecharMenu();
+        });
+    }
+
+    // Menu items com data-page e data-sub
+    document.querySelectorAll('.menu-item').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const page = this.getAttribute('data-page');
+            const sub = this.getAttribute('data-sub');
+            if (sub) {
+                mostrarSubPage(sub);
+            } else if (page) {
+                navegarPara(page);
+            }
+            fecharMenu();
+        });
+    });
+
+    // Tabs do admin
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const sub = this.getAttribute('data-sub');
+            if (sub) mostrarSubPage(sub);
+        });
+    });
+
+    // Auto-login
     const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
     if (savedToken && savedUser) {
@@ -2425,7 +2458,7 @@ function logout() {
             localStorage.clear();
         });
     }
-})();
+});
 
 // Fechar modais ao clicar fora
 document.querySelectorAll('.modal-overlay').forEach(modal => {

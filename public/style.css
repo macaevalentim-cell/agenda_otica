@@ -542,6 +542,166 @@ body {
 
 .print-options { display:flex; gap:12px; margin:16px 0; flex-wrap:wrap; }
 
+/* ===== COMPROVANTE / IMPRESSÃO ===== */
+.comprovante-container {
+    background: white;
+    padding: 20px 30px;
+    margin: 0 auto;
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    page-break-after: avoid;
+    page-break-inside: avoid;
+    max-height: 100vh;
+    overflow: hidden;
+    box-sizing: border-box;
+    width: 100%;
+}
+.comprovante-container .header-loja {
+    text-align: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: #1a202c;
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+.comprovante-container .header-endereco-loja {
+    text-align: center;
+    font-size: 14px;
+    color: #4a5568;
+    margin-bottom: 12px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+.comprovante-container .header-vendedor {
+    text-align: center;
+    font-size: 14px;
+    color: #4a5568;
+    margin-bottom: 16px;
+    font-weight: 500;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+.comprovante-container h2 {
+    text-align: center;
+    border-bottom: 2px solid #2d3748;
+    padding-bottom: 10px;
+    font-size: 20px;
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 16px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+.comprovante-container .detalhe {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px dashed #e2e8f0;
+    font-size: 15px;
+    color: #2d3748;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+.comprovante-container .detalhe .label {
+    font-weight: 600;
+    color: #4a5568;
+    flex-shrink: 0;
+}
+.comprovante-container .detalhe .valor {
+    font-weight: 500;
+    text-align: right;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 60%;
+}
+.comprovante-container .rodape-medico {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 2px solid #2d3748;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 500;
+    color: #2d3748;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+.comprovante-container .rodape-medico .endereco-medico {
+    font-weight: 400;
+    color: #4a5568;
+    font-size: 15px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+.comprovante-container .rodape-final {
+    text-align: center;
+    font-size: 12px;
+    color: #a0aec0;
+    margin-top: 12px;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 10px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+.comprovante-container .no-print {
+    display: block;
+    margin: 16px auto 0 auto;
+    padding: 8px 24px;
+    background: #e53e3e;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+}
+.comprovante-container .no-print:hover {
+    background: #c53030;
+}
+
+.comprovante-bobina {
+    padding: 10px 15px;
+    font-size: 12px;
+}
+.comprovante-bobina .header-loja { font-size: 18px; }
+.comprovante-bobina .header-endereco-loja { font-size: 11px; }
+.comprovante-bobina .detalhe { font-size: 11px; padding: 3px 0; }
+.comprovante-bobina .rodape-medico { font-size: 11px; }
+.comprovante-bobina .rodape-medico .endereco-medico { font-size: 11px; }
+.comprovante-bobina h2 { font-size: 15px; }
+
+@media print {
+    body * { visibility: hidden; }
+    .comprovante-container, .comprovante-container * { visibility: visible; }
+    .comprovante-container {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        background: white;
+        padding: 25px 30px;
+        margin: 0;
+        border: none;
+        box-shadow: none;
+        box-sizing: border-box;
+    }
+    .comprovante-container .comprovante-conteudo {
+        width: 100%;
+        max-width: 210mm;
+        margin: 0 auto;
+        padding-top: 5px;
+    }
+    .no-print { display: none !important; }
+    .comprovante-container .rodape-final {
+        display: block !important;
+    }
+    @page { margin: 0; }
+}
+
 /* TOAST */
 .toast {
     position: fixed;
