@@ -92,7 +92,6 @@ document.addEventListener('change', function(e) {
     if (e.target.id === 'solPacienteDataNasc') atualizarIdadeSol();
 });
 
-// Lógica dos checkboxes Encaixe/Neurodivergente/Deficiência Física
 function setupEncaixeLogic(encaixeId, neuroId, defId) {
     const encaixe = document.getElementById(encaixeId);
     const neuro = document.getElementById(neuroId);
@@ -129,27 +128,21 @@ function setupEncaixeLogic(encaixeId, neuroId, defId) {
 }
 
 // ========================================================================
-// NAVEGAÇÃO ENTRE PÁGINAS E SUB-PÁGINAS
+// NAVEGAÇÃO
 // ========================================================================
-
-// Navegar para uma página principal (Lista, Calendário, etc.)
 function navegarPara(pageId) {
-    // Ocultar todas as páginas
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     const target = document.getElementById(pageId);
     if (target) target.classList.add('active');
 
-    // Atualizar menu lateral
     document.querySelectorAll('.menu-item').forEach(btn => btn.classList.remove('active'));
     const menuBtn = document.querySelector(`.menu-item[data-page="${pageId}"]`);
     if (menuBtn) menuBtn.classList.add('active');
 
-    // Se for página admin, mostrar a primeira sub-página (Médicos)
     if (pageId === 'pageAdmin') {
         mostrarSubPage('medicos');
     }
 
-    // Se for página de perfil, carregar dados
     if (pageId === 'pagePerfil') {
         document.getElementById('perfilNome').textContent = user.nome;
         document.getElementById('perfilUsername').textContent = user.username;
@@ -157,7 +150,6 @@ function navegarPara(pageId) {
         document.getElementById('perfilLoja').textContent = user.loja_nome || 'Não vinculado';
     }
 
-    // Recarregar listas conforme a página
     if (pageId === 'pageLista') renderizarLista();
     if (pageId === 'pageCalendario') renderizarCalendario();
     if (pageId === 'pageDashboard' && user.tipo === 'admin') carregarDashboard();
@@ -165,20 +157,17 @@ function navegarPara(pageId) {
     fecharMenu();
 }
 
-// Mostrar uma sub-página dentro do admin
 function mostrarSubPage(subId) {
     if (user.tipo !== 'admin') {
         showToast('Acesso negado.', true);
         return;
     }
 
-    // Ocultar todas as sub-páginas
     document.querySelectorAll('#pageAdmin .sub-page').forEach(el => {
         el.classList.remove('active');
-        el.style.display = 'none'; // redundância
+        el.style.display = 'none';
     });
 
-    // Mostrar a sub-página alvo
     const targetId = 'sub' + subId.charAt(0).toUpperCase() + subId.slice(1);
     const target = document.getElementById(targetId);
     if (target) {
@@ -186,7 +175,6 @@ function mostrarSubPage(subId) {
         target.style.display = 'block';
     }
 
-    // Atualizar abas
     document.querySelectorAll('.admin-tabs .tab-btn').forEach(btn => {
         btn.classList.remove('active');
         if (btn.getAttribute('data-sub') === subId) {
@@ -194,7 +182,6 @@ function mostrarSubPage(subId) {
         }
     });
 
-    // Carregar dados específicos
     if (subId === 'solicitacoes') carregarSolicitacoes();
     if (subId === 'whatsapp') carregarConfigWhatsapp();
     if (subId === 'usuarios') {
@@ -211,7 +198,7 @@ function mostrarSubPage(subId) {
 }
 
 // ========================================================================
-// MENU LATERAL (Hamburger)
+// MENU LATERAL
 // ========================================================================
 function abrirMenu() {
     document.getElementById('sideMenu').classList.add('open');
@@ -223,7 +210,6 @@ function fecharMenu() {
     document.getElementById('menuOverlay').classList.remove('show');
 }
 
-// Inicializar eventos do menu
 document.addEventListener('DOMContentLoaded', function() {
     const hamburger = document.getElementById('hamburgerBtn');
     const closeBtn = document.getElementById('closeMenuBtn');
@@ -242,13 +228,11 @@ document.addEventListener('DOMContentLoaded', function() {
         overlay.addEventListener('click', fecharMenu);
     }
 
-    // Eventos dos itens do menu
     document.querySelectorAll('.menu-item').forEach(btn => {
         btn.addEventListener('click', function() {
             const page = this.getAttribute('data-page');
             const sub = this.getAttribute('data-sub');
             if (sub) {
-                // Se tem sub, navega para página admin e mostra sub
                 navegarPara('pageAdmin');
                 mostrarSubPage(sub);
             } else if (page) {
@@ -258,7 +242,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Eventos das abas do admin (clique nas tabs)
     document.querySelectorAll('.admin-tabs .tab-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const sub = this.getAttribute('data-sub');
@@ -1379,7 +1362,7 @@ function cancelarEdicao() {
 }
 
 // ========================================================================
-// IMPRESSÃO
+// IMPRESSÃO (com destaque para "Encaixe")
 // ========================================================================
 function abrirModalImpressao(id) {
     consultaParaImprimir = id;
@@ -1430,6 +1413,10 @@ function gerarComprovante(id, tipo) {
         else if (paciente.encaixe) condicao = 'Encaixe';
     }
 
+    const condicaoDisplay = condicao === 'Encaixe' 
+        ? `<span style="font-weight:bold; color:#e53e3e; background:#fff5f5; padding:2px 10px; border-radius:4px; border:1px solid #e53e3e;">🔹 Encaixe</span>`
+        : condicao;
+
     const medico = medicos.find(m => m.id === c.medico_id);
     const enderecoMedico = medico ? medico.endereco : 'Endereço não informado';
 
@@ -1473,7 +1460,7 @@ function gerarComprovante(id, tipo) {
                 </div>
                 <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
                     <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Condição:</span>
-                    <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${condicao}</span>
+                    <span class="valor" style="font-weight:500; text-align:right; word-wrap:break-word; overflow-wrap:break-word; max-width:60%;">${condicaoDisplay}</span>
                 </div>
                 <div class="detalhe" style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #e2e8f0; font-size:15px; color:#2d3748; word-wrap:break-word; overflow-wrap:break-word;">
                     <span class="label" style="font-weight:600; color:#4a5568; flex-shrink:0;">Pedido:</span>
@@ -1520,7 +1507,7 @@ function fecharComprovante() {
 }
 
 // ========================================================================
-// CALENDÁRIO
+// CALENDÁRIO (com cores fortes e bloqueio de outros vendedores)
 // ========================================================================
 function renderizarCalendario() {
     const container = document.getElementById('calendarioContainer');
@@ -1561,7 +1548,11 @@ function renderizarMes(container) {
             <span class="dia-numero">${d}</span>`;
         const maxShow = 3;
         dayEvents.slice(0, maxShow).forEach(e => {
-            html += `<div class="dia-consulta" onclick="mostrarDetalhes(${e.id})">
+            const isOwn = (user.tipo === 'admin' || e.is_own);
+            const clickAttr = isOwn ? `onclick="mostrarDetalhes(${e.id})"` : '';
+            const classExtra = isOwn ? '' : ' other-vendor';
+            const styleExtra = !isOwn ? 'cursor:default; opacity:0.6;' : '';
+            html += `<div class="dia-consulta${classExtra}" ${clickAttr} style="${styleExtra}">
                 <span class="horario">${e.horario}</span>
                 <span class="paciente">${escapeHtml(e.paciente_nome.substring(0,12))}</span>
                 <span class="medico">${escapeHtml(e.medico_nome)}</span>
@@ -1605,7 +1596,11 @@ function renderizarSemana(container) {
             let hourEvents = consultas.filter(c => c.data_consulta === dateStr && c.horario === hour);
             html += `<td style="background: ${hourEvents.length > 0 ? '#f0f4ff' : 'white'};">`;
             hourEvents.forEach(e => {
-                html += `<div class="consulta-item" onclick="mostrarDetalhes(${e.id})">
+                const isOwn = (user.tipo === 'admin' || e.is_own);
+                const clickAttr = isOwn ? `onclick="mostrarDetalhes(${e.id})"` : '';
+                const classExtra = isOwn ? '' : ' other-vendor';
+                const styleExtra = !isOwn ? 'cursor:default; opacity:0.6;' : '';
+                html += `<div class="consulta-item${classExtra}" ${clickAttr} style="${styleExtra}">
                     <span class="paciente-nome">${escapeHtml(e.paciente_nome)}</span>
                     <span class="medico-nome">${escapeHtml(e.medico_nome)}</span>
                 </div>`;
@@ -1633,7 +1628,11 @@ function renderizarDia(container) {
     } else {
         html += `<div class="dia-list">`;
         dayEvents.forEach(e => {
-            html += `<div class="dia-card" onclick="mostrarDetalhes(${e.id})" style="cursor:pointer;">
+            const isOwn = (user.tipo === 'admin' || e.is_own);
+            const clickAttr = isOwn ? `onclick="mostrarDetalhes(${e.id})"` : '';
+            const classExtra = isOwn ? '' : ' other-vendor';
+            const styleExtra = !isOwn ? 'cursor:default; opacity:0.6;' : 'cursor:pointer;';
+            html += `<div class="dia-card${classExtra}" ${clickAttr} style="${styleExtra}">
                 <div class="info">
                     <div class="horario">${e.horario}</div>
                     <div class="dados">
@@ -2476,7 +2475,7 @@ function logout() {
                     setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
                     setupEncaixeLogic('novoPacienteEncaixe', 'novoPacienteNeurodivergente', 'novoPacienteDeficienciaFisica');
                 }, 100);
-                navegarPara('pageLista');
+                navegarPara('pageCalendario');
             } else {
                 localStorage.clear();
             }

@@ -436,21 +436,85 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     overflow-x: auto;
 }
-.semana-table { width:100%; border-collapse:collapse; }
-.semana-table th, .semana-table td { padding:8px; border:1px solid #edf2f7; text-align:center; vertical-align:top; }
-.semana-table th { background:#f7fafc; }
-.horario-label { font-weight:600; background:#f7fafc; }
+
+/* ===== CORES FORTES PARA ITENS DE CALENDÁRIO ===== */
 .consulta-item {
-    background: #2d3748;
+    background: linear-gradient(135deg, #667eea, #764ba2);
     color: #fff;
     padding: 6px 10px;
     border-radius: 6px;
     margin: 4px 0;
     cursor: pointer;
     font-size: 12px;
-    transition:0.2s;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+    transition: 0.2s;
+    border: 1px solid rgba(255,255,255,0.1);
 }
-.consulta-item:hover { opacity:0.9; transform:scale(1.01); }
+.consulta-item:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.5);
+}
+.consulta-item.status-agendada {
+    background: linear-gradient(135deg, #ed8936, #dd6b20);
+}
+.consulta-item.status-confirmada {
+    background: linear-gradient(135deg, #48bb78, #38a169);
+}
+.consulta-item.status-realizada {
+    background: linear-gradient(135deg, #4299e1, #2b6cb0);
+}
+.consulta-item.status-cancelada {
+    background: linear-gradient(135deg, #fc8181, #e53e3e);
+    opacity: 0.7;
+}
+.dia-consulta {
+    background: #667eea;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    margin: 2px 0;
+    cursor: pointer;
+    font-weight: 500;
+    border: 1px solid rgba(255,255,255,0.2);
+    transition: 0.2s;
+}
+.dia-consulta:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.4);
+}
+.dia-consulta.mais {
+    background: #a0aec0;
+    color: #2d3748;
+    font-weight: 600;
+}
+.dia-card .horario { font-weight:600; color:#2d3748; }
+.dia-card .detalhes { font-size:13px; color:#718096; }
+
+/* ===== ESTILO PARA CONSULTAS DE OUTROS VENDEDORES ===== */
+.consulta-item.other-vendor,
+.dia-consulta.other-vendor,
+.dia-card.other-vendor {
+    opacity: 0.6;
+    cursor: default !important;
+    background: #a0aec0 !important;
+    border: 1px dashed #718096;
+}
+.dia-card.other-vendor {
+    background: #f7fafc !important;
+    border-left-color: #a0aec0;
+}
+.dia-card.other-vendor .horario {
+    color: #718096;
+}
+
+/* TABELAS DO CALENDÁRIO */
+.semana-table { width:100%; border-collapse:collapse; }
+.semana-table th, .semana-table td { padding:8px; border:1px solid #edf2f7; text-align:center; vertical-align:top; }
+.semana-table th { background:#f7fafc; }
+.horario-label { font-weight:600; background:#f7fafc; }
+
 .mes-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -465,15 +529,7 @@ body {
 .dia-cell.outro-mes { background:#f7fafc; color:#a0aec0; }
 .dia-cell.dia-hoje { border-color:#2d3748; background:#f0f4ff; }
 .dia-numero { font-weight:600; }
-.dia-consulta {
-    background: #edf2f7;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 11px;
-    margin: 2px 0;
-    cursor: pointer;
-}
-.dia-consulta.mais { background:transparent; color:#718096; }
+
 .dia-list .dia-card {
     background: #fff;
     border-left: 4px solid #2d3748;
@@ -485,8 +541,6 @@ body {
     justify-content:space-between;
     align-items:center;
 }
-.dia-card .horario { font-weight:600; color:#2d3748; }
-.dia-card .detalhes { font-size:13px; color:#718096; }
 
 /* LISTA DE CONSULTAS */
 .consulta-card {
