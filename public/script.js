@@ -1157,6 +1157,11 @@ function renderizarLista() {
         const hasPedido = c.numero_pedido ? `<br><small>📦 Pedido: ${escapeHtml(c.numero_pedido)}</small>` : '';
         const lojaStr = c.loja_nome ? `<br><small>🏢 ${escapeHtml(c.loja_nome)}</small>` : '';
 
+        // Controle de permissão para abrir detalhes
+        const canView = (isAdmin || isOwn);
+        const clickAttr = canView ? `onclick="mostrarDetalhes(${c.id})"` : '';
+        const cursorStyle = canView ? 'cursor:pointer;' : 'cursor:default;';
+
         if (isAdmin) {
             actions = `
                 <div style="display:flex; gap:5px; flex-wrap:wrap;">
@@ -1210,7 +1215,7 @@ function renderizarLista() {
         }
 
         const isRealizadaClass = isRealizada ? 'consulta-realizada' : '';
-        return `<div class="consulta-card ${extraClass} ${isRealizadaClass}" onclick="mostrarDetalhes(${c.id})" style="cursor:pointer;">
+        return `<div class="consulta-card ${extraClass} ${isRealizadaClass}" ${clickAttr} style="${cursorStyle}">
             <div class="info">
                 ${infoHtml}
             </div>

@@ -9,7 +9,7 @@
 </head>
 <body>
 
-    <!-- ========== LOGIN ========== -->
+    <!-- ===== LOGIN ===== -->
     <div id="loginDiv" class="login-wrapper">
         <div class="login-card">
             <div class="login-header">
@@ -17,26 +17,26 @@
                 <h2>Ótica Macaé</h2>
                 <p>Sistema de Agenda Médica</p>
             </div>
-            <div class="login-form">
+            <form class="login-form" onsubmit="event.preventDefault(); fazerLogin();">
                 <input type="text" id="username" placeholder="Usuário" value="admin" />
                 <input type="password" id="password" placeholder="Senha" value="admin123" />
-                <button onclick="fazerLogin()">Entrar</button>
+                <button type="submit">Entrar</button>
                 <div id="loginMsg" class="login-msg"></div>
                 <div class="login-footer">
                     <small>Admin: admin / admin123</small>
                     <small>Vendedor: vendedor / vender123</small>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
 
-    <!-- ========== DASHBOARD ========== -->
+    <!-- ===== DASHBOARD ===== -->
     <div id="dashboardDiv" class="dashboard" style="display:none;">
 
-        <!-- TOP HEADER -->
+        <!-- HEADER -->
         <header class="main-header">
             <div class="header-left">
-                <button id="hamburgerBtn" class="hamburger"><i class="fas fa-bars"></i></button>
+                <button id="hamburgerBtn" class="hamburger" aria-label="Abrir menu"><i class="fas fa-bars"></i></button>
                 <h1>📅 Agenda Médica</h1>
             </div>
             <div class="header-right">
@@ -84,7 +84,7 @@
         </nav>
         <div class="sidebar-overlay" id="menuOverlay"></div>
 
-        <!-- MAIN CONTENT -->
+        <!-- MAIN -->
         <main class="main-content">
 
             <!-- ===== PÁGINA: LISTA DE CONSULTAS ===== -->
@@ -435,7 +435,7 @@
 
         </main>
 
-        <!-- ========== MODAIS ========== -->
+        <!-- ===== MODAIS ===== -->
         <div id="modalLembretes" class="modal-overlay">
             <div class="modal-box">
                 <h3><i class="fas fa-bell"></i> Lembretes</h3>
