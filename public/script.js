@@ -2,6 +2,8 @@
 // CONFIGURAÇÕES E VARIÁVEIS GLOBAIS
 // ========================================================================
 const API_URL = window.location.origin + '/api';
+const ITENS_POR_PAGINA = 20;
+
 let token = null;
 let user = null;
 let consultas = [];
@@ -14,6 +16,7 @@ let currentDate = new Date();
 let editandoId = null;
 let medicoSelecionadoId = null;
 let consultaParaImprimir = null;
+let paginaAtual = 1;
 let _ultimoContadorLembretes = 0;
 let _ultimoContadorSolic = 0;
 
@@ -150,7 +153,7 @@ function navegarPara(pageId) {
         document.getElementById('perfilLoja').textContent = user.loja_nome || 'Não vinculado';
     }
 
-    if (pageId === 'pageLista') renderizarLista();
+    if (pageId === 'pageLista') renderizarLista(paginaAtual);
     if (pageId === 'pageCalendario') renderizarCalendario();
     if (pageId === 'pageDashboard' && user.tipo === 'admin') carregarDashboard();
 
@@ -296,7 +299,7 @@ async function fazerLogin() {
         document.getElementById('perfilLoja').textContent = user.loja_nome || 'Não vinculado';
 
         await carregarDados();
-        renderizarLista();
+        renderizarLista(1);
         iniciarPollingLembretes();
         if (isAdmin) {
             iniciarPollingSolicitacoes();
@@ -344,7 +347,7 @@ async function carregarDados() {
         clientes = await resClientes.json();
         preencherSelectPacientes();
 
-        renderizarLista();
+        renderizarLista(paginaAtual);
         if (user.tipo === 'admin') {
             const resUsuarios = await fetch(`${API_URL}/usuarios`, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -1077,7 +1080,7 @@ document.addEventListener('change', function(e) {
 });
 
 // ========================================================================
-// CONSULTAS (CRUD)
+// CONSULTAS (CRUD) + LISTA COM PAGINAÇÃO
 // ========================================================================
 async function salvarConsulta() {
     if (user.tipo !== 'admin') { showToast('Apenas administradores podem agendar.', true); return; }
@@ -1127,21 +1130,41 @@ async function salvarConsulta() {
         cancelarEdicao();
         await carregarDados();
         renderizarCalendario();
+        renderizarLista(paginaAtual);
     } catch (err) {
         showToast(err.message, true);
     }
 }
 
-function renderizarLista() {
+function renderizarLista(pagina = 1) {
     const container = document.getElementById('consultasListMain');
+    const paginacao = document.getElementById('listaPaginacao');
     if (!container) return;
+
+    // Ordenar por data (mais recentes primeiro)
+    const listaOrdenada = [...consultas].sort((a, b) => {
+        if (a.data_consulta !== b.data_consulta) {
+            return b.data_consulta.localeCompare(a.data_consulta);
+        }
+        return b.horario.localeCompare(a.horario);
+    });
+
+    const total = listaOrdenada.length;
+    const totalPaginas = Math.ceil(total / ITENS_POR_PAGINA);
+    if (pagina > totalPaginas) pagina = totalPaginas || 1;
+    const inicio = (pagina - 1) * ITENS_POR_PAGINA;
+    const fim = Math.min(inicio + ITENS_POR_PAGINA, total);
+    const paginaConsultas = listaOrdenada.slice(inicio, fim);
+
     if (consultas.length === 0) {
         container.innerHTML = '<p class="no-data">Nenhuma consulta agendada.</p>';
+        paginacao.innerHTML = '';
         return;
     }
+
     const isAdmin = user.tipo === 'admin';
-    container.innerHTML = consultas.map(c => {
-        const isOwn = c.is_own;
+    let html = '';
+    paginaConsultas.forEach(c => {
         const status = c.status || 'agendada';
         let statusClass = 'status-agendada';
         if (status === 'cancelada') statusClass = 'status-cancelada';
@@ -1150,31 +1173,41 @@ function renderizarLista() {
 
         const isRealizada = status === 'realizada';
         const podeEditar = isAdmin && !isRealizada && status !== 'cancelada';
-
-        let actions = '';
-        let extraClass = '';
-        let infoHtml = '';
-        const hasPedido = c.numero_pedido ? `<br><small>📦 Pedido: ${escapeHtml(c.numero_pedido)}</small>` : '';
-        const lojaStr = c.loja_nome ? `<br><small>🏢 ${escapeHtml(c.loja_nome)}</small>` : '';
-
-        // Controle de permissão para abrir detalhes
+        const isOwn = c.is_own;
         const canView = (isAdmin || isOwn);
         const clickAttr = canView ? `onclick="mostrarDetalhes(${c.id})"` : '';
         const cursorStyle = canView ? 'cursor:pointer;' : 'cursor:default;';
 
+        let actions = '';
+        let infoHtml = '';
+        const hasPedido = c.numero_pedido ? `<br><small>📦 Pedido: ${escapeHtml(c.numero_pedido)}</small>` : '';
+        const lojaStr = c.loja_nome ? `<br><small>🏢 ${escapeHtml(c.loja_nome)}</small>` : '';
+
+        // Admin: dropdown para alterar vendedor
+        let vendedorDropdown = '';
+        if (isAdmin && usuarios.length > 0) {
+            vendedorDropdown = `
+                <select class="vendedor-select" data-consulta-id="${c.id}" style="padding:4px 8px; border-radius:4px; border:1px solid #ccc; font-size:12px;">
+                    ${usuarios.map(u => `<option value="${u.id}" ${u.id === c.criado_por ? 'selected' : ''}>${escapeHtml(u.nome)}</option>`).join('')}
+                </select>
+                <button onclick="alterarVendedor(${c.id})" class="btn-warning btn-small" title="Alterar vendedor">🔄</button>
+            `;
+        }
+
         if (isAdmin) {
             actions = `
-                <div style="display:flex; gap:5px; flex-wrap:wrap;">
-                    ${podeEditar ? `<button onclick="editarConsulta(${c.id})" class="btn-warning">✏️</button>` : ''}
-                    ${podeEditar ? `<button onclick="cancelarConsulta(${c.id})" class="btn-danger">🚫</button>` : ''}
-                    ${podeEditar ? `<button onclick="excluirConsulta(${c.id})" class="btn-danger">🗑️</button>` : ''}
+                <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
+                    ${vendedorDropdown}
+                    ${podeEditar ? `<button onclick="editarConsulta(${c.id})" class="btn-warning btn-small" title="Editar">✏️</button>` : ''}
+                    ${podeEditar ? `<button onclick="cancelarConsulta(${c.id})" class="btn-danger btn-small" title="Cancelar">🚫</button>` : ''}
+                    ${podeEditar ? `<button onclick="excluirConsulta(${c.id})" class="btn-danger btn-small" title="Excluir">🗑️</button>` : ''}
                     ${podeEditar && status !== 'cancelada' && status !== 'realizada' && status !== 'confirmada' ? 
-                        `<button onclick="confirmarConsulta(${c.id})" class="btn-success">✅ Confirmar</button>` : ''}
+                        `<button onclick="confirmarConsulta(${c.id})" class="btn-success btn-small" title="Confirmar">✅</button>` : ''}
                     ${podeEditar && status !== 'cancelada' && status !== 'realizada' ? 
-                        `<button onclick="processarConsulta(${c.id})" class="btn-process">🔄 Processar</button>` : ''}
-                    <button onclick="enviarWhatsAppPaciente(${c.id})" class="btn-whatsapp">📱 WhatsApp</button>
-                    <button onclick="enviarWhatsAppMedico(${c.id})" class="btn-medico">📱 Médico</button>
-                    <button onclick="abrirModalImpressao(${c.id})" class="btn-print">🖨️ Imprimir Comprovante</button>
+                        `<button onclick="processarConsulta(${c.id})" class="btn-process btn-small" title="Processar">🔄</button>` : ''}
+                    <button onclick="enviarWhatsAppPaciente(${c.id})" class="btn-whatsapp btn-small" title="WhatsApp Paciente">📱</button>
+                    <button onclick="enviarWhatsAppMedico(${c.id})" class="btn-medico btn-small" title="WhatsApp Médico">📱</button>
+                    <button onclick="abrirModalImpressao(${c.id})" class="btn-print btn-small" title="Imprimir Comprovante">🖨️</button>
                 </div>
             `;
             infoHtml = `
@@ -1190,7 +1223,7 @@ function renderizarLista() {
             if (isOwn) {
                 actions = `
                     <div style="display:flex; gap:5px; flex-wrap:wrap;">
-                        <button onclick="mostrarDetalhes(${c.id})" class="btn-primary">👁️ Ver</button>
+                        <button onclick="mostrarDetalhes(${c.id})" class="btn-primary btn-small">👁️ Ver</button>
                     </div>
                 `;
                 infoHtml = `
@@ -1203,7 +1236,6 @@ function renderizarLista() {
                     <br><small>👤 Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
                 `;
             } else {
-                extraClass = 'other-vendor';
                 infoHtml = `
                     <div style="display:flex; align-items:center; gap:10px;">
                         <span style="font-weight:bold; color:#a0aec0;">⏰ Horário já agendado</span>
@@ -1211,17 +1243,75 @@ function renderizarLista() {
                     </div>
                     <small style="color:#a0aec0;">Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
                 `;
+                actions = '';
             }
         }
 
+        const extraClass = (!isOwn && !isAdmin) ? 'other-vendor' : '';
         const isRealizadaClass = isRealizada ? 'consulta-realizada' : '';
-        return `<div class="consulta-card ${extraClass} ${isRealizadaClass}" ${clickAttr} style="${cursorStyle}">
-            <div class="info">
-                ${infoHtml}
-            </div>
+        html += `<div class="consulta-card ${extraClass} ${isRealizadaClass}" ${clickAttr} style="${cursorStyle}">
+            <div class="info">${infoHtml}</div>
             ${actions}
         </div>`;
-    }).join('');
+    });
+
+    container.innerHTML = html;
+
+    // Controles de paginação
+    paginacao.innerHTML = '';
+    if (totalPaginas > 1) {
+        let pagHtml = '';
+        if (pagina > 1) {
+            pagHtml += `<button onclick="renderizarLista(${pagina - 1})"><i class="fas fa-chevron-left"></i></button>`;
+        }
+        for (let i = 1; i <= totalPaginas; i++) {
+            pagHtml += `<button class="${i === pagina ? 'active' : ''}" onclick="renderizarLista(${i})">${i}</button>`;
+        }
+        if (pagina < totalPaginas) {
+            pagHtml += `<button onclick="renderizarLista(${pagina + 1})"><i class="fas fa-chevron-right"></i></button>`;
+        }
+        paginacao.innerHTML = pagHtml;
+        paginaAtual = pagina;
+    }
+}
+
+// ========================================================================
+// ALTERAR VENDEDOR (admin)
+// ========================================================================
+async function alterarVendedor(consultaId) {
+    if (user.tipo !== 'admin') {
+        showToast('Apenas administradores podem alterar o vendedor.', true);
+        return;
+    }
+    const select = document.querySelector(`.vendedor-select[data-consulta-id="${consultaId}"]`);
+    if (!select) return;
+    const novoVendedorId = parseInt(select.value);
+    if (!novoVendedorId) {
+        showToast('Selecione um vendedor válido.', true);
+        return;
+    }
+
+    if (!confirm('Alterar o vendedor desta consulta?')) return;
+
+    try {
+        const res = await fetch(`${API_URL}/consultas/${consultaId}/vendedor`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ vendedor_id: novoVendedorId })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Erro ao alterar vendedor');
+        }
+        showToast('Vendedor alterado com sucesso!');
+        await carregarDados();
+        renderizarLista(paginaAtual);
+    } catch (err) {
+        showToast(err.message, true);
+    }
 }
 
 // ========================================================================
@@ -1241,6 +1331,7 @@ async function confirmarConsulta(id) {
         showToast('Consulta confirmada!');
         await carregarDados();
         renderizarCalendario();
+        renderizarLista(paginaAtual);
     } catch (err) {
         showToast(err.message, true);
     }
@@ -1260,6 +1351,7 @@ async function processarConsulta(id) {
         showToast('Consulta processada (realizada)!');
         await carregarDados();
         renderizarCalendario();
+        renderizarLista(paginaAtual);
         if (user.tipo === 'admin') carregarDashboard();
     } catch (err) {
         showToast(err.message, true);
@@ -1284,6 +1376,7 @@ async function cancelarConsulta(id) {
         showToast('Consulta cancelada!');
         await carregarDados();
         renderizarCalendario();
+        renderizarLista(paginaAtual);
     } catch (err) {
         showToast(err.message, true);
     }
@@ -1302,6 +1395,7 @@ async function excluirConsulta(id) {
         showToast('Excluída!');
         await carregarDados();
         renderizarCalendario();
+        renderizarLista(paginaAtual);
     } catch (err) {
         showToast(err.message, true);
     }
@@ -2108,6 +2202,7 @@ async function aprovarSolicitacao(id) {
         await carregarSolicitacoes();
         await carregarDados();
         renderizarCalendario();
+        renderizarLista(paginaAtual);
         atualizarBadgeSolicitacoes();
     } catch (err) {
         showToast(err.message, true);
@@ -2466,7 +2561,7 @@ function logout() {
                 document.getElementById('perfilLoja').textContent = user.loja_nome || 'Não vinculado';
 
                 carregarDados();
-                renderizarLista();
+                renderizarLista(1);
                 iniciarPollingLembretes();
                 if (isAdmin) {
                     iniciarPollingSolicitacoes();
@@ -2498,4 +2593,4 @@ document.querySelectorAll('.modal-overlay').forEach(modal => {
     });
 });
 
-console.log('✅ Sistema completo com configurações de impressão personalizáveis.');
+console.log('✅ Sistema completo com paginação, alteração de vendedor e melhorias visuais.');

@@ -40,6 +40,11 @@ body {
     width: 100%;
     max-width: 400px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    animation: fadeInUp 0.5s ease;
+}
+@keyframes fadeInUp {
+    from { opacity:0; transform:translateY(30px); }
+    to { opacity:1; transform:translateY(0); }
 }
 .login-header { text-align: center; margin-bottom: 30px; }
 .login-header .logo-icon {
@@ -131,7 +136,9 @@ body {
     cursor: pointer;
     position: relative;
     color: var(--primary-light);
+    transition: transform 0.2s;
 }
+.icon-btn:hover { transform: scale(1.1); }
 .icon-btn .badge {
     position: absolute;
     top: -8px;
@@ -254,7 +261,7 @@ body {
 }
 .form-card h3, .list-card h3 { margin-bottom: 16px; font-size: 18px; }
 
-/* FORMULÁRIOS */
+/* FORMULÁRIOS com labels */
 .form-row {
     display: flex;
     flex-wrap: wrap;
@@ -321,6 +328,27 @@ body {
 }
 .form-msg { margin-top: 12px; }
 
+/* TOOLTIPS (via title) */
+[title] {
+    position: relative;
+}
+[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 50;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    pointer-events: none;
+}
+
 /* BOTÕES */
 .btn-primary {
     background: var(--primary);
@@ -332,7 +360,7 @@ body {
     cursor: pointer;
     transition: var(--transition);
 }
-.btn-primary:hover { background: var(--primary-light); }
+.btn-primary:hover { background: var(--primary-light); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(45,55,72,0.2); }
 .btn-secondary {
     background: var(--light-gray);
     color: var(--primary);
@@ -343,7 +371,7 @@ body {
     cursor: pointer;
     transition: var(--transition);
 }
-.btn-secondary:hover { background: var(--border); }
+.btn-secondary:hover { background: var(--border); transform: translateY(-1px); }
 .btn-success {
     background: var(--success);
     color: #fff;
@@ -354,7 +382,7 @@ body {
     cursor: pointer;
     transition: var(--transition);
 }
-.btn-success:hover { background: #38a169; }
+.btn-success:hover { background: #38a169; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(72,187,120,0.3); }
 .btn-danger {
     background: var(--danger);
     color: #fff;
@@ -365,7 +393,7 @@ body {
     cursor: pointer;
     transition: var(--transition);
 }
-.btn-danger:hover { background: #e53e3e; }
+.btn-danger:hover { background: #e53e3e; transform: translateY(-1px); }
 .btn-warning {
     background: var(--warning);
     color: #fff;
@@ -395,7 +423,9 @@ body {
     padding: 16px;
     text-align: center;
     box-shadow: var(--shadow);
+    transition: transform 0.2s;
 }
+.stat-card:hover { transform: translateY(-4px); }
 .stat-card .numero { font-size: 28px; font-weight: 700; display: block; }
 .stat-card .label { font-size: 13px; color: #718096; }
 .stat-card.primary .numero { color: var(--primary); }
@@ -452,7 +482,7 @@ body {
     overflow-x: auto;
 }
 
-/* ===== CORES FORTES PARA ITENS DE CALENDÁRIO ===== */
+/* CORES FORTES PARA ITENS DE CALENDÁRIO */
 .consulta-item {
     background: linear-gradient(135deg, var(--secondary), var(--secondary-dark));
     color: #fff;
@@ -504,10 +534,8 @@ body {
     color: var(--primary);
     font-weight: 600;
 }
-.dia-card .horario { font-weight:600; color:var(--primary); }
-.dia-card .detalhes { font-size:13px; color:#718096; }
 
-/* ===== ESTILO PARA CONSULTAS DE OUTROS VENDEDORES ===== */
+/* ESTILO PARA CONSULTAS DE OUTROS VENDEDORES */
 .consulta-item.other-vendor,
 .dia-consulta.other-vendor,
 .dia-card.other-vendor,
@@ -520,9 +548,6 @@ body {
 .dia-card.other-vendor {
     background: var(--light-gray) !important;
     border-left-color: var(--gray);
-}
-.dia-card.other-vendor .horario {
-    color: #718096;
 }
 .consulta-card.other-vendor {
     background: var(--light-gray) !important;
@@ -562,7 +587,12 @@ body {
     align-items:center;
 }
 
-/* LISTA DE CONSULTAS */
+/* LISTA DE CONSULTAS (com paginação) */
+.consultas-list-container {
+    max-height: 600px;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+}
 .consulta-card {
     background: #fff;
     border-radius: var(--radius);
@@ -575,6 +605,11 @@ body {
     flex-wrap:wrap;
     gap:12px;
     border-left:4px solid var(--primary);
+    transition: all 0.2s;
+}
+.consulta-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    transform: translateX(4px);
 }
 .consulta-card .info { flex:1; }
 .consulta-card .info strong { font-size:16px; }
@@ -584,7 +619,32 @@ body {
 .status-realizada { color:var(--info); font-weight:600; }
 .status-cancelada { color:var(--danger); }
 .consulta-realizada { opacity:0.7; background:var(--light-gray); }
-.consulta-card .actions { display:flex; gap:8px; flex-wrap:wrap; }
+.consulta-card .actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+.pagination-controls {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+.pagination-controls button {
+    background: var(--light-gray);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: var(--transition);
+}
+.pagination-controls button.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
+.pagination-controls button:hover:not(.active) {
+    background: var(--border);
+}
 
 /* SUB-PÁGINAS DO ADMIN */
 #pageAdmin .sub-page {
@@ -649,7 +709,7 @@ body {
 .modal-box button { margin-top:8px; }
 .print-options { display:flex; gap:12px; margin:16px 0; flex-wrap:wrap; }
 
-/* ===== COMPROVANTE / IMPRESSÃO ===== */
+/* COMPROVANTE */
 .comprovante-container {
     background: white;
     padding: 20px 30px;
