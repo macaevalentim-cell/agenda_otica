@@ -6,7 +6,7 @@ const { agendarLembrete } = require('../services/lembreteService');
 const router = express.Router();
 
 // =========================================================================
-// LISTAR CONSULTAS (TODAS PARA ADMIN, TODAS COM is_own PARA VENDEDORES)
+// LISTAR CONSULTAS (TODAS PARA TODOS, COM is_own)
 // =========================================================================
 router.get('/', authenticateToken, async (req, res) => {
   try {
@@ -26,8 +26,6 @@ router.get('/', authenticateToken, async (req, res) => {
     `;
 
     const result = await pool.query(query, [userId]);
-
-    // Formatar data para YYYY-MM-DD
     const consultas = result.rows.map(c => ({
       ...c,
       data_consulta: formatDateToYYYYMMDD(c.data_consulta)
@@ -64,7 +62,7 @@ router.get('/filtrar', authenticateToken, async (req, res) => {
     const params = [userId];
     let paramCount = 2;
 
-    // Se não for admin, filtra apenas as próprias consultas (a pedido do filtro)
+    // Filtros (se não for admin, apenas as próprias, mas pode ser sobrescrito)
     if (!isAdmin) {
       query += ` AND c.criado_por = $${paramCount}`;
       params.push(userId);
@@ -409,6 +407,39 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
   } catch (error) {
     console.error('❌ Erro ao atualizar consulta:', error);
     res.status(500).json({ error: 'Erro interno ao atualizar consulta' });
+  }
+});
+
+// =========================================================================
+// ALTERAR VENDEDOR DA CONSULTA (somente admin)
+// =========================================================================
+router.put('/:id/vendedor', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { vendedor_id } = req.body;
+    if (!vendedor_id) {
+      return res.status(400).json({ error: 'Vendedor ID é obrigatório.' });
+    }
+
+    // Verifica se o vendedor existe
+    const userCheck = await pool.query('SELECT id FROM usuarios WHERE id = $1', [vendedor_id]);
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Vendedor não encontrado.' });
+    }
+
+    // Verifica se a consulta existe
+    const consulta = await pool.query('SELECT status FROM consultas WHERE id = $1', [req.params.id]);
+    if (consulta.rows.length === 0) {
+      return res.status(404).json({ error: 'Consulta não encontrada.' });
+    }
+    if (consulta.rows[0].status === 'realizada') {
+      return res.status(400).json({ error: 'Consulta já realizada, não pode alterar.' });
+    }
+
+    await pool.query('UPDATE consultas SET criado_por = $1 WHERE id = $2', [vendedor_id, req.params.id]);
+    res.json({ message: 'Vendedor alterado com sucesso!' });
+  } catch (error) {
+    console.error('❌ Erro ao alterar vendedor:', error);
+    res.status(500).json({ error: 'Erro interno ao alterar vendedor' });
   }
 });
 
