@@ -2,6 +2,7 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
+// ===== CONFIGURAÇÃO DO POOL =====
 let poolConfig;
 if (process.env.DATABASE_URL) {
   poolConfig = {
@@ -22,10 +23,18 @@ if (process.env.DATABASE_URL) {
 
 const pool = new Pool(poolConfig);
 
+// ============================================================
+// FUNÇÃO PRINCIPAL DE INICIALIZAÇÃO
+// ============================================================
 async function initDatabase() {
   try {
     console.log('📦 Inicializando banco de dados (PostgreSQL)...');
 
+    // ============================================================
+    // 1. CRIAÇÃO DAS TABELAS
+    // ============================================================
+
+    // --- Lojas ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS lojas (
         id SERIAL PRIMARY KEY,
@@ -36,6 +45,7 @@ async function initDatabase() {
       )
     `);
 
+    // --- Usuários (com CHECK incluindo 'consultorio') ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -50,6 +60,18 @@ async function initDatabase() {
       )
     `);
 
+    // 🔧 AJUSTE AUTOMÁTICO: Garante que a coluna tipo aceite 'consultorio' (11 caracteres)
+    try {
+      await pool.query(`ALTER TABLE usuarios ALTER COLUMN tipo TYPE VARCHAR(20);`);
+      console.log('✅ Coluna tipo ajustada para VARCHAR(20)');
+    } catch (alterError) {
+      // Se a coluna já for VARCHAR(20) ou não existir, ignora
+      if (!alterError.message.includes('already exists')) {
+        console.warn('⚠️ Não foi possível alterar coluna tipo (pode já estar ok):', alterError.message);
+      }
+    }
+
+    // --- Médicos ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS medicos (
         id SERIAL PRIMARY KEY,
@@ -66,6 +88,7 @@ async function initDatabase() {
       )
     `);
 
+    // --- Clientes ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS clientes (
         id SERIAL PRIMARY KEY,
@@ -83,6 +106,7 @@ async function initDatabase() {
       )
     `);
 
+    // --- Consultas ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS consultas (
         id SERIAL PRIMARY KEY,
@@ -102,6 +126,7 @@ async function initDatabase() {
       )
     `);
 
+    // --- Solicitações ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS solicitacoes_consultas (
         id SERIAL PRIMARY KEY,
@@ -124,6 +149,7 @@ async function initDatabase() {
       )
     `);
 
+    // --- Horários dos médicos (coluna intervalo, sem sufixo _minutos) ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS medico_horarios (
         id SERIAL PRIMARY KEY,
@@ -137,6 +163,7 @@ async function initDatabase() {
       )
     `);
 
+    // --- Lembretes ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS lembretes (
         id SERIAL PRIMARY KEY,
@@ -153,6 +180,7 @@ async function initDatabase() {
       )
     `);
 
+    // --- Configuração WhatsApp ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS whatsapp_config (
         id INTEGER PRIMARY KEY DEFAULT 1,
@@ -163,6 +191,7 @@ async function initDatabase() {
       )
     `);
 
+    // --- Índices para performance ---
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_data ON consultas(data_consulta)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_medico ON consultas(medico_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_status ON consultas(status)`);
@@ -172,7 +201,11 @@ async function initDatabase() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitacoes_status ON solicitacoes_consultas(status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_lembretes_status ON lembretes(status)`);
 
-    // Dados iniciais
+    // ============================================================
+    // 2. DADOS INICIAIS
+    // ============================================================
+
+    // --- Loja padrão ---
     const lojaExist = await pool.query('SELECT id FROM lojas WHERE nome = $1', ['Ótica Macaé - Matriz']);
     let lojaId;
     if (lojaExist.rows.length === 0) {
@@ -186,6 +219,7 @@ async function initDatabase() {
       lojaId = lojaExist.rows[0].id;
     }
 
+    // --- Usuário Admin ---
     const adminExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['admin']);
     if (adminExist.rows.length === 0) {
       const hash = await bcrypt.hash('admin123', 10);
@@ -196,6 +230,7 @@ async function initDatabase() {
       console.log('✅ Usuário admin criado');
     }
 
+    // --- Usuário Vendedor ---
     const vendedorExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['vendedor']);
     if (vendedorExist.rows.length === 0) {
       const hash = await bcrypt.hash('vender123', 10);
@@ -206,7 +241,7 @@ async function initDatabase() {
       console.log('✅ Usuário vendedor criado');
     }
 
-    // Criar usuário consultorio
+    // --- Usuário Consultório ---
     const consultorioExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['consultorio']);
     if (consultorioExist.rows.length === 0) {
       const hash = await bcrypt.hash('consultorio123', 10);
@@ -217,6 +252,7 @@ async function initDatabase() {
       console.log('✅ Usuário consultorio criado');
     }
 
+    // --- Configuração WhatsApp padrão ---
     const configExist = await pool.query('SELECT id FROM whatsapp_config WHERE id = 1');
     if (configExist.rows.length === 0) {
       await pool.query(
@@ -233,4 +269,7 @@ async function initDatabase() {
   }
 }
 
+// ============================================================
+// EXPORTAÇÃO
+// ============================================================
 module.exports = { pool, initDatabase };
