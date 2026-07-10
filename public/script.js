@@ -1080,7 +1080,7 @@ document.addEventListener('change', function(e) {
 });
 
 // ========================================================================
-// CONSULTAS (CRUD) + LISTA COM PAGINAÇÃO
+// CONSULTAS (CRUD) + LISTA COM PAGINAÇÃO E ALTERAÇÃO DE VENDEDOR
 // ========================================================================
 async function salvarConsulta() {
     if (user.tipo !== 'admin') { showToast('Apenas administradores podem agendar.', true); return; }
@@ -1136,6 +1136,9 @@ async function salvarConsulta() {
     }
 }
 
+// ------------------------------------------------------------
+// RENDERIZAR LISTA COM PAGINAÇÃO E ALTERAÇÃO DE VENDEDOR
+// ------------------------------------------------------------
 function renderizarLista(pagina = 1) {
     const container = document.getElementById('consultasListMain');
     const paginacao = document.getElementById('listaPaginacao');
@@ -1183,21 +1186,32 @@ function renderizarLista(pagina = 1) {
         const hasPedido = c.numero_pedido ? `<br><small>📦 Pedido: ${escapeHtml(c.numero_pedido)}</small>` : '';
         const lojaStr = c.loja_nome ? `<br><small>🏢 ${escapeHtml(c.loja_nome)}</small>` : '';
 
-        // Admin: dropdown para alterar vendedor
-        let vendedorDropdown = '';
+        // --- Bloco de alteração de vendedor (admin) ---
+        let vendedorHtml = '';
         if (isAdmin && usuarios.length > 0) {
-            vendedorDropdown = `
-                <select class="vendedor-select" data-consulta-id="${c.id}" style="padding:4px 8px; border-radius:4px; border:1px solid #ccc; font-size:12px;">
-                    ${usuarios.map(u => `<option value="${u.id}" ${u.id === c.criado_por ? 'selected' : ''}>${escapeHtml(u.nome)}</option>`).join('')}
-                </select>
-                <button onclick="alterarVendedor(${c.id})" class="btn-warning btn-small" title="Alterar vendedor">🔄</button>
+            const currentVendedorId = c.criado_por || '';
+            const options = usuarios.map(u => 
+                `<option value="${u.id}" ${u.id === currentVendedorId ? 'selected' : ''}>${escapeHtml(u.nome)}</option>`
+            ).join('');
+
+            // ID único para os controles
+            const uid = `vendedor-${c.id}`;
+
+            vendedorHtml = `
+                <div class="vendedor-controls" style="display:flex; gap:4px; align-items:center; flex-wrap:wrap;">
+                    <select id="${uid}-select" data-consulta-id="${c.id}" data-original="${currentVendedorId}" style="padding:4px 8px; border-radius:4px; border:1px solid #ccc; font-size:12px;">
+                        ${options}
+                    </select>
+                    <button id="${uid}-salvar" class="btn-success btn-small" style="display:none; padding:4px 8px;" onclick="salvarVendedor(${c.id}, '${uid}')">💾 Salvar</button>
+                    <button id="${uid}-cancelar" class="btn-secondary btn-small" style="display:none; padding:4px 8px;" onclick="cancelarVendedor(${c.id}, '${uid}')">✖ Cancelar</button>
+                </div>
             `;
         }
 
         if (isAdmin) {
             actions = `
                 <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
-                    ${vendedorDropdown}
+                    ${vendedorHtml}
                     ${podeEditar ? `<button onclick="editarConsulta(${c.id})" class="btn-warning btn-small" title="Editar">✏️</button>` : ''}
                     ${podeEditar ? `<button onclick="cancelarConsulta(${c.id})" class="btn-danger btn-small" title="Cancelar">🚫</button>` : ''}
                     ${podeEditar ? `<button onclick="excluirConsulta(${c.id})" class="btn-danger btn-small" title="Excluir">🗑️</button>` : ''}
@@ -1257,7 +1271,7 @@ function renderizarLista(pagina = 1) {
 
     container.innerHTML = html;
 
-    // Controles de paginação
+    // Paginação
     paginacao.innerHTML = '';
     if (totalPaginas > 1) {
         let pagHtml = '';
@@ -1273,25 +1287,40 @@ function renderizarLista(pagina = 1) {
         paginacao.innerHTML = pagHtml;
         paginaAtual = pagina;
     }
+
+    // Adicionar eventos para mostrar/ocultar botões de vendedor
+    document.querySelectorAll('.vendedor-controls select').forEach(select => {
+        select.addEventListener('change', function() {
+            const uid = this.id.replace('-select', '');
+            const salvarBtn = document.getElementById(`${uid}-salvar`);
+            const cancelarBtn = document.getElementById(`${uid}-cancelar`);
+            const original = this.getAttribute('data-original');
+            if (this.value !== original) {
+                salvarBtn.style.display = 'inline-block';
+                cancelarBtn.style.display = 'inline-block';
+            } else {
+                salvarBtn.style.display = 'none';
+                cancelarBtn.style.display = 'none';
+            }
+        });
+    });
 }
 
 // ========================================================================
-// ALTERAR VENDEDOR (admin)
+// FUNÇÕES PARA ALTERAR VENDEDOR (SALVAR E CANCELAR)
 // ========================================================================
-async function alterarVendedor(consultaId) {
+async function salvarVendedor(consultaId, uid) {
     if (user.tipo !== 'admin') {
         showToast('Apenas administradores podem alterar o vendedor.', true);
         return;
     }
-    const select = document.querySelector(`.vendedor-select[data-consulta-id="${consultaId}"]`);
+    const select = document.getElementById(`${uid}-select`);
     if (!select) return;
     const novoVendedorId = parseInt(select.value);
     if (!novoVendedorId) {
         showToast('Selecione um vendedor válido.', true);
         return;
     }
-
-    if (!confirm('Alterar o vendedor desta consulta?')) return;
 
     try {
         const res = await fetch(`${API_URL}/consultas/${consultaId}/vendedor`, {
@@ -1307,6 +1336,10 @@ async function alterarVendedor(consultaId) {
             throw new Error(err.error || 'Erro ao alterar vendedor');
         }
         showToast('Vendedor alterado com sucesso!');
+        // Atualizar o data-original e ocultar botões
+        select.setAttribute('data-original', novoVendedorId);
+        document.getElementById(`${uid}-salvar`).style.display = 'none';
+        document.getElementById(`${uid}-cancelar`).style.display = 'none';
         await carregarDados();
         renderizarLista(paginaAtual);
     } catch (err) {
@@ -1314,8 +1347,17 @@ async function alterarVendedor(consultaId) {
     }
 }
 
+function cancelarVendedor(consultaId, uid) {
+    const select = document.getElementById(`${uid}-select`);
+    if (!select) return;
+    const original = select.getAttribute('data-original');
+    select.value = original;
+    document.getElementById(`${uid}-salvar`).style.display = 'none';
+    document.getElementById(`${uid}-cancelar`).style.display = 'none';
+}
+
 // ========================================================================
-// AÇÕES DE CONSULTAS
+// AÇÕES DE CONSULTAS (confirmar, processar, cancelar, excluir, editar)
 // ========================================================================
 async function confirmarConsulta(id) {
     if (user.tipo !== 'admin') { showToast('Apenas administradores podem confirmar.', true); return; }
@@ -1606,7 +1648,7 @@ function fecharComprovante() {
 }
 
 // ========================================================================
-// CALENDÁRIO (com cores fortes e bloqueio de outros vendedores)
+// CALENDÁRIO
 // ========================================================================
 function renderizarCalendario() {
     const container = document.getElementById('calendarioContainer');
@@ -1821,7 +1863,7 @@ async function carregarDashboard() {
 }
 
 // ========================================================================
-// ENVIO DE WHATSAPP
+// ENVIO DE WHATSAPP (mantido igual)
 // ========================================================================
 async function enviarWhatsAppPaciente(id) {
     if (user.tipo !== 'admin') { showToast('Apenas administradores podem enviar.', true); return; }
@@ -1916,7 +1958,7 @@ async function enviarWhatsAppMedico(id) {
 }
 
 // ========================================================================
-// USUÁRIOS
+// USUÁRIOS (CRUD)
 // ========================================================================
 async function salvarUsuario() {
     if (user.tipo !== 'admin') { showToast('Apenas administradores podem criar usuários.', true); return; }
@@ -2593,4 +2635,4 @@ document.querySelectorAll('.modal-overlay').forEach(modal => {
     });
 });
 
-console.log('✅ Sistema completo com paginação, alteração de vendedor e melhorias visuais.');
+console.log('✅ Sistema completo com paginação, alteração de vendedor com salvar/cancelar e campos em maiúsculas.');
