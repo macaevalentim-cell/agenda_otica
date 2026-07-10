@@ -31,7 +31,7 @@ async function initDatabase() {
     console.log('📦 Inicializando banco de dados (PostgreSQL)...');
 
     // ============================================================
-    // 1. CRIAÇÃO DAS TABELAS (com CHECK já incluindo 'consultorio')
+    // 1. CRIAÇÃO DAS TABELAS
     // ============================================================
 
     // --- Lojas ---
@@ -45,7 +45,7 @@ async function initDatabase() {
       )
     `);
 
-    // --- Usuários (com CHECK incluindo 'consultorio' desde o início) ---
+    // --- Usuários (com tipo VARCHAR(20) já) ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -53,32 +53,24 @@ async function initDatabase() {
         username VARCHAR(50) UNIQUE NOT NULL,
         senha VARCHAR(255) NOT NULL,
         telefone VARCHAR(20),
-        tipo VARCHAR(20) DEFAULT 'vendedor' CHECK (tipo IN ('admin', 'vendedor', 'consultorio')),
+        tipo VARCHAR(20) DEFAULT 'vendedor',
         loja_id INTEGER REFERENCES lojas(id) ON DELETE SET NULL,
         ativo BOOLEAN DEFAULT TRUE,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // 🔧 AJUSTE AUTOMÁTICO:
-    // 1. Aumentar tamanho da coluna tipo para VARCHAR(20)
-    try {
-      await pool.query(`ALTER TABLE usuarios ALTER COLUMN tipo TYPE VARCHAR(20);`);
-      console.log('✅ Coluna tipo ajustada para VARCHAR(20)');
-    } catch (alterError) {
-      if (!alterError.message.includes('already exists')) {
-        console.warn('⚠️ Não foi possível alterar coluna tipo (pode já estar ok):', alterError.message);
-      }
-    }
+    // ===== AJUSTES FORÇADOS (cruciais) =====
+    // 1. Garantir que a coluna tipo seja VARCHAR(20)
+    await pool.query(`ALTER TABLE usuarios ALTER COLUMN tipo TYPE VARCHAR(20);`);
+    console.log('✅ Coluna tipo ajustada para VARCHAR(20)');
 
-    // 2. Remover constraint existente e recriar com os valores corretos
-    try {
-      await pool.query(`ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_tipo_check;`);
-      await pool.query(`ALTER TABLE usuarios ADD CONSTRAINT usuarios_tipo_check CHECK (tipo IN ('admin', 'vendedor', 'consultorio'));`);
-      console.log('✅ Constraint de tipo atualizada');
-    } catch (constraintError) {
-      console.warn('⚠️ Não foi possível atualizar constraint (pode já estar ok):', constraintError.message);
-    }
+    // 2. Remover qualquer constraint antiga
+    await pool.query(`ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_tipo_check;`);
+
+    // 3. Recriar a constraint com os valores corretos
+    await pool.query(`ALTER TABLE usuarios ADD CONSTRAINT usuarios_tipo_check CHECK (tipo IN ('admin', 'vendedor', 'consultorio'));`);
+    console.log('✅ Constraint de tipo atualizada');
 
     // --- Médicos ---
     await pool.query(`
@@ -158,7 +150,7 @@ async function initDatabase() {
       )
     `);
 
-    // --- Horários dos médicos (coluna intervalo, sem sufixo _minutos) ---
+    // --- Horários dos médicos (coluna intervalo) ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS medico_horarios (
         id SERIAL PRIMARY KEY,
@@ -200,7 +192,7 @@ async function initDatabase() {
       )
     `);
 
-    // --- Índices para performance ---
+    // --- Índices ---
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_data ON consultas(data_consulta)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_medico ON consultas(medico_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_status ON consultas(status)`);
@@ -228,7 +220,7 @@ async function initDatabase() {
       lojaId = lojaExist.rows[0].id;
     }
 
-    // --- Usuário Admin ---
+    // --- Admin ---
     const adminExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['admin']);
     if (adminExist.rows.length === 0) {
       const hash = await bcrypt.hash('admin123', 10);
@@ -239,7 +231,7 @@ async function initDatabase() {
       console.log('✅ Usuário admin criado');
     }
 
-    // --- Usuário Vendedor ---
+    // --- Vendedor ---
     const vendedorExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['vendedor']);
     if (vendedorExist.rows.length === 0) {
       const hash = await bcrypt.hash('vender123', 10);
@@ -250,7 +242,7 @@ async function initDatabase() {
       console.log('✅ Usuário vendedor criado');
     }
 
-    // --- Usuário Consultório ---
+    // --- Consultório ---
     const consultorioExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['consultorio']);
     if (consultorioExist.rows.length === 0) {
       const hash = await bcrypt.hash('consultorio123', 10);
@@ -261,7 +253,7 @@ async function initDatabase() {
       console.log('✅ Usuário consultorio criado');
     }
 
-    // --- Configuração WhatsApp padrão ---
+    // --- WhatsApp ---
     const configExist = await pool.query('SELECT id FROM whatsapp_config WHERE id = 1');
     if (configExist.rows.length === 0) {
       await pool.query(
