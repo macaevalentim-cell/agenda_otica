@@ -31,7 +31,7 @@ async function initDatabase() {
     console.log('📦 Inicializando banco de dados (PostgreSQL)...');
 
     // ============================================================
-    // 1. CRIAÇÃO DAS TABELAS
+    // 1. CRIAÇÃO DAS TABELAS (com CHECK já incluindo 'consultorio')
     // ============================================================
 
     // --- Lojas ---
@@ -45,7 +45,7 @@ async function initDatabase() {
       )
     `);
 
-    // --- Usuários (com CHECK incluindo 'consultorio') ---
+    // --- Usuários (com CHECK incluindo 'consultorio' desde o início) ---
     await pool.query(`
       CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -60,15 +60,24 @@ async function initDatabase() {
       )
     `);
 
-    // 🔧 AJUSTE AUTOMÁTICO: Garante que a coluna tipo aceite 'consultorio' (11 caracteres)
+    // 🔧 AJUSTE AUTOMÁTICO:
+    // 1. Aumentar tamanho da coluna tipo para VARCHAR(20)
     try {
       await pool.query(`ALTER TABLE usuarios ALTER COLUMN tipo TYPE VARCHAR(20);`);
       console.log('✅ Coluna tipo ajustada para VARCHAR(20)');
     } catch (alterError) {
-      // Se a coluna já for VARCHAR(20) ou não existir, ignora
       if (!alterError.message.includes('already exists')) {
         console.warn('⚠️ Não foi possível alterar coluna tipo (pode já estar ok):', alterError.message);
       }
+    }
+
+    // 2. Remover constraint existente e recriar com os valores corretos
+    try {
+      await pool.query(`ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_tipo_check;`);
+      await pool.query(`ALTER TABLE usuarios ADD CONSTRAINT usuarios_tipo_check CHECK (tipo IN ('admin', 'vendedor', 'consultorio'));`);
+      console.log('✅ Constraint de tipo atualizada');
+    } catch (constraintError) {
+      console.warn('⚠️ Não foi possível atualizar constraint (pode já estar ok):', constraintError.message);
     }
 
     // --- Médicos ---
@@ -269,7 +278,4 @@ async function initDatabase() {
   }
 }
 
-// ============================================================
-// EXPORTAÇÃO
-// ============================================================
 module.exports = { pool, initDatabase };
