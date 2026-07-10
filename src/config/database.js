@@ -43,7 +43,7 @@ async function initDatabase() {
         username VARCHAR(50) UNIQUE NOT NULL,
         senha VARCHAR(255) NOT NULL,
         telefone VARCHAR(20),
-        tipo VARCHAR(10) DEFAULT 'vendedor' CHECK (tipo IN ('admin', 'vendedor', 'consultorio')),
+        tipo VARCHAR(20) DEFAULT 'vendedor' CHECK (tipo IN ('admin', 'vendedor', 'consultorio')),
         loja_id INTEGER REFERENCES lojas(id) ON DELETE SET NULL,
         ativo BOOLEAN DEFAULT TRUE,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
