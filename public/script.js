@@ -21,6 +21,33 @@ let _ultimoContadorLembretes = 0;
 let _ultimoContadorSolic = 0;
 
 // ========================================================================
+// TEMA CLARO/ESCURO
+// ========================================================================
+function aplicarTema() {
+    const tema = localStorage.getItem('theme') || 'light';
+    if (tema === 'dark') {
+        document.body.classList.add('dark-theme');
+        const icon = document.querySelector('#themeToggle i');
+        if (icon) icon.className = 'fas fa-sun';
+    } else {
+        document.body.classList.remove('dark-theme');
+        const icon = document.querySelector('#themeToggle i');
+        if (icon) icon.className = 'fas fa-moon';
+    }
+}
+
+function toggleTheme() {
+    const body = document.body;
+    body.classList.toggle('dark-theme');
+    const tema = body.classList.contains('dark-theme') ? 'dark' : 'light';
+    localStorage.setItem('theme', tema);
+    const icon = document.querySelector('#themeToggle i');
+    if (icon) {
+        icon.className = tema === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    }
+}
+
+// ========================================================================
 // UTILITÁRIOS
 // ========================================================================
 function showToast(msg, isError = false) {
@@ -149,7 +176,7 @@ function navegarPara(pageId) {
     if (pageId === 'pagePerfil') {
         document.getElementById('perfilNome').textContent = user.nome;
         document.getElementById('perfilUsername').textContent = user.username;
-        document.getElementById('perfilTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+        document.getElementById('perfilTipo').textContent = user.tipo === 'admin' ? 'Administrador' : user.tipo === 'consultorio' ? 'Consultório' : 'Vendedor';
         document.getElementById('perfilLoja').textContent = user.loja_nome || 'Não vinculado';
     }
 
@@ -214,6 +241,13 @@ function fecharMenu() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Tema
+    aplicarTema();
+    const themeBtn = document.getElementById('themeToggle');
+    if (themeBtn) {
+        themeBtn.addEventListener('click', toggleTheme);
+    }
+
     const hamburger = document.getElementById('hamburgerBtn');
     const closeBtn = document.getElementById('closeMenuBtn');
     const overlay = document.getElementById('menuOverlay');
@@ -279,9 +313,11 @@ async function fazerLogin() {
         localStorage.setItem('user', JSON.stringify(user));
         document.getElementById('loginDiv').style.display = 'none';
         document.getElementById('dashboardDiv').style.display = 'block';
-        document.getElementById('userName').innerHTML = `👤 ${user.nome} (${user.tipo === 'admin' ? 'Admin' : 'Vendedor'})`;
+
+        const labelTipo = user.tipo === 'admin' ? 'Admin' : user.tipo === 'consultorio' ? 'Consultório' : 'Vendedor';
+        document.getElementById('userName').innerHTML = `👤 ${user.nome} (${labelTipo})`;
         document.getElementById('menuUserName').textContent = user.nome;
-        document.getElementById('menuUserTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+        document.getElementById('menuUserTipo').textContent = labelTipo;
 
         if (user.loja_nome) {
             document.getElementById('lojaNome').innerHTML = `🏢 ${user.loja_nome}`;
@@ -289,13 +325,23 @@ async function fazerLogin() {
         }
 
         const isAdmin = user.tipo === 'admin';
+        const isConsultorio = user.tipo === 'consultorio';
+
+        // Ajustar menus por tipo
+        document.getElementById('menuCalendario').style.display = isConsultorio ? 'none' : 'block';
         document.getElementById('menuAgendar').style.display = isAdmin ? 'block' : 'none';
+        document.getElementById('menuSolicitar').style.display = isConsultorio ? 'none' : 'block';
         document.getElementById('menuDashboard').style.display = isAdmin ? 'block' : 'none';
         document.getElementById('menuAdmin').style.display = isAdmin ? 'block' : 'none';
 
+        // Sub-itens do admin (para consultorio ficam ocultos)
+        document.querySelectorAll('.menu-item[data-sub]').forEach(el => {
+            el.style.display = isAdmin ? 'block' : 'none';
+        });
+
         document.getElementById('perfilNome').textContent = user.nome;
         document.getElementById('perfilUsername').textContent = user.username;
-        document.getElementById('perfilTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+        document.getElementById('perfilTipo').textContent = labelTipo;
         document.getElementById('perfilLoja').textContent = user.loja_nome || 'Não vinculado';
 
         await carregarDados();
@@ -308,7 +354,7 @@ async function fazerLogin() {
             carregarConfigImpressao();
         }
         fecharMenu();
-        navegarPara('pageCalendario');
+        navegarPara('pageLista');
 
         setTimeout(() => {
             setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
@@ -1000,8 +1046,16 @@ async function carregarHorariosDisponiveis() {
             msgDiv.innerHTML = '⚠️ Médico não possui horários disponíveis para esta data.';
             return;
         }
+        // Para agendamento, queremos apenas os disponíveis (true)
+        const disponiveis = horarios.filter(h => h.disponivel !== false);
+        if (disponiveis.length === 0) {
+            select.innerHTML = '<option value="">Nenhum horário disponível</option>';
+            msgDiv.style.display = 'block';
+            msgDiv.innerHTML = '⚠️ Todos os horários estão ocupados nesta data.';
+            return;
+        }
         select.innerHTML = '<option value="">Selecione um horário</option>' +
-            horarios.map(h => `<option value="${h.horario}">${h.horario}</option>`).join('');
+            disponiveis.map(h => `<option value="${h.horario}">${h.horario}</option>`).join('');
         msgDiv.style.display = 'none';
     } catch (err) {
         select.innerHTML = '<option value="">Erro ao carregar</option>';
@@ -1017,7 +1071,7 @@ document.addEventListener('change', function(e) {
 });
 
 // ========================================================================
-// CARREGAR HORÁRIOS DISPONÍVEIS (SOLICITAÇÃO)
+// CARREGAR HORÁRIOS DISPONÍVEIS (SOLICITAÇÃO - com ocupados)
 // ========================================================================
 async function carregarHorariosDisponiveisSol() {
     const medicoId = document.getElementById('solMedicoSelect').value;
@@ -1062,9 +1116,18 @@ async function carregarHorariosDisponiveisSol() {
             msgDiv.innerHTML = '⚠️ Médico não possui horários disponíveis para esta data.';
             return;
         }
-        const options = '<option value="">Selecione um horário</option>' +
-            horarios.map(h => `<option value="${h.horario}">${h.horario}</option>`).join('');
-        selects.forEach(s => s.innerHTML = options);
+
+        // Montar opções com flag de ocupado
+        let optionsHtml = '<option value="">Selecione um horário</option>';
+        horarios.forEach(h => {
+            const disponivel = h.disponivel !== false;
+            const label = disponivel ? h.horario : `${h.horario} (Agendado)`;
+            const disabled = !disponivel ? 'disabled' : '';
+            const style = !disponivel ? 'style="color:#999; background:#f5f5f5;"' : '';
+            optionsHtml += `<option value="${h.horario}" ${disabled} ${style}>${label}</option>`;
+        });
+
+        selects.forEach(s => s.innerHTML = optionsHtml);
         msgDiv.style.display = 'none';
     } catch (err) {
         selects.forEach(s => s.innerHTML = '<option value="">Erro</option>');
@@ -1080,7 +1143,7 @@ document.addEventListener('change', function(e) {
 });
 
 // ========================================================================
-// CONSULTAS (CRUD) + LISTA COM PAGINAÇÃO E ALTERAÇÃO DE VENDEDOR
+// CONSULTAS (CRUD) + LISTA COM PAGINAÇÃO, ALTERAÇÃO DE VENDEDOR E PERFIL CONSULTORIO
 // ========================================================================
 async function salvarConsulta() {
     if (user.tipo !== 'admin') { showToast('Apenas administradores podem agendar.', true); return; }
@@ -1136,15 +1199,14 @@ async function salvarConsulta() {
     }
 }
 
-// ------------------------------------------------------------
-// RENDERIZAR LISTA COM PAGINAÇÃO E ALTERAÇÃO DE VENDEDOR
-// ------------------------------------------------------------
+// ========================================================================
+// RENDERIZAR LISTA (com paginação, vendedor, consultorio)
+// ========================================================================
 function renderizarLista(pagina = 1) {
     const container = document.getElementById('consultasListMain');
     const paginacao = document.getElementById('listaPaginacao');
     if (!container) return;
 
-    // Ordenar por data (mais recentes primeiro)
     const listaOrdenada = [...consultas].sort((a, b) => {
         if (a.data_consulta !== b.data_consulta) {
             return b.data_consulta.localeCompare(a.data_consulta);
@@ -1166,6 +1228,7 @@ function renderizarLista(pagina = 1) {
     }
 
     const isAdmin = user.tipo === 'admin';
+    const isConsultorio = user.tipo === 'consultorio';
     let html = '';
     paginaConsultas.forEach(c => {
         const status = c.status || 'agendada';
@@ -1186,17 +1249,14 @@ function renderizarLista(pagina = 1) {
         const hasPedido = c.numero_pedido ? `<br><small>📦 Pedido: ${escapeHtml(c.numero_pedido)}</small>` : '';
         const lojaStr = c.loja_nome ? `<br><small>🏢 ${escapeHtml(c.loja_nome)}</small>` : '';
 
-        // --- Bloco de alteração de vendedor (admin) ---
+        // Bloco de alteração de vendedor (admin)
         let vendedorHtml = '';
         if (isAdmin && usuarios.length > 0) {
             const currentVendedorId = c.criado_por || '';
             const options = usuarios.map(u => 
                 `<option value="${u.id}" ${u.id === currentVendedorId ? 'selected' : ''}>${escapeHtml(u.nome)}</option>`
             ).join('');
-
-            // ID único para os controles
             const uid = `vendedor-${c.id}`;
-
             vendedorHtml = `
                 <div class="vendedor-controls" style="display:flex; gap:4px; align-items:center; flex-wrap:wrap;">
                     <select id="${uid}-select" data-consulta-id="${c.id}" data-original="${currentVendedorId}" style="padding:4px 8px; border-radius:4px; border:1px solid #ccc; font-size:12px;">
@@ -1208,13 +1268,15 @@ function renderizarLista(pagina = 1) {
             `;
         }
 
+        // Ações para admin
         if (isAdmin) {
+            const podeExcluir = status === 'cancelada';
             actions = `
                 <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
                     ${vendedorHtml}
                     ${podeEditar ? `<button onclick="editarConsulta(${c.id})" class="btn-warning btn-small" title="Editar">✏️</button>` : ''}
                     ${podeEditar ? `<button onclick="cancelarConsulta(${c.id})" class="btn-danger btn-small" title="Cancelar">🚫</button>` : ''}
-                    ${podeEditar ? `<button onclick="excluirConsulta(${c.id})" class="btn-danger btn-small" title="Excluir">🗑️</button>` : ''}
+                    ${podeExcluir ? `<button onclick="excluirConsulta(${c.id})" class="btn-danger btn-small" title="Excluir">🗑️</button>` : ''}
                     ${podeEditar && status !== 'cancelada' && status !== 'realizada' && status !== 'confirmada' ? 
                         `<button onclick="confirmarConsulta(${c.id})" class="btn-success btn-small" title="Confirmar">✅</button>` : ''}
                     ${podeEditar && status !== 'cancelada' && status !== 'realizada' ? 
@@ -1233,7 +1295,29 @@ function renderizarLista(pagina = 1) {
                 ${c.observacoes ? `<br><small>📝 ${escapeHtml(c.observacoes)}</small>` : ''}
                 <br><small>👤 Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
             `;
-        } else {
+        } 
+        // Ações para consultorio
+        else if (isConsultorio) {
+            const podeConfirmar = !isRealizada && status !== 'cancelada' && status !== 'confirmada';
+            const podeCancelar = !isRealizada && status !== 'cancelada';
+            actions = `
+                <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
+                    ${podeConfirmar ? `<button onclick="confirmarConsulta(${c.id})" class="btn-success btn-small" title="Confirmar">✅ Confirmar</button>` : ''}
+                    ${podeCancelar ? `<button onclick="cancelarConsulta(${c.id})" class="btn-danger btn-small" title="Cancelar">🚫 Cancelar</button>` : ''}
+                </div>
+            `;
+            infoHtml = `
+                <strong>${escapeHtml(c.paciente_nome)}</strong>
+                <span class="${statusClass}">${status}</span><br>
+                ${formatDisplay(c.data_consulta)} ${c.horario} | Dr. ${escapeHtml(c.medico_nome)}
+                ${hasPedido}
+                ${lojaStr}
+                ${c.observacoes ? `<br><small>📝 ${escapeHtml(c.observacoes)}</small>` : ''}
+                <br><small>👤 Vendedor: ${escapeHtml(c.vendedor_nome || 'Não informado')}</small>
+            `;
+        } 
+        // Vendedor comum
+        else {
             if (isOwn) {
                 actions = `
                     <div style="display:flex; gap:5px; flex-wrap:wrap;">
@@ -1261,7 +1345,7 @@ function renderizarLista(pagina = 1) {
             }
         }
 
-        const extraClass = (!isOwn && !isAdmin) ? 'other-vendor' : '';
+        const extraClass = (!isOwn && !isAdmin && !isConsultorio) ? 'other-vendor' : '';
         const isRealizadaClass = isRealizada ? 'consulta-realizada' : '';
         html += `<div class="consulta-card ${extraClass} ${isRealizadaClass}" ${clickAttr} style="${cursorStyle}">
             <div class="info">${infoHtml}</div>
@@ -1288,7 +1372,7 @@ function renderizarLista(pagina = 1) {
         paginaAtual = pagina;
     }
 
-    // Adicionar eventos para mostrar/ocultar botões de vendedor
+    // Eventos para mostrar/ocultar botões de vendedor
     document.querySelectorAll('.vendedor-controls select').forEach(select => {
         select.addEventListener('change', function() {
             const uid = this.id.replace('-select', '');
@@ -1307,7 +1391,7 @@ function renderizarLista(pagina = 1) {
 }
 
 // ========================================================================
-// FUNÇÕES PARA ALTERAR VENDEDOR (SALVAR E CANCELAR)
+// FUNÇÕES PARA ALTERAR VENDEDOR
 // ========================================================================
 async function salvarVendedor(consultaId, uid) {
     if (user.tipo !== 'admin') {
@@ -1336,7 +1420,6 @@ async function salvarVendedor(consultaId, uid) {
             throw new Error(err.error || 'Erro ao alterar vendedor');
         }
         showToast('Vendedor alterado com sucesso!');
-        // Atualizar o data-original e ocultar botões
         select.setAttribute('data-original', novoVendedorId);
         document.getElementById(`${uid}-salvar`).style.display = 'none';
         document.getElementById(`${uid}-cancelar`).style.display = 'none';
@@ -1357,10 +1440,15 @@ function cancelarVendedor(consultaId, uid) {
 }
 
 // ========================================================================
-// AÇÕES DE CONSULTAS (confirmar, processar, cancelar, excluir, editar)
+// AÇÕES DE CONSULTAS
 // ========================================================================
 async function confirmarConsulta(id) {
-    if (user.tipo !== 'admin') { showToast('Apenas administradores podem confirmar.', true); return; }
+    const isAdmin = user.tipo === 'admin';
+    const isConsultorio = user.tipo === 'consultorio';
+    if (!isAdmin && !isConsultorio) {
+        showToast('Apenas administradores ou consultório podem confirmar.', true);
+        return;
+    }
     const c = consultas.find(cons => cons.id === id);
     if (c && c.status === 'realizada') { showToast('Consulta já realizada.', true); return; }
     if (!confirm('Confirmar esta consulta?')) return;
@@ -1401,20 +1489,45 @@ async function processarConsulta(id) {
 }
 
 async function cancelarConsulta(id) {
-    if (user.tipo !== 'admin') { showToast('Apenas administradores podem cancelar.', true); return; }
+    const isAdmin = user.tipo === 'admin';
+    const isConsultorio = user.tipo === 'consultorio';
+    if (!isAdmin && !isConsultorio) {
+        showToast('Apenas administradores ou consultório podem cancelar.', true);
+        return;
+    }
     const c = consultas.find(cons => cons.id === id);
     if (c && c.status === 'realizada') { showToast('Consulta já realizada. Não pode ser cancelada.', true); return; }
     if (!confirm('Cancelar esta consulta?')) return;
     try {
-        const consulta = consultas.find(c => c.id === id);
-        if (!consulta) return;
-        const dados = { ...consulta, status: 'cancelada' };
-        const res = await fetch(`${API_URL}/consultas/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify(dados)
-        });
-        if (!res.ok) throw new Error('Erro ao cancelar');
+        // Para consultorio, usa PUT com status cancelada
+        if (isConsultorio) {
+            const res = await fetch(`${API_URL}/consultas/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ status: 'cancelada' })
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Erro ao cancelar');
+            }
+        } else {
+            // Admin usa a mesma lógica (mas pode fazer mais coisas)
+            const consulta = consultas.find(c => c.id === id);
+            if (!consulta) return;
+            const dados = { ...consulta, status: 'cancelada' };
+            const res = await fetch(`${API_URL}/consultas/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify(dados)
+            });
+            if (!res.ok) throw new Error('Erro ao cancelar');
+        }
         showToast('Consulta cancelada!');
         await carregarDados();
         renderizarCalendario();
@@ -1427,8 +1540,11 @@ async function cancelarConsulta(id) {
 async function excluirConsulta(id) {
     if (user.tipo !== 'admin') { showToast('Apenas administradores podem excluir.', true); return; }
     const c = consultas.find(cons => cons.id === id);
-    if (c && c.status === 'realizada') { showToast('Consulta já realizada. Não pode ser excluída.', true); return; }
-    if (!confirm('Excluir permanentemente?')) return;
+    if (!c || c.status !== 'cancelada') {
+        showToast('Apenas consultas canceladas podem ser excluídas.', true);
+        return;
+    }
+    if (!confirm('Excluir permanentemente esta consulta cancelada?')) return;
     try {
         await fetch(`${API_URL}/consultas/${id}`, {
             method: 'DELETE',
@@ -1648,7 +1764,7 @@ function fecharComprovante() {
 }
 
 // ========================================================================
-// CALENDÁRIO
+// CALENDÁRIO (cores fortes e bloqueio de outros vendedores)
 // ========================================================================
 function renderizarCalendario() {
     const container = document.getElementById('calendarioContainer');
@@ -1863,7 +1979,7 @@ async function carregarDashboard() {
 }
 
 // ========================================================================
-// ENVIO DE WHATSAPP (mantido igual)
+// ENVIO DE WHATSAPP
 // ========================================================================
 async function enviarWhatsAppPaciente(id) {
     if (user.tipo !== 'admin') { showToast('Apenas administradores podem enviar.', true); return; }
@@ -1958,7 +2074,7 @@ async function enviarWhatsAppMedico(id) {
 }
 
 // ========================================================================
-// USUÁRIOS (CRUD)
+// USUÁRIOS (CRUD) - com perfil consultorio
 // ========================================================================
 async function salvarUsuario() {
     if (user.tipo !== 'admin') { showToast('Apenas administradores podem criar usuários.', true); return; }
@@ -2583,9 +2699,11 @@ function logout() {
             if (data.valid) {
                 document.getElementById('loginDiv').style.display = 'none';
                 document.getElementById('dashboardDiv').style.display = 'block';
-                document.getElementById('userName').innerHTML = `👤 ${user.nome} (${user.tipo === 'admin' ? 'Admin' : 'Vendedor'})`;
+
+                const labelTipo = user.tipo === 'admin' ? 'Admin' : user.tipo === 'consultorio' ? 'Consultório' : 'Vendedor';
+                document.getElementById('userName').innerHTML = `👤 ${user.nome} (${labelTipo})`;
                 document.getElementById('menuUserName').textContent = user.nome;
-                document.getElementById('menuUserTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+                document.getElementById('menuUserTipo').textContent = labelTipo;
 
                 if (user.loja_nome) {
                     document.getElementById('lojaNome').innerHTML = `🏢 ${user.loja_nome}`;
@@ -2593,13 +2711,20 @@ function logout() {
                 }
 
                 const isAdmin = user.tipo === 'admin';
+                const isConsultorio = user.tipo === 'consultorio';
+
+                document.getElementById('menuCalendario').style.display = isConsultorio ? 'none' : 'block';
                 document.getElementById('menuAgendar').style.display = isAdmin ? 'block' : 'none';
+                document.getElementById('menuSolicitar').style.display = isConsultorio ? 'none' : 'block';
                 document.getElementById('menuDashboard').style.display = isAdmin ? 'block' : 'none';
                 document.getElementById('menuAdmin').style.display = isAdmin ? 'block' : 'none';
+                document.querySelectorAll('.menu-item[data-sub]').forEach(el => {
+                    el.style.display = isAdmin ? 'block' : 'none';
+                });
 
                 document.getElementById('perfilNome').textContent = user.nome;
                 document.getElementById('perfilUsername').textContent = user.username;
-                document.getElementById('perfilTipo').textContent = user.tipo === 'admin' ? 'Administrador' : 'Vendedor';
+                document.getElementById('perfilTipo').textContent = labelTipo;
                 document.getElementById('perfilLoja').textContent = user.loja_nome || 'Não vinculado';
 
                 carregarDados();
@@ -2617,7 +2742,7 @@ function logout() {
                     setupEncaixeLogic('solEncaixe', 'solNeurodivergente', 'solDeficienciaFisica');
                     setupEncaixeLogic('novoPacienteEncaixe', 'novoPacienteNeurodivergente', 'novoPacienteDeficienciaFisica');
                 }, 100);
-                navegarPara('pageCalendario');
+                navegarPara('pageLista');
             } else {
                 localStorage.clear();
             }
@@ -2635,4 +2760,4 @@ document.querySelectorAll('.modal-overlay').forEach(modal => {
     });
 });
 
-console.log('✅ Sistema completo com paginação, alteração de vendedor com salvar/cancelar e campos em maiúsculas.');
+console.log('✅ Sistema completo com tema, perfil consultorio, horários ocupados e exclusão de canceladas.');

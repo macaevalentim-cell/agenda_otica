@@ -25,6 +25,7 @@
                 <div class="login-footer">
                     <small>Admin: admin / admin123</small>
                     <small>Vendedor: vendedor / vender123</small>
+                    <small>Consultório: consultorio / consultorio123</small>
                 </div>
             </form>
         </div>
@@ -42,6 +43,9 @@
             <div class="header-right">
                 <span id="userName" class="user-badge"></span>
                 <span id="lojaNome" class="loja-badge"></span>
+                <button id="themeToggle" class="icon-btn" title="Alternar tema">
+                    <i class="fas fa-moon"></i>
+                </button>
                 <button onclick="abrirModalLembretes()" class="icon-btn" title="Lembretes">
                     <i class="fas fa-bell"></i>
                     <span id="badgeLembretes" class="badge">0</span>
@@ -64,10 +68,10 @@
                 </div>
             </div>
             <ul class="menu-list">
-                <li><button class="menu-item" data-page="pageLista"><i class="fas fa-list"></i> Lista de Consultas</button></li>
-                <li><button class="menu-item active" data-page="pageCalendario"><i class="fas fa-calendar-alt"></i> Calendário</button></li>
+                <li><button class="menu-item active" data-page="pageLista"><i class="fas fa-list"></i> Lista de Consultas</button></li>
+                <li><button class="menu-item" data-page="pageCalendario" id="menuCalendario"><i class="fas fa-calendar-alt"></i> Calendário</button></li>
                 <li><button class="menu-item" data-page="pageAgendar" id="menuAgendar"><i class="fas fa-pen"></i> Agendar</button></li>
-                <li><button class="menu-item" data-page="pageSolicitar" style="background:#48bb78; color:white;"><i class="fas fa-paper-plane"></i> Solicitar</button></li>
+                <li><button class="menu-item" data-page="pageSolicitar" id="menuSolicitar" style="background:#48bb78; color:white;"><i class="fas fa-paper-plane"></i> Solicitar</button></li>
                 <li><button class="menu-item" data-page="pageDashboard" id="menuDashboard"><i class="fas fa-chart-bar"></i> Dashboard</button></li>
                 <li><button class="menu-item" data-page="pageAdmin" id="menuAdmin"><i class="fas fa-cogs"></i> Admin</button></li>
                 <hr />
@@ -87,15 +91,15 @@
         <!-- MAIN -->
         <main class="main-content">
 
-            <!-- ===== PÁGINA: LISTA DE CONSULTAS (com paginação) ===== -->
-            <section id="pageLista" class="page">
+            <!-- ===== PÁGINA: LISTA DE CONSULTAS (INICIAL) ===== -->
+            <section id="pageLista" class="page active">
                 <h2><i class="fas fa-list"></i> Lista de Consultas</h2>
                 <div id="consultasListMain" class="consultas-list-container"></div>
                 <div id="listaPaginacao" class="pagination-controls"></div>
             </section>
 
             <!-- ===== PÁGINA: CALENDÁRIO ===== -->
-            <section id="pageCalendario" class="page active">
+            <section id="pageCalendario" class="page">
                 <h2><i class="fas fa-calendar-alt"></i> Calendário de Consultas</h2>
                 <div class="calendar-toolbar">
                     <div class="view-buttons">
@@ -113,98 +117,50 @@
                 <div id="calendarioContainer" class="calendar-container"></div>
             </section>
 
-            <!-- ===== PÁGINA: AGENDAR (admin) com campos reorganizados ===== -->
+            <!-- ===== PÁGINA: AGENDAR (admin) ===== -->
             <section id="pageAgendar" class="page">
                 <h2><i class="fas fa-pen"></i> Agendar Consulta</h2>
                 <div class="form-card">
-                    <!-- Busca por CPF -->
                     <div class="form-row">
                         <div class="form-group" style="flex:2; display:flex; gap:5px;">
                             <input type="text" id="buscarCpf" placeholder="Buscar paciente por CPF" style="flex:1;" />
-                            <button onclick="buscarPacientePorCpf()" class="btn-secondary" title="Buscar paciente">🔍</button>
-                            <button onclick="limparBuscaPaciente()" class="btn-danger" title="Limpar busca">Limpar</button>
+                            <button onclick="buscarPacientePorCpf()" class="btn-secondary">🔍</button>
+                            <button onclick="limparBuscaPaciente()" class="btn-danger">Limpar</button>
                         </div>
                     </div>
-
-                    <!-- Paciente: Select + Nome + Telefone -->
                     <div class="form-row">
                         <div class="form-group" style="flex:2; display:flex; gap:5px; align-items:center;">
                             <select id="pacienteSelect" style="flex:1;">
                                 <option value="">Selecione um paciente</option>
                             </select>
-                            <button onclick="abrirModalCadastroPaciente()" class="btn-success" title="Cadastrar novo paciente">+</button>
+                            <button onclick="abrirModalCadastroPaciente()" class="btn-success">+</button>
                         </div>
-                        <div class="form-group">
-                            <label for="pacienteNome">Nome *</label>
-                            <input type="text" id="pacienteNome" placeholder="Nome *" />
-                        </div>
-                        <div class="form-group">
-                            <label for="pacienteTelefone">Telefone *</label>
-                            <input type="text" id="pacienteTelefone" placeholder="Telefone *" />
-                        </div>
+                        <div class="form-group"><label for="pacienteNome">Nome *</label><input type="text" id="pacienteNome" placeholder="Nome *" /></div>
+                        <div class="form-group"><label for="pacienteTelefone">Telefone *</label><input type="text" id="pacienteTelefone" placeholder="Telefone *" /></div>
                     </div>
-
-                    <!-- Email + CPF + Data Nascimento -->
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="pacienteEmail">E-mail</label>
-                            <input type="email" id="pacienteEmail" placeholder="E-mail" />
-                        </div>
-                        <div class="form-group">
-                            <label for="pacienteCpf">CPF</label>
-                            <input type="text" id="pacienteCpf" placeholder="CPF" />
-                        </div>
-                        <div class="form-group">
-                            <label for="pacienteDataNasc">Data Nascimento</label>
-                            <input type="date" id="pacienteDataNasc" />
-                        </div>
+                        <div class="form-group"><label for="pacienteEmail">E-mail</label><input type="email" id="pacienteEmail" placeholder="E-mail" /></div>
+                        <div class="form-group"><label for="pacienteCpf">CPF</label><input type="text" id="pacienteCpf" placeholder="CPF" /></div>
+                        <div class="form-group"><label for="pacienteDataNasc">Data Nascimento</label><input type="date" id="pacienteDataNasc" /></div>
                     </div>
-
-                    <!-- Condições -->
                     <div class="form-row check-group">
                         <label><input type="checkbox" id="pacienteEncaixe" checked /> Encaixe</label>
                         <label><input type="checkbox" id="pacienteNeurodivergente" disabled /> Neurodivergente</label>
                         <label><input type="checkbox" id="pacienteDeficienciaFisica" disabled /> Deficiência Física</label>
                         <span id="idadeDisplay" class="idade-display"></span>
                     </div>
-
-                    <!-- MÉDICO (agora antes da data) -->
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="medicoSelect">Médico *</label>
-                            <select id="medicoSelect">
-                                <option value="">Selecione um médico</option>
-                            </select>
-                        </div>
+                        <div class="form-group"><label for="medicoSelect">Médico *</label><select id="medicoSelect"><option value="">Selecione um médico</option></select></div>
                     </div>
-
-                    <!-- Data + Horário -->
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="dataConsulta">Data *</label>
-                            <input type="date" id="dataConsulta" />
-                        </div>
-                        <div class="form-group">
-                            <label for="horarioSelect">Horário *</label>
-                            <select id="horarioSelect">
-                                <option value="">Selecione médico e data</option>
-                            </select>
-                        </div>
+                        <div class="form-group"><label for="dataConsulta">Data *</label><input type="date" id="dataConsulta" /></div>
+                        <div class="form-group"><label for="horarioSelect">Horário *</label><select id="horarioSelect"><option value="">Selecione médico e data</option></select></div>
                     </div>
                     <div id="msgHorarios" class="msg-horarios"></div>
-
-                    <!-- Observações + Nº Pedido -->
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="observacoes">Observações</label>
-                            <input type="text" id="observacoes" placeholder="Observações" />
-                        </div>
-                        <div class="form-group">
-                            <label for="numeroPedido">Nº do Pedido (opcional)</label>
-                            <input type="text" id="numeroPedido" placeholder="Número do Pedido" />
-                        </div>
+                        <div class="form-group"><label for="observacoes">Observações</label><input type="text" id="observacoes" placeholder="Observações" /></div>
+                        <div class="form-group"><label for="numeroPedido">Nº do Pedido</label><input type="text" id="numeroPedido" placeholder="Número do Pedido" /></div>
                     </div>
-
                     <input type="hidden" id="editConsultaId" />
                     <div class="form-actions">
                         <button onclick="salvarConsulta()" class="btn-primary">💾 Salvar</button>
@@ -302,10 +258,10 @@
                         </div>
                         <div class="form-row">
                             <div class="form-group"><label for="usuarioSenha">Senha *</label><input type="password" id="usuarioSenha" placeholder="Senha *" /></div>
-                            <div class="form-group"><label for="usuarioTelefone">Telefone * (vendedor)</label><input type="text" id="usuarioTelefone" placeholder="Telefone * (vendedor)" /></div>
+                            <div class="form-group"><label for="usuarioTelefone">Telefone * (vendedor)</label><input type="text" id="usuarioTelefone" placeholder="Telefone *" /></div>
                         </div>
                         <div class="form-row">
-                            <div class="form-group"><label for="usuarioTipo">Tipo</label><select id="usuarioTipo"><option value="vendedor">Vendedor</option><option value="admin">Admin</option></select></div>
+                            <div class="form-group"><label for="usuarioTipo">Tipo</label><select id="usuarioTipo"><option value="vendedor">Vendedor</option><option value="admin">Admin</option><option value="consultorio">Consultório</option></select></div>
                             <div class="form-group"><label for="usuarioLoja">Loja</label><select id="usuarioLoja"><option value="">Selecione uma loja</option></select></div>
                         </div>
                         <input type="hidden" id="editUsuarioId" />
@@ -331,7 +287,7 @@
                         <div class="form-row">
                             <div class="form-group"><label for="pacienteCadEmail">E-mail</label><input type="email" id="pacienteCadEmail" placeholder="E-mail" /></div>
                             <div class="form-group"><label for="pacienteCadCpf">CPF</label><input type="text" id="pacienteCadCpf" placeholder="CPF" /></div>
-                            <div class="form-group"><label for="pacienteCadDataNasc">Data Nascimento</label><input type="date" id="pacienteCadDataNasc" placeholder="Data Nascimento" /></div>
+                            <div class="form-group"><label for="pacienteCadDataNasc">Data Nascimento</label><input type="date" id="pacienteCadDataNasc" /></div>
                         </div>
                         <div class="form-row check-group">
                             <label><input type="checkbox" id="pacienteCadEncaixe" checked /> Encaixe</label>
@@ -408,7 +364,6 @@
                         <button onclick="salvarConfigWhatsapp()" class="btn-primary">Salvar</button>
                     </div>
                 </div>
-
             </section>
 
             <!-- ===== PÁGINA: SOLICITAR CONSULTA ===== -->
@@ -429,10 +384,7 @@
                     <div class="form-row">
                         <div class="form-group"><label for="solPacienteEmail">E-mail</label><input type="email" id="solPacienteEmail" placeholder="E-mail" /></div>
                         <div class="form-group"><label for="solPacienteCpf">CPF</label><input type="text" id="solPacienteCpf" placeholder="CPF" /></div>
-                        <div class="form-group">
-                            <label for="solPacienteDataNasc">Data Nascimento</label>
-                            <input type="date" id="solPacienteDataNasc" />
-                        </div>
+                        <div class="form-group"><label for="solPacienteDataNasc">Data Nascimento</label><input type="date" id="solPacienteDataNasc" /></div>
                     </div>
                     <div class="form-row check-group">
                         <label><input type="checkbox" id="solEncaixe" checked /> Encaixe</label>
@@ -440,12 +392,8 @@
                         <label><input type="checkbox" id="solDeficienciaFisica" disabled /> Deficiência Física</label>
                         <span id="solIdadeDisplay" class="idade-display"></span>
                     </div>
-                    <!-- Médico (agora antes da data) -->
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="solMedicoSelect">Médico *</label>
-                            <select id="solMedicoSelect"></select>
-                        </div>
+                        <div class="form-group"><label for="solMedicoSelect">Médico *</label><select id="solMedicoSelect"></select></div>
                     </div>
                     <div class="form-row">
                         <div class="form-group"><label for="solDataConsulta">Data *</label><input type="date" id="solDataConsulta" /></div>
@@ -456,7 +404,7 @@
                     <div id="solMsgHorarios" class="msg-horarios"></div>
                     <div class="form-row">
                         <div class="form-group"><label for="solObservacoes">Observações</label><input type="text" id="solObservacoes" placeholder="Observações" /></div>
-                        <div class="form-group"><label for="solNumeroPedido">Nº do Pedido (opcional)</label><input type="text" id="solNumeroPedido" placeholder="Número do Pedido" /></div>
+                        <div class="form-group"><label for="solNumeroPedido">Nº do Pedido</label><input type="text" id="solNumeroPedido" placeholder="Número do Pedido" /></div>
                     </div>
                     <div class="form-actions">
                         <button onclick="enviarSolicitacao()" class="btn-success" id="btnEnviarSolicitacao">Enviar Solicitação</button>
@@ -476,7 +424,7 @@
                     <hr />
                     <h3>Alterar Senha</h3>
                     <div class="form-group"><label for="perfilSenhaAtual">Senha atual *</label><input type="password" id="perfilSenhaAtual" placeholder="Senha atual *" /></div>
-                    <div class="form-group"><label for="perfilNovaSenha">Nova senha * (mín. 6 caracteres)</label><input type="password" id="perfilNovaSenha" placeholder="Nova senha * (mín. 6 caracteres)" /></div>
+                    <div class="form-group"><label for="perfilNovaSenha">Nova senha *</label><input type="password" id="perfilNovaSenha" placeholder="Nova senha *" /></div>
                     <div class="form-group"><label for="perfilConfirmarSenha">Confirmar nova senha *</label><input type="password" id="perfilConfirmarSenha" placeholder="Confirmar nova senha *" /></div>
                     <div id="perfilMsg" class="form-msg"></div>
                     <button onclick="salvarAlterarSenha()" class="btn-primary">Salvar Senha</button>
@@ -510,7 +458,7 @@
                 <div class="form-row">
                     <div class="form-group"><label for="novoPacienteEmail">E-mail</label><input type="email" id="novoPacienteEmail" placeholder="E-mail" /></div>
                     <div class="form-group"><label for="novoPacienteCpf">CPF</label><input type="text" id="novoPacienteCpf" placeholder="CPF" /></div>
-                    <div class="form-group"><label for="novoPacienteDataNasc">Data Nascimento</label><input type="date" id="novoPacienteDataNasc" placeholder="Data Nascimento" /></div>
+                    <div class="form-group"><label for="novoPacienteDataNasc">Data Nascimento</label><input type="date" id="novoPacienteDataNasc" /></div>
                 </div>
                 <div class="form-row check-group">
                     <label><input type="checkbox" id="novoPacienteEncaixe" checked /> Encaixe</label>
