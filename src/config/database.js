@@ -24,18 +24,19 @@ if (process.env.DATABASE_URL) {
 const pool = new Pool(poolConfig);
 
 // ============================================================
-// FUNÇÃO PRINCIPAL DE INICIALIZAÇÃO
+// FUNÇÃO DE INICIALIZAÇÃO COM TRATAMENTO DE ERROS
 // ============================================================
 async function initDatabase() {
+  let client;
   try {
-    console.log('📦 Inicializando banco de dados (PostgreSQL)...');
+    console.log('📦 Conectando ao banco de dados...');
+    client = await pool.connect();
+    console.log('✅ Conexão estabelecida com sucesso');
 
-    // ============================================================
-    // 1. CRIAÇÃO DAS TABELAS
-    // ============================================================
+    console.log('📦 Criando tabelas...');
 
-    // --- Lojas ---
-    await pool.query(`
+    // ===== CRIAÇÃO DAS TABELAS =====
+    await client.query(`
       CREATE TABLE IF NOT EXISTS lojas (
         id SERIAL PRIMARY KEY,
         nome VARCHAR(200) NOT NULL,
@@ -45,8 +46,7 @@ async function initDatabase() {
       )
     `);
 
-    // --- Usuários (com tipo VARCHAR(20) já) ---
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
         nome VARCHAR(100) NOT NULL,
@@ -60,20 +60,23 @@ async function initDatabase() {
       )
     `);
 
-    // ===== AJUSTES FORÇADOS (cruciais) =====
-    // 1. Garantir que a coluna tipo seja VARCHAR(20)
-    await pool.query(`ALTER TABLE usuarios ALTER COLUMN tipo TYPE VARCHAR(20);`);
-    console.log('✅ Coluna tipo ajustada para VARCHAR(20)');
+    // ===== AJUSTES NA TABELA USUARIOS =====
+    try {
+      await client.query(`ALTER TABLE usuarios ALTER COLUMN tipo TYPE VARCHAR(20);`);
+      console.log('✅ Coluna tipo ajustada para VARCHAR(20)');
+    } catch (e) {
+      console.log('ℹ️ Coluna tipo já está ajustada ou não pôde ser alterada:', e.message);
+    }
 
-    // 2. Remover qualquer constraint antiga
-    await pool.query(`ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_tipo_check;`);
+    try {
+      await client.query(`ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_tipo_check;`);
+      await client.query(`ALTER TABLE usuarios ADD CONSTRAINT usuarios_tipo_check CHECK (tipo IN ('admin', 'vendedor', 'consultorio'));`);
+      console.log('✅ Constraint de tipo atualizada');
+    } catch (e) {
+      console.log('ℹ️ Constraint de tipo já está correta:', e.message);
+    }
 
-    // 3. Recriar a constraint com os valores corretos
-    await pool.query(`ALTER TABLE usuarios ADD CONSTRAINT usuarios_tipo_check CHECK (tipo IN ('admin', 'vendedor', 'consultorio'));`);
-    console.log('✅ Constraint de tipo atualizada');
-
-    // --- Médicos ---
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS medicos (
         id SERIAL PRIMARY KEY,
         nome VARCHAR(100) NOT NULL,
@@ -89,8 +92,7 @@ async function initDatabase() {
       )
     `);
 
-    // --- Clientes ---
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS clientes (
         id SERIAL PRIMARY KEY,
         nome VARCHAR(200) NOT NULL,
@@ -107,8 +109,7 @@ async function initDatabase() {
       )
     `);
 
-    // --- Consultas ---
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS consultas (
         id SERIAL PRIMARY KEY,
         paciente_nome VARCHAR(200) NOT NULL,
@@ -127,8 +128,7 @@ async function initDatabase() {
       )
     `);
 
-    // --- Solicitações ---
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS solicitacoes_consultas (
         id SERIAL PRIMARY KEY,
         paciente_nome VARCHAR(200) NOT NULL,
@@ -150,8 +150,7 @@ async function initDatabase() {
       )
     `);
 
-    // --- Horários dos médicos (coluna intervalo) ---
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS medico_horarios (
         id SERIAL PRIMARY KEY,
         medico_id INTEGER NOT NULL REFERENCES medicos(id) ON DELETE CASCADE,
@@ -164,8 +163,7 @@ async function initDatabase() {
       )
     `);
 
-    // --- Lembretes ---
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS lembretes (
         id SERIAL PRIMARY KEY,
         consulta_id INTEGER NOT NULL REFERENCES consultas(id) ON DELETE CASCADE,
@@ -181,8 +179,7 @@ async function initDatabase() {
       )
     `);
 
-    // --- Configuração WhatsApp ---
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS whatsapp_config (
         id INTEGER PRIMARY KEY DEFAULT 1,
         numero VARCHAR(20) DEFAULT '(22) 99764-0112',
@@ -192,39 +189,41 @@ async function initDatabase() {
       )
     `);
 
-    // --- Índices ---
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_data ON consultas(data_consulta)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_medico ON consultas(medico_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_status ON consultas(status)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_criado_por ON consultas(criado_por)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_clientes_cpf ON clientes(cpf)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_horarios_medico ON medico_horarios(medico_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitacoes_status ON solicitacoes_consultas(status)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_lembretes_status ON lembretes(status)`);
+    // ===== ÍNDICES =====
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_consultas_data ON consultas(data_consulta)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_consultas_medico ON consultas(medico_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_consultas_status ON consultas(status)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_consultas_criado_por ON consultas(criado_por)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_clientes_cpf ON clientes(cpf)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_horarios_medico ON medico_horarios(medico_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_solicitacoes_status ON solicitacoes_consultas(status)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_lembretes_status ON lembretes(status)`);
+
+    console.log('✅ Tabelas criadas/verificadas');
 
     // ============================================================
-    // 2. DADOS INICIAIS
+    // DADOS INICIAIS
     // ============================================================
 
     // --- Loja padrão ---
-    const lojaExist = await pool.query('SELECT id FROM lojas WHERE nome = $1', ['Ótica Macaé - Matriz']);
+    const lojaResult = await client.query('SELECT id FROM lojas WHERE nome = $1', ['Ótica Macaé - Matriz']);
     let lojaId;
-    if (lojaExist.rows.length === 0) {
-      const result = await pool.query(
+    if (lojaResult.rows.length === 0) {
+      const result = await client.query(
         'INSERT INTO lojas (nome, endereco) VALUES ($1, $2) RETURNING id',
         ['Ótica Macaé - Matriz', 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ']
       );
       lojaId = result.rows[0].id;
       console.log('✅ Loja padrão criada');
     } else {
-      lojaId = lojaExist.rows[0].id;
+      lojaId = lojaResult.rows[0].id;
     }
 
     // --- Admin ---
-    const adminExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['admin']);
-    if (adminExist.rows.length === 0) {
+    const adminCheck = await client.query('SELECT id FROM usuarios WHERE username = $1', ['admin']);
+    if (adminCheck.rows.length === 0) {
       const hash = await bcrypt.hash('admin123', 10);
-      await pool.query(
+      await client.query(
         'INSERT INTO usuarios (nome, username, senha, tipo, loja_id, ativo) VALUES ($1, $2, $3, $4, $5, $6)',
         ['Administrador', 'admin', hash, 'admin', lojaId, true]
       );
@@ -232,10 +231,10 @@ async function initDatabase() {
     }
 
     // --- Vendedor ---
-    const vendedorExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['vendedor']);
-    if (vendedorExist.rows.length === 0) {
+    const vendedorCheck = await client.query('SELECT id FROM usuarios WHERE username = $1', ['vendedor']);
+    if (vendedorCheck.rows.length === 0) {
       const hash = await bcrypt.hash('vender123', 10);
-      await pool.query(
+      await client.query(
         'INSERT INTO usuarios (nome, username, senha, tipo, loja_id, ativo) VALUES ($1, $2, $3, $4, $5, $6)',
         ['Vendedor', 'vendedor', hash, 'vendedor', lojaId, true]
       );
@@ -243,30 +242,33 @@ async function initDatabase() {
     }
 
     // --- Consultório ---
-    const consultorioExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['consultorio']);
-    if (consultorioExist.rows.length === 0) {
+    const consultorioCheck = await client.query('SELECT id FROM usuarios WHERE username = $1', ['consultorio']);
+    if (consultorioCheck.rows.length === 0) {
       const hash = await bcrypt.hash('consultorio123', 10);
-      await pool.query(
+      await client.query(
         'INSERT INTO usuarios (nome, username, senha, tipo, loja_id, ativo) VALUES ($1, $2, $3, $4, $5, $6)',
         ['Consultório', 'consultorio', hash, 'consultorio', lojaId, true]
       );
       console.log('✅ Usuário consultorio criado');
     }
 
-    // --- WhatsApp ---
-    const configExist = await pool.query('SELECT id FROM whatsapp_config WHERE id = 1');
-    if (configExist.rows.length === 0) {
-      await pool.query(
+    // --- WhatsApp Config ---
+    const configCheck = await client.query('SELECT id FROM whatsapp_config WHERE id = 1');
+    if (configCheck.rows.length === 0) {
+      await client.query(
         'INSERT INTO whatsapp_config (id, numero, endereco_otica) VALUES ($1, $2, $3)',
         [1, '(22) 99764-0112', 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ']
       );
       console.log('✅ Configuração WhatsApp criada');
     }
 
-    console.log('✅ Banco de dados (PostgreSQL) inicializado com sucesso!');
+    console.log('✅ Banco de dados inicializado com sucesso!');
   } catch (error) {
     console.error('❌ Erro ao inicializar banco:', error.message);
+    console.error('❌ Stack:', error.stack);
     throw error;
+  } finally {
+    if (client) client.release();
   }
 }
 
