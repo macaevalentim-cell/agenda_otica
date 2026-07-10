@@ -43,7 +43,7 @@ async function initDatabase() {
         username VARCHAR(50) UNIQUE NOT NULL,
         senha VARCHAR(255) NOT NULL,
         telefone VARCHAR(20),
-        tipo VARCHAR(10) DEFAULT 'vendedor' CHECK (tipo IN ('admin', 'vendedor')),
+        tipo VARCHAR(10) DEFAULT 'vendedor' CHECK (tipo IN ('admin', 'vendedor', 'consultorio')),
         loja_id INTEGER REFERENCES lojas(id) ON DELETE SET NULL,
         ativo BOOLEAN DEFAULT TRUE,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -131,7 +131,7 @@ async function initDatabase() {
         dia_semana INTEGER NOT NULL CHECK (dia_semana BETWEEN 0 AND 6),
         hora_inicio TIME NOT NULL,
         hora_fim TIME NOT NULL,
-        intervalo_minutos INTEGER DEFAULT 30,
+        intervalo INTEGER DEFAULT 30,
         ativo BOOLEAN DEFAULT TRUE,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -204,6 +204,17 @@ async function initDatabase() {
         ['Vendedor', 'vendedor', hash, 'vendedor', lojaId, true]
       );
       console.log('✅ Usuário vendedor criado');
+    }
+
+    // Criar usuário consultorio
+    const consultorioExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['consultorio']);
+    if (consultorioExist.rows.length === 0) {
+      const hash = await bcrypt.hash('consultorio123', 10);
+      await pool.query(
+        'INSERT INTO usuarios (nome, username, senha, tipo, loja_id, ativo) VALUES ($1, $2, $3, $4, $5, $6)',
+        ['Consultório', 'consultorio', hash, 'consultorio', lojaId, true]
+      );
+      console.log('✅ Usuário consultorio criado');
     }
 
     const configExist = await pool.query('SELECT id FROM whatsapp_config WHERE id = 1');

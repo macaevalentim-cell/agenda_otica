@@ -116,7 +116,9 @@ router.delete('/horarios/:id', authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// Buscar horários disponíveis para uma data
+// =========================================================================
+// BUSCAR HORÁRIOS DISPONÍVEIS (com flag de ocupado)
+// =========================================================================
 router.get('/medicos/:id/horarios/disponiveis', authenticateToken, async (req, res) => {
   try {
     const medicoId = req.params.id;
@@ -154,21 +156,26 @@ router.get('/medicos/:id/horarios/disponiveis', authenticateToken, async (req, r
       }
     }
 
-    // Remover duplicatas (caso haja sobreposição de intervalos)
+    // Remover duplicatas
     const horariosUnicos = [...new Set(todosHorarios)];
 
     // Buscar horários já ocupados (consultas não canceladas/não realizadas)
     const ocupadosResult = await pool.query(
-      'SELECT horario FROM consultas WHERE medico_id = $1 AND data_consulta = $2 AND status NOT IN ($3, $4)',
+      `SELECT horario FROM consultas 
+       WHERE medico_id = $1 AND data_consulta = $2 
+       AND status NOT IN ($3, $4)`,
       [medicoId, data, 'cancelada', 'realizada']
     );
 
     const ocupadosSet = new Set(ocupadosResult.rows.map(r => r.horario));
 
-    // Filtrar disponíveis
-    const disponiveis = horariosUnicos.filter(h => !ocupadosSet.has(h));
+    // Montar resultado com flag disponivel
+    const resultado = horariosUnicos.map(h => ({
+      horario: h,
+      disponivel: !ocupadosSet.has(h)
+    }));
 
-    res.json(disponiveis.map(h => ({ horario: h })));
+    res.json(resultado);
   } catch (error) {
     console.error('❌ Erro ao buscar horários disponíveis:', error);
     res.status(500).json({ error: 'Erro interno ao buscar horários disponíveis' });
