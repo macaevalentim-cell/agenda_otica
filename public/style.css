@@ -1636,3 +1636,10 @@ body.dark-theme .dia-cell.dia-hoje {
     font-size: 13px;
   }
 }
+
+.filtros-busca{background:var(--bg-card);border-radius:var(--radius);padding:20px;margin-bottom:20px;box-shadow:var(--shadow);transition:background .3s,box-shadow .3s}
+.filtros-busca .form-row{margin-bottom:10px}
+.filtros-busca .form-row:last-child{margin-bottom:0}
+.filtros-busca .form-group label{font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:4px;display:block}
+.filtros-busca .form-group input,.filtros-busca .form-group select{width:100%;padding:8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--bg-body);color:var(--text-primary);transition:var(--transition)}
+.filtros-busca .form-group input:focus,.filtros-busca .form-group select:focus{outline:none;border-color:var(--secondary);box-shadow:0 0 0 3px rgba(102,126,234,.2)}

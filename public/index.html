@@ -91,12 +91,49 @@
         <!-- MAIN -->
         <main class="main-content">
 
-            <!-- ===== PÁGINA: LISTA DE CONSULTAS (INICIAL) ===== -->
-            <section id="pageLista" class="page active">
-                <h2><i class="fas fa-list"></i> Lista de Consultas</h2>
-                <div id="consultasListMain" class="consultas-list-container"></div>
-                <div id="listaPaginacao" class="pagination-controls"></div>
-            </section>
+ 
+            <!-- ===== PÁGINA: LISTA DE CONSULTAS (com barra de busca) ===== -->
+<section id="pageLista" class="page active">
+    <h2><i class="fas fa-list"></i> Lista de Consultas</h2>
+    <div class="filtros-busca">
+        <div class="form-row">
+            <div class="form-group" style="flex:2;">
+                <label for="buscaPaciente">Paciente</label>
+                <input type="text" id="buscaPaciente" placeholder="Digite o nome..." />
+            </div>
+            <div class="form-group">
+                <label for="buscaVendedor">Vendedor</label>
+                <select id="buscaVendedor"><option value="">Todos</option></select>
+            </div>
+            <div class="form-group">
+                <label for="buscaStatus">Status</label>
+                <select id="buscaStatus">
+                    <option value="">Todos</option>
+                    <option value="agendada">Agendada</option>
+                    <option value="confirmada">Confirmada</option>
+                    <option value="realizada">Realizada</option>
+                    <option value="cancelada">Cancelada</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="buscaDataInicio">Data Início</label>
+                <input type="date" id="buscaDataInicio" />
+            </div>
+            <div class="form-group">
+                <label for="buscaDataFim">Data Fim</label>
+                <input type="date" id="buscaDataFim" />
+            </div>
+            <div class="form-group" style="display:flex; align-items:flex-end; gap:8px;">
+                <button onclick="aplicarFiltros()" class="btn-primary">🔍 Buscar</button>
+                <button onclick="limparFiltros()" class="btn-secondary">Limpar</button>
+            </div>
+        </div>
+    </div>
+    <div id="consultasListMain" class="consultas-list-container"></div>
+    <div id="listaPaginacao" class="pagination-controls"></div>
+</section>
 
             <!-- ===== PÁGINA: CALENDÁRIO ===== -->
             <section id="pageCalendario" class="page">
