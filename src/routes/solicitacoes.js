@@ -49,7 +49,14 @@ router.post('/', authenticateToken, async (req, res) => {
       medico_id, medico_nome, observacoes, numero_pedido
     } = req.body;
 
-    // Valida horários
+    // ===== VALIDAÇÃO: DATA/HORA NÃO RETROATIVA (1º horário) =====
+    const now = new Date();
+    const dataHora1 = new Date(`${data_consulta}T${horario1}:00`);
+    if (dataHora1 < now) {
+      return res.status(400).json({ error: 'Não é permitido solicitar para data/hora no passado.' });
+    }
+
+    // Validação do dia da semana
     const diaSemana = new Date(data_consulta).getDay();
     const horariosConfig = await pool.query(
       `SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,

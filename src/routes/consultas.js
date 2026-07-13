@@ -6,12 +6,12 @@ const { agendarLembrete } = require('../services/lembreteService');
 const router = express.Router();
 
 // =========================================================================
-// LISTAR CONSULTAS (TODAS COM is_own)
+// LISTAR CONSULTAS
 // =========================================================================
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const result = await pool.query(`
+    const query = `
       SELECT 
         c.*,
         u.nome AS vendedor_nome,
@@ -22,7 +22,8 @@ router.get('/', authenticateToken, async (req, res) => {
       LEFT JOIN usuarios u ON c.criado_por = u.id
       LEFT JOIN lojas l ON u.loja_id = l.id
       ORDER BY c.data_consulta ASC, c.horario ASC
-    `, [userId]);
+    `;
+    const result = await pool.query(query, [userId]);
     const consultas = result.rows.map(c => ({
       ...c,
       data_consulta: formatDateToYYYYMMDD(c.data_consulta)
@@ -96,6 +97,7 @@ router.get('/filtrar', authenticateToken, async (req, res) => {
     }
 
     query += ' ORDER BY c.data_consulta DESC, c.horario DESC';
+
     const result = await pool.query(query, params);
     const consultas = result.rows.map(c => ({
       ...c,
@@ -109,7 +111,7 @@ router.get('/filtrar', authenticateToken, async (req, res) => {
 });
 
 // =========================================================================
-// CRIAR CONSULTA (admin)
+// CRIAR CONSULTA (somente admin)
 // =========================================================================
 router.post('/', authenticateToken, isAdmin, async (req, res) => {
   try {
@@ -131,16 +133,26 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
       numero_pedido
     } = req.body;
 
-    // Valida horário
+    // ===== VALIDAÇÃO: DATA/HORA NÃO RETROATIVA =====
+    const now = new Date();
+    const dataHoraConsulta = new Date(`${data_consulta}T${horario}:00`);
+    if (dataHoraConsulta < now) {
+      return res.status(400).json({ error: 'Não é permitido agendar para data/hora no passado.' });
+    }
+
+    // --- Validação de horário dentro do expediente ---
     const diaSemana = new Date(data_consulta).getDay();
     const horariosConfig = await pool.query(
-      `SELECT hora_inicio, hora_fim FROM medico_horarios 
+      `SELECT hora_inicio, hora_fim 
+       FROM medico_horarios 
        WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
       [medico_id, diaSemana]
     );
+
     if (horariosConfig.rows.length === 0) {
       return res.status(400).json({ error: 'Médico não atende neste dia.' });
     }
+
     let horarioValido = false;
     for (const config of horariosConfig.rows) {
       if (horario >= config.hora_inicio && horario < config.hora_fim) {
@@ -152,7 +164,7 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Horário fora do expediente.' });
     }
 
-    // Verifica conflito
+    // --- Verificar conflito com outra consulta (não cancelada/realizada) ---
     const conflito = await pool.query(
       `SELECT id FROM consultas 
        WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 
@@ -163,7 +175,7 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Horário já ocupado.' });
     }
 
-    // Gerenciar paciente
+    // --- Gerenciar paciente (cria se não existir) ---
     let pacienteIdFinal = paciente_id;
     if (!pacienteIdFinal && paciente_cpf) {
       const existente = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [paciente_cpf]);
@@ -173,7 +185,8 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
         const result = await pool.query(
           `INSERT INTO clientes 
            (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           RETURNING id`,
           [
             paciente_nome,
             paciente_telefone,
@@ -190,14 +203,15 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
       }
     }
 
-    // Busca dados do paciente
+    // Buscar dados atualizados do paciente (se houver)
     let nome = paciente_nome,
         telefone = paciente_telefone,
         email = paciente_email,
         cpf = paciente_cpf;
     if (pacienteIdFinal) {
       const cliente = await pool.query(
-        `SELECT nome, telefone, email, cpf FROM clientes WHERE id = $1`,
+        `SELECT nome, telefone, email, cpf 
+         FROM clientes WHERE id = $1`,
         [pacienteIdFinal]
       );
       if (cliente.rows.length > 0) {
@@ -208,12 +222,13 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
       }
     }
 
-    // Insere consulta
+    // --- Inserir consulta ---
     const result = await pool.query(
       `INSERT INTO consultas 
        (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, 
         data_consulta, horario, medico_id, medico_nome, observacoes, numero_pedido, criado_por)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id`,
       [
         nome,
         telefone,
@@ -228,7 +243,10 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
         req.user.id
       ]
     );
+
     const consultaId = result.rows[0].id;
+
+    // --- Agendar lembrete (assíncrono) ---
     await agendarLembrete(
       consultaId,
       nome,
@@ -240,6 +258,7 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
       req.user.id,
       numero_pedido
     );
+
     res.status(201).json({ id: consultaId, message: 'Consulta agendada com sucesso!' });
   } catch (error) {
     console.error('❌ Erro ao criar consulta:', error);
@@ -248,7 +267,7 @@ router.post('/', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // =========================================================================
-// ATUALIZAR CONSULTA (admin e consultorio)
+// ATUALIZAR CONSULTA (admin ou consultorio para cancelar)
 // =========================================================================
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
@@ -257,7 +276,6 @@ router.put('/:id', authenticateToken, async (req, res) => {
     const isConsultorio = user.tipo === 'consultorio';
     const { status } = req.body;
 
-    // Consultorio só pode cancelar
     if (isConsultorio) {
       if (status !== 'cancelada') {
         return res.status(403).json({ error: 'Consultório só pode cancelar consultas.' });
@@ -273,7 +291,6 @@ router.put('/:id', authenticateToken, async (req, res) => {
       return res.json({ message: 'Consulta cancelada com sucesso!' });
     }
 
-    // Admin pode editar completamente
     if (isAdmin) {
       const {
         paciente_id,
@@ -305,7 +322,14 @@ router.put('/:id', authenticateToken, async (req, res) => {
         return res.status(400).json({ error: 'Consulta cancelada, não pode editar.' });
       }
 
-      // Valida horário
+      // ===== VALIDAÇÃO: DATA/HORA NÃO RETROATIVA =====
+      const now = new Date();
+      const dataHoraConsulta = new Date(`${data_consulta}T${horario}:00`);
+      if (dataHoraConsulta < now) {
+        return res.status(400).json({ error: 'Não é permitido editar para data/hora no passado.' });
+      }
+
+      // --- Validação de horário ---
       const diaSemana = new Date(data_consulta).getDay();
       const horariosConfig = await pool.query(
         `SELECT hora_inicio, hora_fim FROM medico_horarios 
@@ -326,7 +350,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         return res.status(400).json({ error: 'Horário fora do expediente.' });
       }
 
-      // Conflito
+      // --- Verificar conflito (excluindo a própria consulta) ---
       const conflito = await pool.query(
         `SELECT id FROM consultas 
          WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 
@@ -337,7 +361,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         return res.status(400).json({ error: 'Horário já ocupado.' });
       }
 
-      // Gerenciar paciente
+      // --- Gerenciar paciente (cria se não existir) ---
       let pacienteIdFinal = paciente_id;
       if (!pacienteIdFinal && paciente_cpf) {
         const existente = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [paciente_cpf]);
@@ -347,7 +371,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
           const result = await pool.query(
             `INSERT INTO clientes 
              (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             RETURNING id`,
             [
               paciente_nome,
               paciente_telefone,
@@ -413,7 +438,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // =========================================================================
-// ALTERAR VENDEDOR (admin)
+// ALTERAR VENDEDOR (somente admin)
 // =========================================================================
 router.put('/:id/vendedor', authenticateToken, isAdmin, async (req, res) => {
   try {
@@ -421,10 +446,12 @@ router.put('/:id/vendedor', authenticateToken, isAdmin, async (req, res) => {
     if (!vendedor_id) {
       return res.status(400).json({ error: 'Vendedor ID é obrigatório.' });
     }
+
     const userCheck = await pool.query('SELECT id FROM usuarios WHERE id = $1', [vendedor_id]);
     if (userCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Vendedor não encontrado.' });
     }
+
     const consulta = await pool.query('SELECT status FROM consultas WHERE id = $1', [req.params.id]);
     if (consulta.rows.length === 0) {
       return res.status(404).json({ error: 'Consulta não encontrada.' });
@@ -432,6 +459,7 @@ router.put('/:id/vendedor', authenticateToken, isAdmin, async (req, res) => {
     if (consulta.rows[0].status === 'realizada') {
       return res.status(400).json({ error: 'Consulta já realizada, não pode alterar.' });
     }
+
     await pool.query('UPDATE consultas SET criado_por = $1 WHERE id = $2', [vendedor_id, req.params.id]);
     res.json({ message: 'Vendedor alterado com sucesso!' });
   } catch (error) {
@@ -441,7 +469,7 @@ router.put('/:id/vendedor', authenticateToken, isAdmin, async (req, res) => {
 });
 
 // =========================================================================
-// EXCLUIR CONSULTA (admin, apenas canceladas)
+// EXCLUIR CONSULTA (admin apenas se cancelada)
 // =========================================================================
 router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
@@ -449,9 +477,11 @@ router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
     if (consulta.rows.length === 0) {
       return res.status(404).json({ error: 'Consulta não encontrada' });
     }
-    if (consulta.rows[0].status !== 'cancelada') {
+    const status = consulta.rows[0].status;
+    if (status !== 'cancelada') {
       return res.status(400).json({ error: 'Apenas consultas canceladas podem ser excluídas.' });
     }
+
     await pool.query('DELETE FROM consultas WHERE id = $1', [req.params.id]);
     res.json({ message: 'Consulta excluída com sucesso!' });
   } catch (error) {
@@ -466,9 +496,12 @@ router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
 router.put('/:id/confirmar', authenticateToken, async (req, res) => {
   try {
     const user = req.user;
-    if (user.tipo !== 'admin' && user.tipo !== 'consultorio') {
+    const isAdmin = user.tipo === 'admin';
+    const isConsultorio = user.tipo === 'consultorio';
+    if (!isAdmin && !isConsultorio) {
       return res.status(403).json({ error: 'Acesso negado.' });
     }
+
     const consulta = await pool.query('SELECT status FROM consultas WHERE id = $1', [req.params.id]);
     if (consulta.rows.length === 0) {
       return res.status(404).json({ error: 'Consulta não encontrada' });
@@ -483,6 +516,7 @@ router.put('/:id/confirmar', authenticateToken, async (req, res) => {
     if (statusAtual === 'confirmada') {
       return res.status(400).json({ error: 'Consulta já está confirmada.' });
     }
+
     await pool.query('UPDATE consultas SET status = $1 WHERE id = $2', ['confirmada', req.params.id]);
     res.json({ message: 'Consulta confirmada com sucesso!' });
   } catch (error) {
@@ -492,7 +526,7 @@ router.put('/:id/confirmar', authenticateToken, async (req, res) => {
 });
 
 // =========================================================================
-// PROCESSAR CONSULTA (admin)
+// PROCESSAR CONSULTA (realizada) - somente admin
 // =========================================================================
 router.put('/:id/processar', authenticateToken, isAdmin, async (req, res) => {
   try {
@@ -507,6 +541,7 @@ router.put('/:id/processar', authenticateToken, isAdmin, async (req, res) => {
     if (statusAtual === 'realizada') {
       return res.status(400).json({ error: 'Consulta já foi processada.' });
     }
+
     await pool.query('UPDATE consultas SET status = $1 WHERE id = $2', ['realizada', req.params.id]);
     res.json({ message: 'Consulta processada com sucesso!' });
   } catch (error) {
