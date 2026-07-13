@@ -1,6 +1,3 @@
-// ========================================================================
-// CONFIGURAÇÕES E VARIÁVEIS GLOBAIS
-// ========================================================================
 const API_URL = window.location.origin + '/api';
 const ITENS_POR_PAGINA = 20;
 
@@ -23,7 +20,7 @@ let timeoutBusca = null;
 let filtrosAtivos = false;
 
 // ========================================================================
-// UTILITÁRIOS
+// UTILITÁRIOS E VALIDAÇÕES
 // ========================================================================
 function showToast(msg, isError = false) {
   const toast = document.getElementById('toast');
@@ -79,12 +76,24 @@ function validarDataNaoPassada(dataStr, campoNome = 'Data') {
   return true;
 }
 
+// ===== NOVA VALIDAÇÃO: DATA/HORA NÃO RETROATIVA =====
+function validarDataHoraNaoPassada(dataStr, horaStr, campoNome = 'Data/Hora') {
+  if (!dataStr || !horaStr) return true;
+  const dataHora = new Date(`${dataStr}T${horaStr}:00`);
+  const agora = new Date();
+  agora.setMilliseconds(0);
+  if (dataHora < agora) {
+    showToast(`${campoNome} não pode ser no passado.`, true);
+    return false;
+  }
+  return true;
+}
+
 function atualizarIdadeDisplay() {
   const dataNasc = document.getElementById('pacienteDataNasc')?.value;
   const idade = calcularIdade(dataNasc);
   document.getElementById('idadeDisplay').innerHTML = idade !== null ? 'Idade: ' + idade + ' anos' : '';
 }
-
 document.addEventListener('change', function(e) {
   if (e.target.id === 'pacienteDataNasc') atualizarIdadeDisplay();
 });
@@ -94,7 +103,6 @@ function atualizarIdadeSol() {
   const idade = calcularIdade(dataNasc);
   document.getElementById('solIdadeDisplay').innerHTML = idade !== null ? 'Idade: ' + idade + ' anos' : '';
 }
-
 document.addEventListener('change', function(e) {
   if (e.target.id === 'solPacienteDataNasc') atualizarIdadeSol();
 });
@@ -116,7 +124,6 @@ function setupEncaixeLogic(encaixeId, neuroId, defId) {
       def.disabled = false;
     }
   }
-
   encaixe.addEventListener('change', update);
   neuro.addEventListener('change', function() {
     if (this.checked) {
@@ -130,7 +137,6 @@ function setupEncaixeLogic(encaixeId, neuroId, defId) {
       neuro.disabled = false;
     }
   });
-
   update();
 }
 
@@ -166,7 +172,6 @@ function navegarPara(pageId) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const target = document.getElementById(pageId);
   if (target) target.classList.add('active');
-
   document.querySelectorAll('.menu-item').forEach(b => b.classList.remove('active'));
   const menuBtn = document.querySelector(`.menu-item[data-page="${pageId}"]`);
   if (menuBtn) menuBtn.classList.add('active');
@@ -179,31 +184,22 @@ function navegarPara(pageId) {
     document.getElementById('perfilLoja').textContent = user.loja_nome || 'Não vinculado';
   }
   if (pageId === 'pageLista') {
-    if (!filtrosAtivos) {
-      carregarDados();
-    } else {
-      renderizarLista(paginaAtual);
-    }
+    if (!filtrosAtivos) carregarDados();
+    else renderizarLista(paginaAtual);
   }
   if (pageId === 'pageCalendario') renderizarCalendario();
   if (pageId === 'pageDashboard' && user.tipo === 'admin') carregarDashboard();
-
   fecharMenu();
 }
 
 function mostrarSubPage(subId) {
   if (user.tipo !== 'admin') { showToast('Acesso negado.', true); return; }
-  document.querySelectorAll('#pageAdmin .sub-page').forEach(el => {
-    el.classList.remove('active');
-    el.style.display = 'none';
-  });
+  document.querySelectorAll('#pageAdmin .sub-page').forEach(el => { el.classList.remove('active');
+    el.style.display = 'none'; });
   const target = document.getElementById('sub' + subId.charAt(0).toUpperCase() + subId.slice(1));
   if (target) { target.classList.add('active');
     target.style.display = 'block'; }
-  document.querySelectorAll('.admin-tabs .tab-btn').forEach(b => {
-    b.classList.remove('active');
-    if (b.getAttribute('data-sub') === subId) b.classList.add('active');
-  });
+  document.querySelectorAll('.admin-tabs .tab-btn').forEach(b => { b.classList.remove('active'); if (b.getAttribute('data-sub') === subId) b.classList.add('active'); });
   if (subId === 'solicitacoes') carregarSolicitacoes();
   if (subId === 'whatsapp') carregarConfigWhatsapp();
   if (subId === 'usuarios') { renderUsuarios();
@@ -226,24 +222,19 @@ function fecharMenu() {
 }
 
 // ========================================================================
-// INICIALIZAÇÃO DOS EVENTOS
+// INICIALIZAÇÃO DOS EVENTOS (DOMContentLoaded)
 // ========================================================================
 document.addEventListener('DOMContentLoaded', function() {
   aplicarTema();
-
   const themeBtn = document.getElementById('themeToggle');
   if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
-
   const hamburger = document.getElementById('hamburgerBtn');
   const closeBtn = document.getElementById('closeMenuBtn');
   const overlay = document.getElementById('menuOverlay');
-
   if (hamburger) hamburger.addEventListener('click', function(e) { e.stopPropagation();
     abrirMenu(); });
   if (closeBtn) closeBtn.addEventListener('click', fecharMenu);
   if (overlay) overlay.addEventListener('click', fecharMenu);
-
-  // Menu items
   document.querySelectorAll('.menu-item').forEach(b => {
     b.addEventListener('click', function() {
       const page = this.getAttribute('data-page');
@@ -253,26 +244,18 @@ document.addEventListener('DOMContentLoaded', function() {
       fecharMenu();
     });
   });
-
-  // Admin tabs
   document.querySelectorAll('.admin-tabs .tab-btn').forEach(b => {
     b.addEventListener('click', function() {
       const sub = this.getAttribute('data-sub');
       if (sub) mostrarSubPage(sub);
     });
   });
-
-  // Busca automática com debounce
   const inputBusca = document.getElementById('buscaPaciente');
   if (inputBusca) {
     inputBusca.addEventListener('input', function() {
       clearTimeout(timeoutBusca);
       timeoutBusca = setTimeout(() => {
-        if (this.value.trim() !== '' ||
-          document.getElementById('buscaVendedor').value ||
-          document.getElementById('buscaStatus').value ||
-          document.getElementById('buscaDataInicio').value ||
-          document.getElementById('buscaDataFim').value) {
+        if (this.value.trim() !== '' || document.getElementById('buscaVendedor').value || document.getElementById('buscaStatus').value || document.getElementById('buscaDataInicio').value || document.getElementById('buscaDataFim').value) {
           aplicarFiltros();
         } else {
           limparFiltros();
@@ -280,15 +263,11 @@ document.addEventListener('DOMContentLoaded', function() {
       }, 500);
     });
   }
-
   ['buscaVendedor', 'buscaStatus', 'buscaDataInicio', 'buscaDataFim'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.addEventListener('change', function() {
-        if (document.getElementById('buscaPaciente').value.trim() ||
-          this.value ||
-          document.getElementById('buscaDataInicio').value ||
-          document.getElementById('buscaDataFim').value) {
+        if (document.getElementById('buscaPaciente').value.trim() || this.value || document.getElementById('buscaDataInicio').value || document.getElementById('buscaDataFim').value) {
           aplicarFiltros();
         } else {
           limparFiltros();
@@ -317,55 +296,44 @@ async function fazerLogin() {
     }
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Erro no login');
-
     token = data.token;
     user = data.user;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
-
     document.getElementById('loginDiv').style.display = 'none';
     document.getElementById('dashboardDiv').style.display = 'block';
-
     const labelTipo = user.tipo === 'admin' ? 'Admin' : user.tipo === 'consultorio' ? 'Consultório' : 'Vendedor';
     document.getElementById('userName').innerHTML = '👤 ' + user.nome + ' (' + labelTipo + ')';
     document.getElementById('menuUserName').textContent = user.nome;
     document.getElementById('menuUserTipo').textContent = labelTipo;
-
     if (user.loja_nome) {
       document.getElementById('lojaNome').innerHTML = '🏢 ' + user.loja_nome;
       document.getElementById('menuLojaNome').textContent = '🏢 ' + user.loja_nome;
     }
-
     const isAdmin = user.tipo === 'admin';
     const isConsult = user.tipo === 'consultorio';
-
     document.getElementById('menuCalendario').style.display = isConsult ? 'none' : 'block';
     document.getElementById('menuAgendar').style.display = isAdmin ? 'block' : 'none';
     document.getElementById('menuSolicitar').style.display = isConsult ? 'none' : 'block';
     document.getElementById('menuDashboard').style.display = isAdmin ? 'block' : 'none';
     document.getElementById('menuAdmin').style.display = isAdmin ? 'block' : 'none';
     document.querySelectorAll('.menu-item[data-sub]').forEach(el => el.style.display = isAdmin ? 'block' : 'none');
-
     document.getElementById('perfilNome').textContent = user.nome;
     document.getElementById('perfilUsername').textContent = user.username;
     document.getElementById('perfilTipo').textContent = labelTipo;
     document.getElementById('perfilLoja').textContent = user.loja_nome || 'Não vinculado';
-
     await carregarDados();
     renderizarLista(1);
     preencherSelectVendedores();
     iniciarPollingLembretes();
-
     if (isAdmin) {
       iniciarPollingSolicitacoes();
       carregarDashboard();
       carregarLojas();
       carregarConfigImpressao();
     }
-
     fecharMenu();
     navegarPara('pageLista');
-
     setTimeout(() => {
       setupEncaixeLogic('pacienteEncaixe', 'pacienteNeurodivergente', 'pacienteDeficienciaFisica');
       setupEncaixeLogic('pacienteCadEncaixe', 'pacienteCadNeurodivergente', 'pacienteCadDeficienciaFisica');
@@ -390,18 +358,14 @@ async function carregarDados() {
     }
     let data = await rC.json();
     consultas = data.map(c => ({ ...c, data_consulta: c.data_consulta || null, is_own: c.is_own === 1 }));
-
     const rM = await fetch(API_URL + '/medicos', { headers: { Authorization: 'Bearer ' + token } });
     medicos = await rM.json();
     preencherSelectMedico();
     preencherSelectMedicoSol();
-
     const rCl = await fetch(API_URL + '/clientes', { headers: { Authorization: 'Bearer ' + token } });
     clientes = await rCl.json();
     preencherSelectPacientes();
-
     renderizarLista(paginaAtual);
-
     if (user.tipo === 'admin') {
       const rU = await fetch(API_URL + '/usuarios', { headers: { Authorization: 'Bearer ' + token } });
       usuarios = await rU.json();
@@ -413,7 +377,6 @@ async function carregarDados() {
       carregarDashboard();
       preencherSelectVendedores();
     }
-
     filtrosAtivos = false;
   } catch (err) {
     console.error(err);
@@ -422,7 +385,7 @@ async function carregarDados() {
 }
 
 // ========================================================================
-// FILTROS DE BUSCA NA LISTA
+// FILTROS DE BUSCA
 // ========================================================================
 function preencherSelectVendedores() {
   const s = document.getElementById('buscaVendedor');
@@ -447,19 +410,16 @@ function aplicarFiltros() {
   const status = document.getElementById('buscaStatus').value;
   const dataInicio = document.getElementById('buscaDataInicio').value;
   const dataFim = document.getElementById('buscaDataFim').value;
-
   if (!paciente && !vendedor && !status && !dataInicio && !dataFim) {
     limparFiltros();
     return;
   }
-
   const params = new URLSearchParams();
   if (paciente) params.append('paciente', paciente);
   if (vendedor) params.append('vendedor_id', vendedor);
   if (status) params.append('status', status);
   if (dataInicio) params.append('data_inicio', dataInicio);
   if (dataFim) params.append('data_fim', dataFim);
-
   fetch(API_URL + '/consultas/filtrar?' + params.toString(), { headers: { Authorization: 'Bearer ' + token } })
     .then(r => {
       if (!r.ok) {
@@ -942,16 +902,13 @@ async function carregarHorariosDisponiveis() {
   const data = document.getElementById('dataConsulta').value;
   const select = document.getElementById('horarioSelect');
   const msg = document.getElementById('msgHorarios');
-
   select.innerHTML = '<option value="">Carregando...</option>';
   msg.style.display = 'none';
   msg.innerHTML = '';
-
   if (!medicoId || !data) { select.innerHTML = '<option value="">Selecione médico e data</option>'; return; }
   if (isDataPassada(data)) { select.innerHTML = '<option value="">Data inválida</option>';
     msg.style.display = 'block';
     msg.innerHTML = '⚠️ Data não pode ser no passado.'; return; }
-
   try {
     const r = await fetch(API_URL + '/medicos/' + medicoId + '/horarios/disponiveis?data=' + data, { headers: { Authorization: 'Bearer ' + token } });
     const horarios = await r.json();
@@ -968,7 +925,6 @@ async function carregarHorariosDisponiveis() {
     msg.style.display = 'block';
     msg.innerHTML = '⚠️ ' + err.message; }
 }
-
 document.addEventListener('change', function(e) {
   if (e.target.id === 'medicoSelect' || e.target.id === 'dataConsulta') carregarHorariosDisponiveis();
 });
@@ -978,16 +934,13 @@ async function carregarHorariosDisponiveisSol() {
   const data = document.getElementById('solDataConsulta').value;
   const selects = [document.getElementById('solHorario1'), document.getElementById('solHorario2'), document.getElementById('solHorario3')];
   const msg = document.getElementById('solMsgHorarios');
-
   selects.forEach(s => s.innerHTML = '<option value="">Carregando...</option>');
   msg.style.display = 'none';
   msg.innerHTML = '';
-
   if (!medicoId || !data) { selects.forEach(s => s.innerHTML = '<option value="">Selecione médico e data</option>'); return; }
   if (isDataPassada(data)) { selects.forEach(s => s.innerHTML = '<option value="">Data inválida</option>');
     msg.style.display = 'block';
     msg.innerHTML = '⚠️ Data não pode ser no passado.'; return; }
-
   try {
     const r = await fetch(API_URL + '/medicos/' + medicoId + '/horarios/disponiveis?data=' + data, { headers: { Authorization: 'Bearer ' + token } });
     const horarios = await r.json();
@@ -1011,13 +964,12 @@ async function carregarHorariosDisponiveisSol() {
     msg.style.display = 'block';
     msg.innerHTML = '⚠️ ' + err.message; }
 }
-
 document.addEventListener('change', function(e) {
   if (e.target.id === 'solMedicoSelect' || e.target.id === 'solDataConsulta') carregarHorariosDisponiveisSol();
 });
 
 // ========================================================================
-// CONSULTAS (CRUD) + LISTA COM PAGINAÇÃO E FILTROS
+// CONSULTAS (CRUD)
 // ========================================================================
 async function salvarConsulta() {
   if (user.tipo !== 'admin') { showToast('Apenas administradores podem agendar.', true); return; }
@@ -1029,13 +981,12 @@ async function salvarConsulta() {
   const medicoId = document.getElementById('medicoSelect').value;
   const medicoNome = medicos.find(m => m.id == medicoId)?.nome;
   const numeroPedido = document.getElementById('numeroPedido').value.trim() || null;
-
   if (!pacienteNome || !pacienteTelefone || !dataConsulta || !horario || !medicoId) {
     showToast('Preencha todos os campos obrigatórios!', true);
     return;
   }
-  if (!validarDataNaoPassada(dataConsulta, 'Data da consulta')) return;
-
+  // VALIDAÇÃO DATA/HORA NÃO RETROATIVA
+  if (!validarDataHoraNaoPassada(dataConsulta, horario, 'Data/Hora da consulta')) return;
   const dados = {
     paciente_id: pacienteId || null,
     paciente_nome: pacienteNome,
@@ -1053,10 +1004,8 @@ async function salvarConsulta() {
     observacoes: document.getElementById('observacoes').value,
     numero_pedido: numeroPedido
   };
-
   const url = editandoId ? API_URL + '/consultas/' + editandoId : API_URL + '/consultas';
   const method = editandoId ? 'PUT' : 'POST';
-
   try {
     const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(dados) });
     if (!r.ok) { const e = await r.json(); throw new Error(e.error || 'Erro'); }
@@ -1072,48 +1021,40 @@ function renderizarLista(pagina = 1) {
   const container = document.getElementById('consultasListMain');
   const paginacao = document.getElementById('listaPaginacao');
   if (!container) return;
-
   const listaOrdenada = [...consultas].sort((a, b) => {
     if (a.data_consulta !== b.data_consulta) return b.data_consulta.localeCompare(a.data_consulta);
     return b.horario.localeCompare(a.horario);
   });
-
   const total = listaOrdenada.length;
   const totalPaginas = Math.ceil(total / ITENS_POR_PAGINA);
   if (pagina > totalPaginas) pagina = totalPaginas || 1;
   const inicio = (pagina - 1) * ITENS_POR_PAGINA;
   const fim = Math.min(inicio + ITENS_POR_PAGINA, total);
   const paginaConsultas = listaOrdenada.slice(inicio, fim);
-
   if (consultas.length === 0) {
     container.innerHTML = '<p class="no-data">Nenhuma consulta agendada.</p>';
     paginacao.innerHTML = '';
     return;
   }
-
   const isAdmin = user.tipo === 'admin';
   const isConsult = user.tipo === 'consultorio';
   let html = '';
-
   paginaConsultas.forEach(cons => {
     const status = cons.status || 'agendada';
     let stCls = 'status-agendada';
     if (status === 'cancelada') stCls = 'status-cancelada';
     else if (status === 'confirmada') stCls = 'status-confirmada';
     else if (status === 'realizada') stCls = 'status-realizada';
-
     const isRealizada = status === 'realizada';
     const podeEditar = isAdmin && !isRealizada && status !== 'cancelada';
     const isOwn = cons.is_own;
     const canView = (isAdmin || isOwn);
     const clickAttr = canView ? `onclick="mostrarDetalhes(${cons.id})"` : '';
     const cursorStyle = canView ? 'cursor:pointer;' : 'cursor:default;';
-
     let acoes = '';
     let info = '';
     const hasPedido = cons.numero_pedido ? '<br><small>📦 Pedido: ' + escapeHtml(cons.numero_pedido) + '</small>' : '';
     const lojaStr = cons.loja_nome ? '<br><small>🏢 ' + escapeHtml(cons.loja_nome) + '</small>' : '';
-
     let vendHtml = '';
     if (isAdmin && usuarios.length > 0) {
       const curr = cons.criado_por || '';
@@ -1125,7 +1066,6 @@ function renderizarLista(pagina = 1) {
         <button id="${uid}-cancelar" class="btn-secondary btn-small" style="display:none;" onclick="cancelarVendedor(${cons.id},'${uid}')">✖ Cancelar</button>
       </div>`;
     }
-
     if (isAdmin) {
       const podeExcluir = status === 'cancelada';
       acoes = `<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
@@ -1157,7 +1097,6 @@ function renderizarLista(pagina = 1) {
         acoes = '';
       }
     }
-
     const extraClass = (!isOwn && !isAdmin && !isConsult) ? 'other-vendor' : '';
     const isRealizadaClass = isRealizada ? 'consulta-realizada' : '';
     html += `<div class="consulta-card ${extraClass} ${isRealizadaClass}" ${clickAttr} style="${cursorStyle}">
@@ -1165,10 +1104,7 @@ function renderizarLista(pagina = 1) {
       ${acoes}
     </div>`;
   });
-
   container.innerHTML = html;
-
-  // Paginação
   paginacao.innerHTML = '';
   if (totalPaginas > 1) {
     let pagHtml = '';
@@ -1180,8 +1116,6 @@ function renderizarLista(pagina = 1) {
     paginacao.innerHTML = pagHtml;
     paginaAtual = pagina;
   }
-
-  // Eventos para vendedor (salvar/cancelar)
   document.querySelectorAll('.vendedor-controls select').forEach(s => {
     s.addEventListener('change', function() {
       const uid = this.id.replace('-select', '');
@@ -1199,16 +1133,12 @@ function renderizarLista(pagina = 1) {
   });
 }
 
-// ========================================================================
-// FUNÇÕES DE ALTERAÇÃO DE VENDEDOR
-// ========================================================================
 async function salvarVendedor(consultaId, uid) {
   if (user.tipo !== 'admin') { showToast('Apenas administradores podem alterar o vendedor.', true); return; }
   const select = document.getElementById(uid + '-select');
   if (!select) return;
   const novoVendedorId = parseInt(select.value);
   if (!novoVendedorId) { showToast('Selecione um vendedor válido.', true); return; }
-
   try {
     const r = await fetch(API_URL + '/consultas/' + consultaId + '/vendedor', {
       method: 'PUT',
@@ -1233,9 +1163,6 @@ function cancelarVendedor(consultaId, uid) {
   document.getElementById(uid + '-cancelar').style.display = 'none';
 }
 
-// ========================================================================
-// AÇÕES DE CONSULTAS
-// ========================================================================
 async function confirmarConsulta(id) {
   if (user.tipo !== 'admin' && user.tipo !== 'consultorio') {
     showToast('Apenas administradores ou consultório podem confirmar.', true);
@@ -1401,7 +1328,6 @@ function getPrintConfig() {
 function gerarComprovante(id, tipo) {
   const c = consultas.find(x => x.id === id);
   if (!c) { showToast('Consulta não encontrada.', true); return; }
-
   let condicao = 'Encaixe';
   let paciente = null;
   if (c.paciente_cpf) paciente = clientes.find(p => p.cpf === c.paciente_cpf);
@@ -1412,7 +1338,6 @@ function gerarComprovante(id, tipo) {
     else if (paciente.deficiencia_fisica) condicao = 'Deficiência Física';
     else if (paciente.encaixe) condicao = 'Encaixe';
   }
-
   const condDisplay = condicao === 'Encaixe' ? '<span style="font-weight:bold;color:#e53e3e;background:#fff5f5;padding:2px 10px;border-radius:4px;border:1px solid #e53e3e;">🔹 Encaixe</span>' : condicao;
   const medico = medicos.find(m => m.id === c.medico_id);
   const endMed = medico ? medico.endereco : 'Endereço não informado';
@@ -1424,7 +1349,6 @@ function gerarComprovante(id, tipo) {
   const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
   const pedido = c.numero_pedido || 'Não informado';
   const cfg = getPrintConfig();
-
   let html = `<div class="comprovante-container" style="padding-left:${cfg.marginLeft}px;padding-right:${cfg.marginRight}px;padding-top:${cfg.marginTop}px;">
     <div class="comprovante-conteudo">
       <div class="header-loja" style="font-size:22px;font-weight:700;margin-bottom:4px;">${escapeHtml(lojaNome)}</div>
@@ -1444,7 +1368,6 @@ function gerarComprovante(id, tipo) {
     </div>
     <button onclick="fecharComprovante()" class="no-print" style="display:block;margin:16px auto 0;padding:8px 24px;background:#e53e3e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;">Fechar</button>
   </div>`;
-
   if (tipo === 'bobina') {
     html = html.replace('comprovante-container', 'comprovante-container comprovante-bobina')
       .replace(/font-size:22px/g, 'font-size:18px')
@@ -1454,7 +1377,6 @@ function gerarComprovante(id, tipo) {
       .replace(/font-size:20px/g, 'font-size:15px')
       .replace(/font-size:16px/g, 'font-size:13px');
   }
-
   document.getElementById('comprovante').innerHTML = html;
   document.getElementById('comprovante').style.display = 'block';
   setTimeout(() => window.print(), 300);
@@ -1768,11 +1690,14 @@ async function enviarSolicitacao() {
   btn.textContent = 'Enviando...';
   try {
     const data = document.getElementById('solDataConsulta').value;
-    if (!validarDataNaoPassada(data, 'Data da consulta')) { btn.disabled = false;
-      btn.textContent = 'Enviar Solicitação'; return; }
+    const h1 = document.getElementById('solHorario1').value;
+    if (!validarDataHoraNaoPassada(data, h1, '1º Horário')) {
+      btn.disabled = false;
+      btn.textContent = 'Enviar Solicitação';
+      return;
+    }
     const medicoId = document.getElementById('solMedicoSelect').value;
     const medicoNome = medicos.find(m => m.id == medicoId)?.nome || '';
-    const h1 = document.getElementById('solHorario1').value;
     const h2 = document.getElementById('solHorario2').value;
     const h3 = document.getElementById('solHorario3').value;
     if (!medicoId) { document.getElementById('solMsg').innerHTML = '<p style="color:red;">Selecione um médico.</p>';
@@ -1808,9 +1733,16 @@ async function enviarSolicitacao() {
       btn.textContent = 'Enviar Solicitação';
       return;
     }
-    const r = await fetch(API_URL + '/solicitacoes', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(dados) });
+    const r = await fetch(API_URL + '/solicitacoes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(dados)
+    });
     const ct = r.headers.get('content-type');
-    if (!ct || !ct.includes('application/json')) { const text = await r.text(); throw new Error(text || 'Erro no servidor'); }
+    if (!ct || !ct.includes('application/json')) {
+      const text = await r.text();
+      throw new Error(text || 'Erro no servidor');
+    }
     const result = await r.json();
     if (!r.ok) throw new Error(result.error || 'Erro ao enviar solicitação');
     document.getElementById('solMsg').innerHTML = '<p style="color:green;">✅ Solicitação enviada! Aguarde aprovação.</p>';
@@ -2086,7 +2018,6 @@ function mostrarDetalhes(id) {
   const vendedor = e.vendedor_nome || 'Não informado';
   const isRealizada = status === 'realizada';
   const podeEditar = user.tipo === 'admin' && !isRealizada && status !== 'cancelada';
-
   let adminActions = '';
   if (user.tipo === 'admin') {
     adminActions = `
@@ -2186,13 +2117,10 @@ function logout() {
   }
 })();
 
-// ========================================================================
-// FECHAR MODAIS AO CLICAR FORA
-// ========================================================================
 document.querySelectorAll('.modal-overlay').forEach(modal => {
   modal.addEventListener('click', function(e) {
     if (e.target === this) this.classList.remove('show');
   });
 });
 
-console.log('✅ Sistema completo com tema, perfil consultorio, busca e muito mais.');
+console.log('✅ Sistema completo com tema, perfil consultorio, busca, validação de data/hora retroativa e muito mais.');
