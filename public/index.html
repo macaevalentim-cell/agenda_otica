@@ -91,49 +91,48 @@
         <!-- MAIN -->
         <main class="main-content">
 
- 
-            <!-- ===== PÁGINA: LISTA DE CONSULTAS (com barra de busca) ===== -->
-<section id="pageLista" class="page active">
-    <h2><i class="fas fa-list"></i> Lista de Consultas</h2>
-    <div class="filtros-busca">
-        <div class="form-row">
-            <div class="form-group" style="flex:2;">
-                <label for="buscaPaciente">Paciente</label>
-                <input type="text" id="buscaPaciente" placeholder="Digite o nome..." />
-            </div>
-            <div class="form-group">
-                <label for="buscaVendedor">Vendedor</label>
-                <select id="buscaVendedor"><option value="">Todos</option></select>
-            </div>
-            <div class="form-group">
-                <label for="buscaStatus">Status</label>
-                <select id="buscaStatus">
-                    <option value="">Todos</option>
-                    <option value="agendada">Agendada</option>
-                    <option value="confirmada">Confirmada</option>
-                    <option value="realizada">Realizada</option>
-                    <option value="cancelada">Cancelada</option>
-                </select>
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="buscaDataInicio">Data Início</label>
-                <input type="date" id="buscaDataInicio" />
-            </div>
-            <div class="form-group">
-                <label for="buscaDataFim">Data Fim</label>
-                <input type="date" id="buscaDataFim" />
-            </div>
-            <div class="form-group" style="display:flex; align-items:flex-end; gap:8px;">
-                <button onclick="aplicarFiltros()" class="btn-primary">🔍 Buscar</button>
-                <button onclick="limparFiltros()" class="btn-secondary">Limpar</button>
-            </div>
-        </div>
-    </div>
-    <div id="consultasListMain" class="consultas-list-container"></div>
-    <div id="listaPaginacao" class="pagination-controls"></div>
-</section>
+            <!-- ===== PÁGINA: LISTA DE CONSULTAS ===== -->
+            <section id="pageLista" class="page active">
+                <h2><i class="fas fa-list"></i> Lista de Consultas</h2>
+                <div class="filtros-busca">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2;">
+                            <label for="buscaPaciente">Paciente</label>
+                            <input type="text" id="buscaPaciente" placeholder="Digite o nome..." />
+                        </div>
+                        <div class="form-group">
+                            <label for="buscaVendedor">Vendedor</label>
+                            <select id="buscaVendedor"><option value="">Todos</option></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="buscaStatus">Status</label>
+                            <select id="buscaStatus">
+                                <option value="">Todos</option>
+                                <option value="agendada">Agendada</option>
+                                <option value="confirmada">Confirmada</option>
+                                <option value="realizada">Realizada</option>
+                                <option value="cancelada">Cancelada</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="buscaDataInicio">Data Início</label>
+                            <input type="date" id="buscaDataInicio" />
+                        </div>
+                        <div class="form-group">
+                            <label for="buscaDataFim">Data Fim</label>
+                            <input type="date" id="buscaDataFim" />
+                        </div>
+                        <div class="form-group" style="display:flex; align-items:flex-end; gap:8px;">
+                            <button onclick="aplicarFiltros()" class="btn-primary">🔍 Buscar</button>
+                            <button onclick="limparFiltros()" class="btn-secondary">Limpar</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="consultasListMain" class="consultas-list-container"></div>
+                <div id="listaPaginacao" class="pagination-controls"></div>
+            </section>
 
             <!-- ===== PÁGINA: CALENDÁRIO ===== -->
             <section id="pageCalendario" class="page">
@@ -172,13 +171,28 @@
                             </select>
                             <button onclick="abrirModalCadastroPaciente()" class="btn-success">+</button>
                         </div>
-                        <div class="form-group"><label for="pacienteNome">Nome *</label><input type="text" id="pacienteNome" placeholder="Nome *" /></div>
-                        <div class="form-group"><label for="pacienteTelefone">Telefone *</label><input type="text" id="pacienteTelefone" placeholder="Telefone *" /></div>
+                        <div class="form-group">
+                            <label for="pacienteNome">Nome *</label>
+                            <input type="text" id="pacienteNome" placeholder="Nome *" />
+                        </div>
+                        <div class="form-group">
+                            <label for="pacienteTelefone">Telefone *</label>
+                            <input type="text" id="pacienteTelefone" placeholder="Telefone *" />
+                        </div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label for="pacienteEmail">E-mail</label><input type="email" id="pacienteEmail" placeholder="E-mail" /></div>
-                        <div class="form-group"><label for="pacienteCpf">CPF</label><input type="text" id="pacienteCpf" placeholder="CPF" /></div>
-                        <div class="form-group"><label for="pacienteDataNasc">Data Nascimento</label><input type="date" id="pacienteDataNasc" /></div>
+                        <div class="form-group">
+                            <label for="pacienteEmail">E-mail</label>
+                            <input type="email" id="pacienteEmail" placeholder="E-mail" />
+                        </div>
+                        <div class="form-group">
+                            <label for="pacienteCpf">CPF</label>
+                            <input type="text" id="pacienteCpf" placeholder="CPF" />
+                        </div>
+                        <div class="form-group">
+                            <label for="pacienteDataNasc">Data Nascimento *</label>
+                            <input type="date" id="pacienteDataNasc" required />
+                        </div>
                     </div>
                     <div class="form-row check-group">
                         <label><input type="checkbox" id="pacienteEncaixe" checked /> Encaixe</label>
@@ -187,16 +201,31 @@
                         <span id="idadeDisplay" class="idade-display"></span>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label for="medicoSelect">Médico *</label><select id="medicoSelect"><option value="">Selecione um médico</option></select></div>
+                        <div class="form-group">
+                            <label for="medicoSelect">Médico *</label>
+                            <select id="medicoSelect"><option value="">Selecione um médico</option></select>
+                        </div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label for="dataConsulta">Data *</label><input type="date" id="dataConsulta" /></div>
-                        <div class="form-group"><label for="horarioSelect">Horário *</label><select id="horarioSelect"><option value="">Selecione médico e data</option></select></div>
+                        <div class="form-group">
+                            <label for="dataConsulta">Data *</label>
+                            <input type="date" id="dataConsulta" />
+                        </div>
+                        <div class="form-group">
+                            <label for="horarioSelect">Horário *</label>
+                            <select id="horarioSelect"><option value="">Selecione médico e data</option></select>
+                        </div>
                     </div>
                     <div id="msgHorarios" class="msg-horarios"></div>
                     <div class="form-row">
-                        <div class="form-group"><label for="observacoes">Observações</label><input type="text" id="observacoes" placeholder="Observações" /></div>
-                        <div class="form-group"><label for="numeroPedido">Nº do Pedido</label><input type="text" id="numeroPedido" placeholder="Número do Pedido" /></div>
+                        <div class="form-group">
+                            <label for="observacoes">Observações</label>
+                            <input type="text" id="observacoes" placeholder="Observações" />
+                        </div>
+                        <div class="form-group">
+                            <label for="numeroPedido">Nº do Pedido</label>
+                            <input type="text" id="numeroPedido" placeholder="Número do Pedido" />
+                        </div>
                     </div>
                     <input type="hidden" id="editConsultaId" />
                     <div class="form-actions">
@@ -324,7 +353,7 @@
                         <div class="form-row">
                             <div class="form-group"><label for="pacienteCadEmail">E-mail</label><input type="email" id="pacienteCadEmail" placeholder="E-mail" /></div>
                             <div class="form-group"><label for="pacienteCadCpf">CPF</label><input type="text" id="pacienteCadCpf" placeholder="CPF" /></div>
-                            <div class="form-group"><label for="pacienteCadDataNasc">Data Nascimento</label><input type="date" id="pacienteCadDataNasc" /></div>
+                            <div class="form-group"><label for="pacienteCadDataNasc">Data Nascimento *</label><input type="date" id="pacienteCadDataNasc" required /></div>
                         </div>
                         <div class="form-row check-group">
                             <label><input type="checkbox" id="pacienteCadEncaixe" checked /> Encaixe</label>
@@ -421,7 +450,10 @@
                     <div class="form-row">
                         <div class="form-group"><label for="solPacienteEmail">E-mail</label><input type="email" id="solPacienteEmail" placeholder="E-mail" /></div>
                         <div class="form-group"><label for="solPacienteCpf">CPF</label><input type="text" id="solPacienteCpf" placeholder="CPF" /></div>
-                        <div class="form-group"><label for="solPacienteDataNasc">Data Nascimento</label><input type="date" id="solPacienteDataNasc" /></div>
+                        <div class="form-group">
+                            <label for="solPacienteDataNasc">Data Nascimento *</label>
+                            <input type="date" id="solPacienteDataNasc" required />
+                        </div>
                     </div>
                     <div class="form-row check-group">
                         <label><input type="checkbox" id="solEncaixe" checked /> Encaixe</label>
@@ -478,6 +510,7 @@
                 <button onclick="fecharModalLembretes()" class="btn-secondary">Fechar</button>
             </div>
         </div>
+
         <div id="modalDetalhes" class="modal-overlay">
             <div class="modal-box">
                 <h3>Detalhes da Consulta</h3>
@@ -485,6 +518,7 @@
                 <button onclick="fecharModalDetalhes()" class="btn-secondary">Fechar</button>
             </div>
         </div>
+
         <div id="modalCadastroPaciente" class="modal-overlay">
             <div class="modal-box">
                 <h3>Novo Paciente</h3>
@@ -495,7 +529,10 @@
                 <div class="form-row">
                     <div class="form-group"><label for="novoPacienteEmail">E-mail</label><input type="email" id="novoPacienteEmail" placeholder="E-mail" /></div>
                     <div class="form-group"><label for="novoPacienteCpf">CPF</label><input type="text" id="novoPacienteCpf" placeholder="CPF" /></div>
-                    <div class="form-group"><label for="novoPacienteDataNasc">Data Nascimento</label><input type="date" id="novoPacienteDataNasc" /></div>
+                    <div class="form-group">
+                        <label for="novoPacienteDataNasc">Data Nascimento *</label>
+                        <input type="date" id="novoPacienteDataNasc" required />
+                    </div>
                 </div>
                 <div class="form-row check-group">
                     <label><input type="checkbox" id="novoPacienteEncaixe" checked /> Encaixe</label>
@@ -509,6 +546,7 @@
                 <div id="novoPacienteMsg" class="form-msg"></div>
             </div>
         </div>
+
         <div id="modalImpressao" class="modal-overlay">
             <div class="modal-box">
                 <h3>🖨️ Impressão do Comprovante</h3>
@@ -521,6 +559,7 @@
                 <button onclick="fecharModalImpressao()" class="btn-secondary">Cancelar</button>
             </div>
         </div>
+
         <div id="comprovante" style="display:none;"></div>
         <div id="toast" class="toast"></div>
     </div>

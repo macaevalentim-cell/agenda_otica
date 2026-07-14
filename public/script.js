@@ -76,7 +76,6 @@ function validarDataNaoPassada(dataStr, campoNome = 'Data') {
   return true;
 }
 
-// ===== NOVA VALIDAÇÃO: DATA/HORA NÃO RETROATIVA =====
 function validarDataHoraNaoPassada(dataStr, horaStr, campoNome = 'Data/Hora') {
   if (!dataStr || !horaStr) return true;
   const dataHora = new Date(`${dataStr}T${horaStr}:00`);
@@ -84,6 +83,18 @@ function validarDataHoraNaoPassada(dataStr, horaStr, campoNome = 'Data/Hora') {
   agora.setMilliseconds(0);
   if (dataHora < agora) {
     showToast(`${campoNome} não pode ser no passado.`, true);
+    return false;
+  }
+  return true;
+}
+
+function validarDataNascimento(dataNasc) {
+  if (!dataNasc) {
+    showToast('Data de nascimento é obrigatória.', true);
+    return false;
+  }
+  if (isNaN(new Date(dataNasc).getTime())) {
+    showToast('Data de nascimento inválida.', true);
     return false;
   }
   return true;
@@ -613,12 +624,14 @@ async function buscarPacienteSol() {
 // CRUD DE PACIENTES
 // ========================================================================
 async function salvarPaciente() {
+  const dataNasc = document.getElementById('pacienteCadDataNasc').value;
+  if (!validarDataNascimento(dataNasc)) return;
   const data = {
     nome: document.getElementById('pacienteCadNome').value,
     telefone: document.getElementById('pacienteCadTelefone').value,
     email: document.getElementById('pacienteCadEmail').value,
     cpf: document.getElementById('pacienteCadCpf').value,
-    data_nascimento: document.getElementById('pacienteCadDataNasc').value,
+    data_nascimento: dataNasc,
     neurodivergente: document.getElementById('pacienteCadNeurodivergente').checked ? 1 : 0,
     deficiencia_fisica: document.getElementById('pacienteCadDeficienciaFisica').checked ? 1 : 0,
     encaixe: document.getElementById('pacienteCadEncaixe').checked ? 1 : 0
@@ -706,12 +719,14 @@ function fecharModalCadastroPaciente() {
 }
 
 async function salvarNovoPaciente() {
+  const dataNasc = document.getElementById('novoPacienteDataNasc').value;
+  if (!validarDataNascimento(dataNasc)) return;
   const data = {
     nome: document.getElementById('novoPacienteNome').value,
     telefone: document.getElementById('novoPacienteTelefone').value,
     email: document.getElementById('novoPacienteEmail').value,
     cpf: document.getElementById('novoPacienteCpf').value,
-    data_nascimento: document.getElementById('novoPacienteDataNasc').value,
+    data_nascimento: dataNasc,
     neurodivergente: document.getElementById('novoPacienteNeurodivergente').checked ? 1 : 0,
     deficiencia_fisica: document.getElementById('novoPacienteDeficienciaFisica').checked ? 1 : 0,
     encaixe: document.getElementById('novoPacienteEncaixe').checked ? 1 : 0
@@ -981,19 +996,22 @@ async function salvarConsulta() {
   const medicoId = document.getElementById('medicoSelect').value;
   const medicoNome = medicos.find(m => m.id == medicoId)?.nome;
   const numeroPedido = document.getElementById('numeroPedido').value.trim() || null;
+  const dataNasc = document.getElementById('pacienteDataNasc').value;
+
   if (!pacienteNome || !pacienteTelefone || !dataConsulta || !horario || !medicoId) {
     showToast('Preencha todos os campos obrigatórios!', true);
     return;
   }
-  // VALIDAÇÃO DATA/HORA NÃO RETROATIVA
+  if (!validarDataNascimento(dataNasc)) return;
   if (!validarDataHoraNaoPassada(dataConsulta, horario, 'Data/Hora da consulta')) return;
+
   const dados = {
     paciente_id: pacienteId || null,
     paciente_nome: pacienteNome,
     paciente_telefone: pacienteTelefone,
     paciente_email: document.getElementById('pacienteEmail').value,
     paciente_cpf: document.getElementById('pacienteCpf').value,
-    data_nascimento: document.getElementById('pacienteDataNasc').value,
+    data_nascimento: dataNasc,
     neurodivergente: document.getElementById('pacienteNeurodivergente').checked ? 1 : 0,
     deficiencia_fisica: document.getElementById('pacienteDeficienciaFisica').checked ? 1 : 0,
     encaixe: document.getElementById('pacienteEncaixe').checked ? 1 : 0,
@@ -1596,7 +1614,18 @@ async function enviarWhatsAppMedico(id) {
     else if (pac.deficiencia_fisica) cond = 'Deficiência Física';
     else if (pac.encaixe) cond = 'Encaixe';
   }
-  let msg = 'Nova consulta agendada\n----------------------------------------\n' + loja + '\nPaciente: ' + e.paciente_nome + '\nData: ' + formatDisplay(e.data_consulta) + '\nHorário: ' + e.horario + '\nTelefone: ' + e.paciente_telefone + '\nLocal: ' + end + '\nCondição: ' + cond;
+  // Buscar idade do paciente
+  const idade = calcularIdade(pac?.data_nascimento);
+  const idadeStr = idade !== null ? `\nIdade: ${idade} anos` : '';
+
+  let msg = 'Nova consulta agendada\n----------------------------------------\n' +
+    loja + '\n' +
+    'Paciente: ' + e.paciente_nome + idadeStr + '\n' +
+    'Data: ' + formatDisplay(e.data_consulta) + '\n' +
+    'Horário: ' + e.horario + '\n' +
+    'Telefone: ' + e.paciente_telefone + '\n' +
+    'Local: ' + end + '\n' +
+    'Condição: ' + cond;
   if (e.numero_pedido) msg += '\nPedido: #' + e.numero_pedido;
   const phone = medico.whatsapp.replace(/\D/g, '');
   if (phone) window.open('https://wa.me/55' + phone + '?text=' + encodeURIComponent(msg), '_blank');
@@ -1691,11 +1720,19 @@ async function enviarSolicitacao() {
   try {
     const data = document.getElementById('solDataConsulta').value;
     const h1 = document.getElementById('solHorario1').value;
+    const dataNasc = document.getElementById('solPacienteDataNasc').value;
+
+    if (!validarDataNascimento(dataNasc)) {
+      btn.disabled = false;
+      btn.textContent = 'Enviar Solicitação';
+      return;
+    }
     if (!validarDataHoraNaoPassada(data, h1, '1º Horário')) {
       btn.disabled = false;
       btn.textContent = 'Enviar Solicitação';
       return;
     }
+
     const medicoId = document.getElementById('solMedicoSelect').value;
     const medicoNome = medicos.find(m => m.id == medicoId)?.nome || '';
     const h2 = document.getElementById('solHorario2').value;
@@ -1714,7 +1751,7 @@ async function enviarSolicitacao() {
       paciente_telefone: document.getElementById('solPacienteTelefone').value.trim(),
       paciente_email: document.getElementById('solPacienteEmail').value.trim(),
       paciente_cpf: document.getElementById('solPacienteCpf').value.trim(),
-      data_nascimento: document.getElementById('solPacienteDataNasc').value,
+      data_nascimento: dataNasc,
       neurodivergente: document.getElementById('solNeurodivergente').checked ? 1 : 0,
       deficiencia_fisica: document.getElementById('solDeficienciaFisica').checked ? 1 : 0,
       encaixe: document.getElementById('solEncaixe').checked ? 1 : 0,
@@ -2123,4 +2160,4 @@ document.querySelectorAll('.modal-overlay').forEach(modal => {
   });
 });
 
-console.log('✅ Sistema completo com tema, perfil consultorio, busca, validação de data/hora retroativa e muito mais.');
+console.log('✅ Sistema completo com tema, perfil consultorio, busca, validação de data/hora retroativa, data de nascimento obrigatória e idade no WhatsApp do médico.');

@@ -49,14 +49,18 @@ router.post('/', authenticateToken, async (req, res) => {
       medico_id, medico_nome, observacoes, numero_pedido
     } = req.body;
 
-    // ===== VALIDAÇÃO: DATA/HORA NÃO RETROATIVA (1º horário) =====
+    // ===== VALIDAÇÕES =====
+    if (!data_nascimento) {
+      return res.status(400).json({ error: 'Data de nascimento do paciente é obrigatória.' });
+    }
+
+    // Data/hora não retroativa (1º horário)
     const now = new Date();
     const dataHora1 = new Date(`${data_consulta}T${horario1}:00`);
     if (dataHora1 < now) {
       return res.status(400).json({ error: 'Não é permitido solicitar para data/hora no passado.' });
     }
 
-    // Validação do dia da semana
     const diaSemana = new Date(data_consulta).getDay();
     const horariosConfig = await pool.query(
       `SELECT hora_inicio, hora_fim FROM medico_horarios WHERE medico_id = $1 AND dia_semana = $2 AND ativo = true`,
@@ -93,20 +97,38 @@ router.post('/', authenticateToken, async (req, res) => {
       }
     }
 
-    // Cria paciente se CPF for fornecido
+    // ===== GERENCIAR PACIENTE (cria/atualiza) =====
     if (paciente_cpf) {
       const existente = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [paciente_cpf]);
-      if (existente.rows.length === 0) {
+      if (existente.rows.length > 0) {
+        // Atualizar dados
+        await pool.query(
+          `UPDATE clientes SET nome=$1, telefone=$2, email=$3, data_nascimento=$4,
+           neurodivergente=$5, deficiencia_fisica=$6, encaixe=$7
+           WHERE cpf=$8`,
+          [paciente_nome, paciente_telefone, toNull(paciente_email), data_nascimento,
+           neurodivergente ? 1 : 0, deficiencia_fisica ? 1 : 0, encaixe ? 1 : 0,
+           paciente_cpf]
+        );
+      } else {
         await pool.query(
           `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [paciente_nome, paciente_telefone, toNull(paciente_email), paciente_cpf, toNull(data_nascimento),
+          [paciente_nome, paciente_telefone, toNull(paciente_email), paciente_cpf, data_nascimento,
            neurodivergente ? 1 : 0, deficiencia_fisica ? 1 : 0, encaixe ? 1 : 0, req.user.id]
         );
       }
+    } else {
+      // Criar paciente sem CPF (com data de nascimento obrigatória)
+      await pool.query(
+        `INSERT INTO clientes (nome, telefone, email, cpf, data_nascimento, neurodivergente, deficiencia_fisica, encaixe, criado_por)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [paciente_nome, paciente_telefone, toNull(paciente_email), null, data_nascimento,
+         neurodivergente ? 1 : 0, deficiencia_fisica ? 1 : 0, encaixe ? 1 : 0, req.user.id]
+      );
     }
 
-    // Insere a solicitação
+    // ===== INSERIR SOLICITAÇÃO =====
     const result = await pool.query(
       `INSERT INTO solicitacoes_consultas
        (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta,
@@ -176,7 +198,17 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Horário já ocupado para este médico.' });
       }
 
-      // Cria a consulta
+      // ===== CRIAR CONSULTA A PARTIR DA SOLICITAÇÃO =====
+      // Buscar data de nascimento do paciente (para o lembrete)
+      const pacienteData = await pool.query(
+        'SELECT data_nascimento FROM clientes WHERE cpf = $1 OR (nome = $2 AND telefone = $3)',
+        [s.paciente_cpf, s.paciente_nome, s.paciente_telefone]
+      );
+      let dataNascimento = null;
+      if (pacienteData.rows.length > 0) {
+        dataNascimento = pacienteData.rows[0].data_nascimento;
+      }
+
       const consultaResult = await pool.query(
         `INSERT INTO consultas
          (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta, horario, medico_id, medico_nome, observacoes, numero_pedido, criado_por)
@@ -186,8 +218,21 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
          s.observacoes, s.numero_pedido, s.solicitado_por]
       );
       const consultaId = consultaResult.rows[0].id;
-      await agendarLembrete(consultaId, s.paciente_nome, s.paciente_telefone, s.data_consulta,
-        horario_escolhido, s.medico_nome, s.medico_id, s.solicitado_por, s.numero_pedido);
+
+      // Agendar lembrete com data de nascimento
+      await agendarLembrete(
+        consultaId,
+        s.paciente_nome,
+        s.paciente_telefone,
+        dataNascimento,
+        s.data_consulta,
+        horario_escolhido,
+        s.medico_nome,
+        s.medico_id,
+        s.solicitado_por,
+        s.numero_pedido
+      );
+
       await pool.query('UPDATE solicitacoes_consultas SET horario_escolhido = $1 WHERE id = $2', [horario_escolhido, req.params.id]);
     }
 

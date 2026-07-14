@@ -2,7 +2,6 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
-// ===== CONFIGURAÇÃO DO POOL =====
 let poolConfig;
 if (process.env.DATABASE_URL) {
   poolConfig = {
@@ -23,20 +22,11 @@ if (process.env.DATABASE_URL) {
 
 const pool = new Pool(poolConfig);
 
-// ============================================================
-// FUNÇÃO DE INICIALIZAÇÃO COM TRATAMENTO DE ERROS
-// ============================================================
 async function initDatabase() {
-  let client;
   try {
-    console.log('📦 Conectando ao banco de dados...');
-    client = await pool.connect();
-    console.log('✅ Conexão estabelecida com sucesso');
+    console.log('📦 Inicializando banco de dados (PostgreSQL)...');
 
-    console.log('📦 Criando tabelas...');
-
-    // ===== CRIAÇÃO DAS TABELAS =====
-    await client.query(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS lojas (
         id SERIAL PRIMARY KEY,
         nome VARCHAR(200) NOT NULL,
@@ -46,37 +36,31 @@ async function initDatabase() {
       )
     `);
 
-    await client.query(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
         nome VARCHAR(100) NOT NULL,
         username VARCHAR(50) UNIQUE NOT NULL,
         senha VARCHAR(255) NOT NULL,
         telefone VARCHAR(20),
-        tipo VARCHAR(20) DEFAULT 'vendedor',
+        tipo VARCHAR(20) DEFAULT 'vendedor' CHECK (tipo IN ('admin', 'vendedor', 'consultorio')),
         loja_id INTEGER REFERENCES lojas(id) ON DELETE SET NULL,
         ativo BOOLEAN DEFAULT TRUE,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // ===== AJUSTES NA TABELA USUARIOS =====
+    // Ajustar coluna tipo e constraint
     try {
-      await client.query(`ALTER TABLE usuarios ALTER COLUMN tipo TYPE VARCHAR(20);`);
-      console.log('✅ Coluna tipo ajustada para VARCHAR(20)');
+      await pool.query(`ALTER TABLE usuarios ALTER COLUMN tipo TYPE VARCHAR(20);`);
+      await pool.query(`ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_tipo_check;`);
+      await pool.query(`ALTER TABLE usuarios ADD CONSTRAINT usuarios_tipo_check CHECK (tipo IN ('admin', 'vendedor', 'consultorio'));`);
+      console.log('✅ Coluna tipo ajustada');
     } catch (e) {
-      console.log('ℹ️ Coluna tipo já está ajustada ou não pôde ser alterada:', e.message);
+      console.warn('⚠️ Ajuste de coluna tipo:', e.message);
     }
 
-    try {
-      await client.query(`ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_tipo_check;`);
-      await client.query(`ALTER TABLE usuarios ADD CONSTRAINT usuarios_tipo_check CHECK (tipo IN ('admin', 'vendedor', 'consultorio'));`);
-      console.log('✅ Constraint de tipo atualizada');
-    } catch (e) {
-      console.log('ℹ️ Constraint de tipo já está correta:', e.message);
-    }
-
-    await client.query(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS medicos (
         id SERIAL PRIMARY KEY,
         nome VARCHAR(100) NOT NULL,
@@ -92,14 +76,15 @@ async function initDatabase() {
       )
     `);
 
-    await client.query(`
+    // Tabela clientes: data_nascimento agora é NOT NULL
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS clientes (
         id SERIAL PRIMARY KEY,
         nome VARCHAR(200) NOT NULL,
         telefone VARCHAR(20) NOT NULL,
         email VARCHAR(100),
         cpf VARCHAR(14) UNIQUE,
-        data_nascimento DATE,
+        data_nascimento DATE NOT NULL,
         neurodivergente BOOLEAN DEFAULT FALSE,
         deficiencia_fisica BOOLEAN DEFAULT FALSE,
         encaixe BOOLEAN DEFAULT TRUE,
@@ -109,7 +94,7 @@ async function initDatabase() {
       )
     `);
 
-    await client.query(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS consultas (
         id SERIAL PRIMARY KEY,
         paciente_nome VARCHAR(200) NOT NULL,
@@ -128,7 +113,7 @@ async function initDatabase() {
       )
     `);
 
-    await client.query(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS solicitacoes_consultas (
         id SERIAL PRIMARY KEY,
         paciente_nome VARCHAR(200) NOT NULL,
@@ -150,7 +135,7 @@ async function initDatabase() {
       )
     `);
 
-    await client.query(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS medico_horarios (
         id SERIAL PRIMARY KEY,
         medico_id INTEGER NOT NULL REFERENCES medicos(id) ON DELETE CASCADE,
@@ -163,7 +148,7 @@ async function initDatabase() {
       )
     `);
 
-    await client.query(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS lembretes (
         id SERIAL PRIMARY KEY,
         consulta_id INTEGER NOT NULL REFERENCES consultas(id) ON DELETE CASCADE,
@@ -179,7 +164,7 @@ async function initDatabase() {
       )
     `);
 
-    await client.query(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS whatsapp_config (
         id INTEGER PRIMARY KEY DEFAULT 1,
         numero VARCHAR(20) DEFAULT '(22) 99764-0112',
@@ -189,86 +174,72 @@ async function initDatabase() {
       )
     `);
 
-    // ===== ÍNDICES =====
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_consultas_data ON consultas(data_consulta)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_consultas_medico ON consultas(medico_id)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_consultas_status ON consultas(status)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_consultas_criado_por ON consultas(criado_por)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_clientes_cpf ON clientes(cpf)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_horarios_medico ON medico_horarios(medico_id)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_solicitacoes_status ON solicitacoes_consultas(status)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_lembretes_status ON lembretes(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_data ON consultas(data_consulta)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_medico ON consultas(medico_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_status ON consultas(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_criado_por ON consultas(criado_por)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_clientes_cpf ON clientes(cpf)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_horarios_medico ON medico_horarios(medico_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitacoes_status ON solicitacoes_consultas(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_lembretes_status ON lembretes(status)`);
 
-    console.log('✅ Tabelas criadas/verificadas');
-
-    // ============================================================
-    // DADOS INICIAIS
-    // ============================================================
-
-    // --- Loja padrão ---
-    const lojaResult = await client.query('SELECT id FROM lojas WHERE nome = $1', ['Ótica Macaé - Matriz']);
+    // Dados iniciais
+    const lojaExist = await pool.query('SELECT id FROM lojas WHERE nome = $1', ['Ótica Macaé - Matriz']);
     let lojaId;
-    if (lojaResult.rows.length === 0) {
-      const result = await client.query(
+    if (lojaExist.rows.length === 0) {
+      const result = await pool.query(
         'INSERT INTO lojas (nome, endereco) VALUES ($1, $2) RETURNING id',
         ['Ótica Macaé - Matriz', 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ']
       );
       lojaId = result.rows[0].id;
       console.log('✅ Loja padrão criada');
     } else {
-      lojaId = lojaResult.rows[0].id;
+      lojaId = lojaExist.rows[0].id;
     }
 
-    // --- Admin ---
-    const adminCheck = await client.query('SELECT id FROM usuarios WHERE username = $1', ['admin']);
-    if (adminCheck.rows.length === 0) {
+    const adminExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['admin']);
+    if (adminExist.rows.length === 0) {
       const hash = await bcrypt.hash('admin123', 10);
-      await client.query(
+      await pool.query(
         'INSERT INTO usuarios (nome, username, senha, tipo, loja_id, ativo) VALUES ($1, $2, $3, $4, $5, $6)',
         ['Administrador', 'admin', hash, 'admin', lojaId, true]
       );
       console.log('✅ Usuário admin criado');
     }
 
-    // --- Vendedor ---
-    const vendedorCheck = await client.query('SELECT id FROM usuarios WHERE username = $1', ['vendedor']);
-    if (vendedorCheck.rows.length === 0) {
+    const vendedorExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['vendedor']);
+    if (vendedorExist.rows.length === 0) {
       const hash = await bcrypt.hash('vender123', 10);
-      await client.query(
+      await pool.query(
         'INSERT INTO usuarios (nome, username, senha, tipo, loja_id, ativo) VALUES ($1, $2, $3, $4, $5, $6)',
         ['Vendedor', 'vendedor', hash, 'vendedor', lojaId, true]
       );
       console.log('✅ Usuário vendedor criado');
     }
 
-    // --- Consultório ---
-    const consultorioCheck = await client.query('SELECT id FROM usuarios WHERE username = $1', ['consultorio']);
-    if (consultorioCheck.rows.length === 0) {
+    const consultorioExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['consultorio']);
+    if (consultorioExist.rows.length === 0) {
       const hash = await bcrypt.hash('consultorio123', 10);
-      await client.query(
+      await pool.query(
         'INSERT INTO usuarios (nome, username, senha, tipo, loja_id, ativo) VALUES ($1, $2, $3, $4, $5, $6)',
         ['Consultório', 'consultorio', hash, 'consultorio', lojaId, true]
       );
       console.log('✅ Usuário consultorio criado');
     }
 
-    // --- WhatsApp Config ---
-    const configCheck = await client.query('SELECT id FROM whatsapp_config WHERE id = 1');
-    if (configCheck.rows.length === 0) {
-      await client.query(
+    const configExist = await pool.query('SELECT id FROM whatsapp_config WHERE id = 1');
+    if (configExist.rows.length === 0) {
+      await pool.query(
         'INSERT INTO whatsapp_config (id, numero, endereco_otica) VALUES ($1, $2, $3)',
         [1, '(22) 99764-0112', 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ']
       );
       console.log('✅ Configuração WhatsApp criada');
     }
 
-    console.log('✅ Banco de dados inicializado com sucesso!');
+    console.log('✅ Banco de dados (PostgreSQL) inicializado com sucesso!');
   } catch (error) {
     console.error('❌ Erro ao inicializar banco:', error.message);
-    console.error('❌ Stack:', error.stack);
     throw error;
-  } finally {
-    if (client) client.release();
   }
 }
 
