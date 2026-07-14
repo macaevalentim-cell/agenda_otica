@@ -343,34 +343,42 @@
                 </div>
 
                 <!-- SUB: PACIENTES -->
-                <div id="subPacientes" class="sub-page" style="display:none;">
-                    <div class="form-card">
-                        <h3>Cadastrar Paciente</h3>
-                        <div class="form-row">
-                            <div class="form-group"><label for="pacienteCadNome">Nome *</label><input type="text" id="pacienteCadNome" placeholder="Nome *" /></div>
-                            <div class="form-group"><label for="pacienteCadTelefone">Telefone *</label><input type="text" id="pacienteCadTelefone" placeholder="Telefone *" /></div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group"><label for="pacienteCadEmail">E-mail</label><input type="email" id="pacienteCadEmail" placeholder="E-mail" /></div>
-                            <div class="form-group"><label for="pacienteCadCpf">CPF</label><input type="text" id="pacienteCadCpf" placeholder="CPF" /></div>
-                            <div class="form-group"><label for="pacienteCadDataNasc">Data Nascimento *</label><input type="date" id="pacienteCadDataNasc" required /></div>
-                        </div>
-                        <div class="form-row check-group">
-                            <label><input type="checkbox" id="pacienteCadEncaixe" checked /> Encaixe</label>
-                            <label><input type="checkbox" id="pacienteCadNeurodivergente" disabled /> Neurodivergente</label>
-                            <label><input type="checkbox" id="pacienteCadDeficienciaFisica" disabled /> Deficiência Física</label>
-                        </div>
-                        <input type="hidden" id="editPacienteId" />
-                        <div class="form-actions">
-                            <button onclick="salvarPaciente()" class="btn-primary">Salvar</button>
-                            <button id="cancelPacienteBtn" onclick="cancelarEdicaoPaciente()" class="btn-secondary" style="display:none;">Cancelar</button>
-                        </div>
-                    </div>
-                    <div class="list-card">
-                        <h3>Pacientes Cadastrados</h3>
-                        <div id="pacientesList"></div>
-                    </div>
-                </div>
+<div id="subPacientes" class="sub-page" style="display:none;">
+    <div class="form-card">
+        <h3>Cadastrar Paciente</h3>
+        <div class="form-row">
+            <div class="form-group"><label for="pacienteCadNome">Nome *</label><input type="text" id="pacienteCadNome" placeholder="Nome *" /></div>
+            <div class="form-group"><label for="pacienteCadTelefone">Telefone *</label><input type="text" id="pacienteCadTelefone" placeholder="Telefone *" /></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label for="pacienteCadEmail">E-mail</label><input type="email" id="pacienteCadEmail" placeholder="E-mail" /></div>
+            <div class="form-group"><label for="pacienteCadCpf">CPF</label><input type="text" id="pacienteCadCpf" placeholder="CPF" /></div>
+            <div class="form-group"><label for="pacienteCadDataNasc">Data Nascimento *</label><input type="date" id="pacienteCadDataNasc" required /></div>
+        </div>
+        <div class="form-row check-group">
+            <label><input type="checkbox" id="pacienteCadEncaixe" checked /> Encaixe</label>
+            <label><input type="checkbox" id="pacienteCadNeurodivergente" disabled /> Neurodivergente</label>
+            <label><input type="checkbox" id="pacienteCadDeficienciaFisica" disabled /> Deficiência Física</label>
+        </div>
+        <input type="hidden" id="editPacienteId" />
+        <div class="form-actions">
+            <button onclick="salvarPaciente()" class="btn-primary">Salvar</button>
+            <button id="cancelPacienteBtn" onclick="cancelarEdicaoPaciente()" class="btn-secondary" style="display:none;">Cancelar</button>
+        </div>
+    </div>
+    <div class="list-card">
+        <h3>Pacientes Cadastrados</h3>
+        <!-- CAMPO DE BUSCA -->
+        <div class="form-row" style="margin-bottom: 15px;">
+            <div class="form-group" style="flex:1; display:flex; gap:8px;">
+                <input type="text" id="buscaPacienteList" placeholder="Buscar por nome, telefone ou CPF..." style="flex:1;" />
+                <button onclick="buscarPacientes()" class="btn-primary">🔍</button>
+                <button onclick="limparBuscaPacientes()" class="btn-secondary">Limpar</button>
+            </div>
+        </div>
+        <div id="pacientesList"></div>
+    </div>
+</div>
 
                 <!-- SUB: LOJAS -->
                 <div id="subLojas" class="sub-page" style="display:none;">

@@ -377,12 +377,12 @@ async function carregarDados() {
     clientes = await rCl.json();
     preencherSelectPacientes();
     renderizarLista(paginaAtual);
+    renderPacientes();
     if (user.tipo === 'admin') {
       const rU = await fetch(API_URL + '/usuarios', { headers: { Authorization: 'Bearer ' + token } });
       usuarios = await rU.json();
       renderUsuarios();
       renderMedicos();
-      renderPacientes();
       atualizarBadgeSolicitacoes();
       carregarConfigWhatsapp();
       carregarDashboard();
@@ -396,7 +396,7 @@ async function carregarDados() {
 }
 
 // ========================================================================
-// FILTROS DE BUSCA
+// FILTROS DE BUSCA (Lista de Consultas)
 // ========================================================================
 function preencherSelectVendedores() {
   const s = document.getElementById('buscaVendedor');
@@ -458,6 +458,35 @@ function limparFiltros() {
   document.getElementById('buscaDataInicio').value = '';
   document.getElementById('buscaDataFim').value = '';
   filtrosAtivos = false;
+  carregarDados();
+}
+
+// ========================================================================
+// BUSCA DE PACIENTES (na lista de pacientes)
+// ========================================================================
+function buscarPacientes() {
+  const search = document.getElementById('buscaPacienteList').value.trim();
+  if (!search) {
+    carregarDados();
+    return;
+  }
+  fetch(API_URL + '/clientes?search=' + encodeURIComponent(search), {
+    headers: { Authorization: 'Bearer ' + token }
+  })
+    .then(r => {
+      if (!r.ok) throw new Error('Erro ao buscar pacientes');
+      return r.json();
+    })
+    .then(data => {
+      clientes = data;
+      renderPacientes();
+      showToast('Encontrados ' + clientes.length + ' paciente(s)');
+    })
+    .catch(err => showToast('Erro ao buscar pacientes: ' + err.message, true));
+}
+
+function limparBuscaPacientes() {
+  document.getElementById('buscaPacienteList').value = '';
   carregarDados();
 }
 
@@ -1614,18 +1643,9 @@ async function enviarWhatsAppMedico(id) {
     else if (pac.deficiencia_fisica) cond = 'Deficiência Física';
     else if (pac.encaixe) cond = 'Encaixe';
   }
-  // Buscar idade do paciente
   const idade = calcularIdade(pac?.data_nascimento);
   const idadeStr = idade !== null ? `\nIdade: ${idade} anos` : '';
-
-  let msg = 'Nova consulta agendada\n----------------------------------------\n' +
-    loja + '\n' +
-    'Paciente: ' + e.paciente_nome + idadeStr + '\n' +
-    'Data: ' + formatDisplay(e.data_consulta) + '\n' +
-    'Horário: ' + e.horario + '\n' +
-    'Telefone: ' + e.paciente_telefone + '\n' +
-    'Local: ' + end + '\n' +
-    'Condição: ' + cond;
+  let msg = 'Nova consulta agendada\n----------------------------------------\n' + loja + '\nPaciente: ' + e.paciente_nome + idadeStr + '\nData: ' + formatDisplay(e.data_consulta) + '\nHorário: ' + e.horario + '\nTelefone: ' + e.paciente_telefone + '\nLocal: ' + end + '\nCondição: ' + cond;
   if (e.numero_pedido) msg += '\nPedido: #' + e.numero_pedido;
   const phone = medico.whatsapp.replace(/\D/g, '');
   if (phone) window.open('https://wa.me/55' + phone + '?text=' + encodeURIComponent(msg), '_blank');
@@ -1820,6 +1840,11 @@ async function carregarSolicitacoes() {
       if (s.status === 'pendente') {
         horHtml = horarios.map(h => `<label style="margin-right:10px;"><input type="radio" name="horario_${s.id}" value="${h}" ${s.horario_escolhido === h ? 'checked' : ''}> ${h}</label>`).join('');
         actHtml = `<div class="horario-radio-group">${horHtml}<button onclick="aprovarSolicitacao(${s.id})" class="btn-success" style="margin-top:5px;">✅ Aprovar (selecionado)</button><button onclick="rejeitarSolicitacao(${s.id})" class="btn-danger" style="margin-top:5px;">❌ Rejeitar</button></div>`;
+      } else if (s.status === 'aprovado') {
+        actHtml = `<div style="margin-top:5px; display:flex; gap:8px;">
+          <button onclick="reabrirSolicitacao(${s.id})" class="btn-warning" style="padding:4px 12px;">🔓 Reabrir</button>
+          <button onclick="editarSolicitacao(${s.id})" class="btn-primary" style="padding:4px 12px;">✏️ Editar</button>
+        </div>`;
       }
       const ped = s.numero_pedido ? '<br><small>📦 Pedido: ' + escapeHtml(s.numero_pedido) + '</small>' : '';
       return `<div style="border-bottom:1px solid #ddd;padding:10px;${s.status === 'pendente' ? 'background:#fffbe6;' : ''}">
@@ -1829,6 +1854,131 @@ async function carregarSolicitacoes() {
     document.getElementById('solicitacoesList').innerHTML = '<p style="color:red;">Erro: ' + err.message + '</p>'; }
 }
 
+// ========================================================================
+// REABRIR SOLICITAÇÃO APROVADA
+// ========================================================================
+async function reabrirSolicitacao(id) {
+  if (!confirm('Reabrir esta solicitação? A consulta vinculada será excluída e você poderá editá-la.')) return;
+  try {
+    const r = await fetch(API_URL + '/solicitacoes/' + id + '/reabrir', {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.error || 'Erro ao reabrir');
+    }
+    showToast('Solicitação reaberta!');
+    carregarSolicitacoes();
+    carregarDados();
+  } catch (err) { showToast(err.message, true); }
+}
+
+// ========================================================================
+// EDITAR SOLICITAÇÃO (carregar dados no formulário)
+// ========================================================================
+function editarSolicitacao(id) {
+  fetch(API_URL + '/solicitacoes', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json())
+    .then(lista => {
+      const s = lista.find(item => item.id === id);
+      if (!s) { showToast('Solicitação não encontrada', true); return; }
+      if (s.status !== 'pendente' && s.status !== 'aprovado') {
+        showToast('Só é possível editar solicitações pendentes ou reabertas.', true);
+        return;
+      }
+      document.getElementById('solPacienteNome').value = s.paciente_nome || '';
+      document.getElementById('solPacienteTelefone').value = s.paciente_telefone || '';
+      document.getElementById('solPacienteEmail').value = s.paciente_email || '';
+      document.getElementById('solPacienteCpf').value = s.paciente_cpf || '';
+      document.getElementById('solPacienteDataNasc').value = s.data_nascimento || '';
+      document.getElementById('solDataConsulta').value = s.data_consulta || '';
+      document.getElementById('solHorario1').value = s.horario_sugerido1 || '';
+      document.getElementById('solHorario2').value = s.horario_sugerido2 || '';
+      document.getElementById('solHorario3').value = s.horario_sugerido3 || '';
+      document.getElementById('solMedicoSelect').value = s.medico_id || '';
+      document.getElementById('solObservacoes').value = s.observacoes || '';
+      document.getElementById('solNumeroPedido').value = s.numero_pedido || '';
+
+      const btn = document.getElementById('btnEnviarSolicitacao');
+      btn.textContent = 'Atualizar Solicitação';
+      btn.dataset.editId = id;
+      btn.onclick = function() { atualizarSolicitacao(id); };
+      navegarPara('pageSolicitar');
+    })
+    .catch(err => showToast('Erro ao carregar solicitação: ' + err.message, true));
+}
+
+// ========================================================================
+// ATUALIZAR SOLICITAÇÃO (editar dados)
+// ========================================================================
+async function atualizarSolicitacao(id) {
+  const btn = document.getElementById('btnEnviarSolicitacao');
+  btn.disabled = true;
+  btn.textContent = 'Atualizando...';
+  try {
+    const data = document.getElementById('solDataConsulta').value;
+    const h1 = document.getElementById('solHorario1').value;
+    const dataNasc = document.getElementById('solPacienteDataNasc').value;
+
+    if (!validarDataNascimento(dataNasc)) { btn.disabled = false;
+      btn.textContent = 'Atualizar Solicitação'; return; }
+    if (!validarDataHoraNaoPassada(data, h1, '1º Horário')) { btn.disabled = false;
+      btn.textContent = 'Atualizar Solicitação'; return; }
+
+    const medicoId = document.getElementById('solMedicoSelect').value;
+    const medicoNome = medicos.find(m => m.id == medicoId)?.nome || '';
+    const h2 = document.getElementById('solHorario2').value;
+    const h3 = document.getElementById('solHorario3').value;
+
+    const dados = {
+      paciente_nome: document.getElementById('solPacienteNome').value.trim(),
+      paciente_telefone: document.getElementById('solPacienteTelefone').value.trim(),
+      paciente_email: document.getElementById('solPacienteEmail').value.trim(),
+      paciente_cpf: document.getElementById('solPacienteCpf').value.trim(),
+      data_consulta: data,
+      horario1: h1,
+      horario2: h2,
+      horario3: h3,
+      medico_id: parseInt(medicoId),
+      medico_nome: medicoNome,
+      observacoes: document.getElementById('solObservacoes').value.trim(),
+      numero_pedido: document.getElementById('solNumeroPedido').value.trim() || null
+    };
+
+    if (!dados.paciente_nome || !dados.paciente_telefone) {
+      showToast('Nome e telefone do paciente são obrigatórios.', true);
+      btn.disabled = false;
+      btn.textContent = 'Atualizar Solicitação';
+      return;
+    }
+
+    const r = await fetch(API_URL + '/solicitacoes/' + id + '/editar', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(dados)
+    });
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.error || 'Erro ao atualizar');
+    }
+    showToast('Solicitação atualizada!');
+    btn.textContent = 'Enviar Solicitação';
+    btn.onclick = function() { enviarSolicitacao(); };
+    delete btn.dataset.editId;
+    navegarPara('pageAdmin');
+    mostrarSubPage('solicitacoes');
+  } catch (err) {
+    showToast('Erro: ' + err.message, true);
+  } finally {
+    btn.disabled = false;
+    if (btn.textContent === 'Atualizando...') btn.textContent = 'Atualizar Solicitação';
+  }
+}
+
+// ========================================================================
+// APROVAR/REJEITAR SOLICITAÇÃO
+// ========================================================================
 async function aprovarSolicitacao(id) {
   if (user.tipo !== 'admin') { showToast('Apenas administradores podem aprovar.', true); return; }
   if (!confirm('Aprovar esta solicitação?')) return;
@@ -1836,7 +1986,11 @@ async function aprovarSolicitacao(id) {
   if (!radio) { showToast('Selecione um horário para aprovar.', true); return; }
   const hor = radio.value;
   try {
-    const r = await fetch(API_URL + '/solicitacoes/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ status: 'aprovado', horario_escolhido: hor }) });
+    const r = await fetch(API_URL + '/solicitacoes/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ status: 'aprovado', horario_escolhido: hor })
+    });
     if (!r.ok) { const e = await r.json(); throw new Error(e.error || 'Erro'); }
     showToast('Solicitação aprovada!');
     await carregarSolicitacoes();
@@ -1851,7 +2005,11 @@ async function rejeitarSolicitacao(id) {
   if (user.tipo !== 'admin') { showToast('Apenas administradores podem rejeitar.', true); return; }
   if (!confirm('Rejeitar esta solicitação?')) return;
   try {
-    const r = await fetch(API_URL + '/solicitacoes/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ status: 'rejeitado' }) });
+    const r = await fetch(API_URL + '/solicitacoes/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ status: 'rejeitado' })
+    });
     if (!r.ok) throw new Error('Erro');
     showToast('Solicitação rejeitada.');
     await carregarSolicitacoes();
@@ -2160,4 +2318,4 @@ document.querySelectorAll('.modal-overlay').forEach(modal => {
   });
 });
 
-console.log('✅ Sistema completo com tema, perfil consultorio, busca, validação de data/hora retroativa, data de nascimento obrigatória e idade no WhatsApp do médico.');
+console.log('✅ Sistema completo com busca, reabrir/editar solicitações e outras melhorias.');
