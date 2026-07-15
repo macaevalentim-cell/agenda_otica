@@ -1847,7 +1847,7 @@ async function carregarSolicitacoes() {
         </div>`;
       }
       const ped = s.numero_pedido ? '<br><small>📦 Pedido: ' + escapeHtml(s.numero_pedido) + '</small>' : '';
-      return `<div style="border-bottom:1px solid #ddd;padding:10px;${s.status === 'pendente' ? 'background:#fffbe6;' : ''}">
+      return `<div style="border-bottom:1px solid #ee5c22;padding:10px;${s.status === 'pendente' ? 'background:#fffbe6;' : ''}">
         <div><strong>${escapeHtml(s.paciente_nome)}</strong>${ped}<br>${formatDisplay(s.data_consulta)} | Médico: ${s.medico_nome}<br><span style="font-size:12px;color:${s.status === 'pendente' ? 'orange' : s.status === 'aprovado' ? 'green' : 'red'};">Status: ${s.status}</span>${s.status === 'pendente' ? '<span style="font-size:11px;color:#999;"> | Solicitado por: ' + escapeHtml(s.solicitante_nome) + '</span>' : ''}${s.horario_escolhido ? '<br><strong>Horário escolhido: ' + s.horario_escolhido + '</strong>' : ''}</div>${actHtml}</div>`;
     }).join('');
   } catch (err) { console.error(err);

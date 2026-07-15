@@ -1514,3 +1514,29 @@ body.dark-theme .dia-cell.dia-hoje {
   .main-header { padding: 8px 12px; }
   .header-right { gap: 8px; }
 }
+
+/* ===== CORREÇÃO DE CONTRASTE PARA SOLICITAÇÕES PENDENTES ===== */
+.solicitacao-pendente {
+  background: #fffbe6 !important;
+  color: #2d3748 !important; /* Texto escuro para contraste */
+}
+.solicitacao-pendente strong {
+  color: #2d3748 !important;
+}
+.solicitacao-pendente span {
+  color: #2d3748 !important;
+}
+.solicitacao-pendente .horario-radio-group label {
+  color: #2d3748 !important;
+}
+
+/* Para tema escuro, manter contraste */
+body.dark-theme .solicitacao-pendente {
+  background: #3a2c0a !important; /* Fundo escuro amarelado */
+  color: #f0e6d0 !important; /* Texto claro */
+}
+body.dark-theme .solicitacao-pendente strong,
+body.dark-theme .solicitacao-pendente span,
+body.dark-theme .solicitacao-pendente .horario-radio-group label {
+  color: #f0e6d0 !important;
+}
