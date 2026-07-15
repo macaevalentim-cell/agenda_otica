@@ -193,19 +193,39 @@ async function initDatabase() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitacoes_status ON solicitacoes_consultas(status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_lembretes_status ON lembretes(status)`);
 
-    // ===== DADOS INICIAIS =====
-    const lojaExist = await pool.query('SELECT id FROM lojas WHERE nome = $1', ['Grupo Valentim - Óticas']);
-    let lojaId;
-    if (lojaExist.rows.length === 0) {
-      const result = await pool.query(
-        'INSERT INTO lojas (nome, endereco) VALUES ($1, $2) RETURNING id',
-        ['Grupo Valentim - Óticas', 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ']
-      );
-      lojaId = result.rows[0].id;
-      console.log('✅ Loja padrão criada');
-    } else {
-      lojaId = lojaExist.rows[0].id;
+    // ================================================================
+    // ===== DADOS INICIAIS – LOJAS =====
+    // ================================================================
+
+    // Lista de lojas a serem criadas
+    const lojasParaCriar = [
+      { nome: 'Ótica Macaé - Matriz', endereco: 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ' },
+      { nome: 'Ótica Macaé - Aeroporto', endereco: 'Rua Joaquim Rosa, 300. Bairro: Parque Aeroporto' },
+      { nome: 'Ótica Valentim - Centro', endereco: 'Rua Teixeira de Gouveia, 641 - Centro' },
+      { nome: 'Ótica Valentim - Cavaleiros', endereco: 'Av. Nossa Sra. da Glória, 2469 - Cavaleiros' },
+      { nome: 'Nizzi Ótica - Centro', endereco: 'Rua Teixeira de Gouveia, 626 - Centro' }
+    ];
+
+    let lojaId = null;
+    for (const loja of lojasParaCriar) {
+      const exist = await pool.query('SELECT id FROM lojas WHERE nome = $1', [loja.nome]);
+      if (exist.rows.length === 0) {
+        const result = await pool.query(
+          'INSERT INTO lojas (nome, endereco) VALUES ($1, $2) RETURNING id',
+          [loja.nome, loja.endereco]
+        );
+        console.log(`✅ Loja "${loja.nome}" criada`);
+        if (loja.nome === 'Ótica Macaé - Matriz') {
+          lojaId = result.rows[0].id;
+        }
+      } else {
+        if (loja.nome === 'Ótica Macaé - Matriz') {
+          lojaId = exist.rows[0].id;
+        }
+      }
     }
+
+    // ===== USUÁRIOS PADRÃO =====
 
     // Admin
     const adminExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['admin']);
@@ -240,7 +260,7 @@ async function initDatabase() {
       console.log('✅ Usuário consultorio criado');
     }
 
-    // WhatsApp config
+    // ===== CONFIGURAÇÃO WHATSAPP =====
     const configExist = await pool.query('SELECT id FROM whatsapp_config WHERE id = 1');
     if (configExist.rows.length === 0) {
       await pool.query(
