@@ -53,7 +53,6 @@ router.post('/', authenticateToken, async (req, res) => {
     if (!data_nascimento) {
       return res.status(400).json({ error: 'Data de nascimento do paciente é obrigatória.' });
     }
-
     const now = new Date();
     const dataHora1 = new Date(`${data_consulta}T${horario1}:00`);
     if (dataHora1 < now) {
@@ -83,7 +82,7 @@ router.post('/', authenticateToken, async (req, res) => {
       }
     }
 
-    // Evita conflitos com solicitações pendentes
+    // Evitar conflitos com solicitações pendentes
     for (const hor of horariosSugeridos) {
       const conflito = await pool.query(
         `SELECT id FROM solicitacoes_consultas
@@ -96,7 +95,7 @@ router.post('/', authenticateToken, async (req, res) => {
       }
     }
 
-    // Gerencia paciente
+    // Gerenciar paciente (cria ou atualiza)
     if (paciente_cpf) {
       const existente = await pool.query('SELECT id FROM clientes WHERE cpf = $1', [paciente_cpf]);
       if (existente.rows.length > 0) {
@@ -125,7 +124,7 @@ router.post('/', authenticateToken, async (req, res) => {
       );
     }
 
-    // Insere solicitação
+    // Inserir solicitação
     const result = await pool.query(
       `INSERT INTO solicitacoes_consultas
        (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta,
@@ -186,7 +185,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Horário fora do expediente do médico.' });
       }
 
-      // Verifica conflito com consultas existentes
+      // Verificar conflito com consultas existentes
       const conflito = await pool.query(
         `SELECT id FROM consultas WHERE data_consulta = $1 AND horario = $2 AND medico_id = $3 AND status NOT IN ($4, $5)`,
         [s.data_consulta, horario_escolhido, s.medico_id, 'cancelada', 'realizada']
@@ -195,7 +194,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
         return res.status(400).json({ error: 'Horário já ocupado para este médico.' });
       }
 
-      // Cria consulta
+      // Buscar data de nascimento para o lembrete
       const pacienteData = await pool.query(
         'SELECT data_nascimento FROM clientes WHERE cpf = $1 OR (nome = $2 AND telefone = $3)',
         [s.paciente_cpf, s.paciente_nome, s.paciente_telefone]
@@ -205,6 +204,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
         dataNascimento = pacienteData.rows[0].data_nascimento;
       }
 
+      // Criar consulta
       const consultaResult = await pool.query(
         `INSERT INTO consultas
          (paciente_nome, paciente_telefone, paciente_email, paciente_cpf, data_consulta, horario, medico_id, medico_nome, observacoes, numero_pedido, criado_por)
@@ -215,6 +215,7 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
       );
       const consultaId = consultaResult.rows[0].id;
 
+      // Agendar lembrete
       await agendarLembrete(
         consultaId,
         s.paciente_nome,
@@ -228,10 +229,11 @@ router.put('/:id', authenticateToken, isAdmin, async (req, res) => {
         s.numero_pedido
       );
 
-      await pool.query('UPDATE solicitacoes_consultas SET horario_escolhido = $1 WHERE id = $2', [horario_escolhido, req.params.id]);
-      
-      // Guardar ID da consulta criada para referência (opcional)
-      await pool.query('UPDATE solicitacoes_consultas SET consulta_id = $1 WHERE id = $2', [consultaId, req.params.id]);
+      // Atualizar solicitação com o ID da consulta criada
+      await pool.query(
+        `UPDATE solicitacoes_consultas SET horario_escolhido = $1, consulta_id = $2 WHERE id = $3`,
+        [horario_escolhido, consultaId, req.params.id]
+      );
     }
 
     await pool.query('UPDATE solicitacoes_consultas SET status = $1 WHERE id = $2', [status, req.params.id]);
@@ -255,18 +257,19 @@ router.put('/:id/reabrir', authenticateToken, isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Apenas solicitações aprovadas podem ser reabertas.' });
     }
 
-    // Verifica se a consulta vinculada ainda existe e não está realizada
-    const consulta = await pool.query('SELECT id, status FROM consultas WHERE id = $1', [s.consulta_id]);
-    if (consulta.rows.length > 0 && consulta.rows[0].status === 'realizada') {
-      return res.status(400).json({ error: 'A consulta já foi realizada, não pode reabrir.' });
+    const consultaId = s.consulta_id;
+    if (consultaId) {
+      const consulta = await pool.query('SELECT id, status FROM consultas WHERE id = $1', [consultaId]);
+      if (consulta.rows.length > 0 && consulta.rows[0].status === 'realizada') {
+        return res.status(400).json({ error: 'A consulta já foi realizada, não pode reabrir.' });
+      }
+      // Excluir a consulta se não estiver realizada
+      if (consulta.rows.length > 0 && consulta.rows[0].status !== 'realizada') {
+        await pool.query('DELETE FROM consultas WHERE id = $1', [consultaId]);
+      }
     }
 
-    // Exclui a consulta vinculada (se ainda não realizada)
-    if (consulta.rows.length > 0 && consulta.rows[0].status !== 'realizada') {
-      await pool.query('DELETE FROM consultas WHERE id = $1', [s.consulta_id]);
-    }
-
-    // Voltar status para pendente e limpar horário escolhido
+    // Resetar status e remover referências
     await pool.query(
       `UPDATE solicitacoes_consultas 
        SET status = 'pendente', horario_escolhido = NULL, consulta_id = NULL
@@ -299,7 +302,7 @@ router.put('/:id/editar', authenticateToken, isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Apenas solicitações pendentes podem ser editadas.' });
     }
 
-    // Validações de data/hora
+    // Validação de data/hora
     const now = new Date();
     const dataHora1 = new Date(`${data_consulta}T${horario1}:00`);
     if (dataHora1 < now) {

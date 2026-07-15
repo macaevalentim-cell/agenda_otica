@@ -26,6 +26,7 @@ async function initDatabase() {
   try {
     console.log('📦 Inicializando banco de dados (PostgreSQL)...');
 
+    // ===== TABELAS =====
     await pool.query(`
       CREATE TABLE IF NOT EXISTS lojas (
         id SERIAL PRIMARY KEY,
@@ -50,7 +51,7 @@ async function initDatabase() {
       )
     `);
 
-    // Ajustar coluna tipo e constraint
+    // Ajustar coluna tipo e constraint (caso exista)
     try {
       await pool.query(`ALTER TABLE usuarios ALTER COLUMN tipo TYPE VARCHAR(20);`);
       await pool.query(`ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_tipo_check;`);
@@ -76,7 +77,6 @@ async function initDatabase() {
       )
     `);
 
-    // Tabela clientes: data_nascimento agora é NOT NULL
     await pool.query(`
       CREATE TABLE IF NOT EXISTS clientes (
         id SERIAL PRIMARY KEY,
@@ -131,9 +131,18 @@ async function initDatabase() {
         numero_pedido VARCHAR(50),
         status VARCHAR(20) DEFAULT 'pendente' CHECK (status IN ('pendente', 'aprovado', 'rejeitado')),
         solicitado_por INTEGER NOT NULL REFERENCES usuarios(id),
+        consulta_id INTEGER REFERENCES consultas(id) ON DELETE SET NULL,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Garantir que a coluna consulta_id exista (caso já exista a tabela)
+    try {
+      await pool.query(`ALTER TABLE solicitacoes_consultas ADD COLUMN IF NOT EXISTS consulta_id INTEGER REFERENCES consultas(id) ON DELETE SET NULL;`);
+      console.log('✅ Coluna consulta_id verificada/adicionada');
+    } catch (error) {
+      console.warn('⚠️ Não foi possível adicionar coluna consulta_id:', error.message);
+    }
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS medico_horarios (
@@ -174,6 +183,7 @@ async function initDatabase() {
       )
     `);
 
+    // Índices
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_data ON consultas(data_consulta)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_medico ON consultas(medico_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_consultas_status ON consultas(status)`);
@@ -183,7 +193,7 @@ async function initDatabase() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_solicitacoes_status ON solicitacoes_consultas(status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_lembretes_status ON lembretes(status)`);
 
-    // Dados iniciais
+    // ===== DADOS INICIAIS =====
     const lojaExist = await pool.query('SELECT id FROM lojas WHERE nome = $1', ['Ótica Macaé - Matriz']);
     let lojaId;
     if (lojaExist.rows.length === 0) {
@@ -197,6 +207,7 @@ async function initDatabase() {
       lojaId = lojaExist.rows[0].id;
     }
 
+    // Admin
     const adminExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['admin']);
     if (adminExist.rows.length === 0) {
       const hash = await bcrypt.hash('admin123', 10);
@@ -207,6 +218,7 @@ async function initDatabase() {
       console.log('✅ Usuário admin criado');
     }
 
+    // Vendedor
     const vendedorExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['vendedor']);
     if (vendedorExist.rows.length === 0) {
       const hash = await bcrypt.hash('vender123', 10);
@@ -217,6 +229,7 @@ async function initDatabase() {
       console.log('✅ Usuário vendedor criado');
     }
 
+    // Consultório
     const consultorioExist = await pool.query('SELECT id FROM usuarios WHERE username = $1', ['consultorio']);
     if (consultorioExist.rows.length === 0) {
       const hash = await bcrypt.hash('consultorio123', 10);
@@ -227,6 +240,7 @@ async function initDatabase() {
       console.log('✅ Usuário consultorio criado');
     }
 
+    // WhatsApp config
     const configExist = await pool.query('SELECT id FROM whatsapp_config WHERE id = 1');
     if (configExist.rows.length === 0) {
       await pool.query(
