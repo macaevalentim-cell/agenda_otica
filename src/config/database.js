@@ -194,12 +194,12 @@ async function initDatabase() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_lembretes_status ON lembretes(status)`);
 
     // ===== DADOS INICIAIS =====
-    const lojaExist = await pool.query('SELECT id FROM lojas WHERE nome = $1', ['Ótica Macaé - Matriz']);
+    const lojaExist = await pool.query('SELECT id FROM lojas WHERE nome = $1', ['Grupo Valentim - Óticas']);
     let lojaId;
     if (lojaExist.rows.length === 0) {
       const result = await pool.query(
         'INSERT INTO lojas (nome, endereco) VALUES ($1, $2) RETURNING id',
-        ['Ótica Macaé - Matriz', 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ']
+        ['Grupo Valentim - Óticas', 'Rua Marechal Deodoro, 185 - Centro - Macae/RJ']
       );
       lojaId = result.rows[0].id;
       console.log('✅ Loja padrão criada');
