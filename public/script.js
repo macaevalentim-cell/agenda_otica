@@ -1837,21 +1837,43 @@ async function carregarSolicitacoes() {
       const horarios = [s.horario_sugerido1, s.horario_sugerido2, s.horario_sugerido3].filter(h => h);
       let horHtml = '';
       let actHtml = '';
+      
+      // ===== CORREÇÃO DE CONTRASTE: classe para pendentes =====
+      const statusColor = s.status === 'pendente' ? '#744210' : s.status === 'aprovado' ? '#276749' : '#9b2c2c';
+      const itemClass = s.status === 'pendente' ? 'solicitacao-pendente' : '';
+      const itemStyle = s.status === 'pendente' ? 'background:#0089BF;' : '';
+      
       if (s.status === 'pendente') {
         horHtml = horarios.map(h => `<label style="margin-right:10px;"><input type="radio" name="horario_${s.id}" value="${h}" ${s.horario_escolhido === h ? 'checked' : ''}> ${h}</label>`).join('');
-        actHtml = `<div class="horario-radio-group">${horHtml}<button onclick="aprovarSolicitacao(${s.id})" class="btn-success" style="margin-top:5px;">✅ Aprovar (selecionado)</button><button onclick="rejeitarSolicitacao(${s.id})" class="btn-danger" style="margin-top:5px;">❌ Rejeitar</button></div>`;
+        actHtml = `<div class="horario-radio-group">${horHtml}
+          <button onclick="aprovarSolicitacao(${s.id})" class="btn-success" style="margin-top:5px;">✅ Aprovar (selecionado)</button>
+          <button onclick="rejeitarSolicitacao(${s.id})" class="btn-danger" style="margin-top:5px;">❌ Rejeitar</button>
+        </div>`;
       } else if (s.status === 'aprovado') {
         actHtml = `<div style="margin-top:5px; display:flex; gap:8px;">
           <button onclick="reabrirSolicitacao(${s.id})" class="btn-warning" style="padding:4px 12px;">🔓 Reabrir</button>
           <button onclick="editarSolicitacao(${s.id})" class="btn-primary" style="padding:4px 12px;">✏️ Editar</button>
         </div>`;
       }
+      
       const ped = s.numero_pedido ? '<br><small>📦 Pedido: ' + escapeHtml(s.numero_pedido) + '</small>' : '';
-      return `<div style="border-bottom:1px solid #ee5c22;padding:10px;${s.status === 'pendente' ? 'background:#fffbe6;' : ''}">
-        <div><strong>${escapeHtml(s.paciente_nome)}</strong>${ped}<br>${formatDisplay(s.data_consulta)} | Médico: ${s.medico_nome}<br><span style="font-size:12px;color:${s.status === 'pendente' ? 'orange' : s.status === 'aprovado' ? 'green' : 'red'};">Status: ${s.status}</span>${s.status === 'pendente' ? '<span style="font-size:11px;color:#999;"> | Solicitado por: ' + escapeHtml(s.solicitante_nome) + '</span>' : ''}${s.horario_escolhido ? '<br><strong>Horário escolhido: ' + s.horario_escolhido + '</strong>' : ''}</div>${actHtml}</div>`;
+      const solicitanteInfo = s.status === 'pendente' ? '<span style="font-size:11px;color:#999;"> | Solicitado por: ' + escapeHtml(s.solicitante_nome) + '</span>' : '';
+      
+      return `<div class="${itemClass}" style="border-bottom:1px solid #ddd;padding:10px;${itemStyle}">
+        <div>
+          <strong>${escapeHtml(s.paciente_nome)}</strong>${ped}
+          <br>${formatDisplay(s.data_consulta)} | Médico: ${s.medico_nome}
+          <br><span style="font-size:12px;color:${statusColor};">Status: ${s.status}</span>
+          ${solicitanteInfo}
+          ${s.horario_escolhido ? '<br><strong>Horário escolhido: ' + s.horario_escolhido + '</strong>' : ''}
+        </div>
+        ${actHtml}
+      </div>`;
     }).join('');
-  } catch (err) { console.error(err);
-    document.getElementById('solicitacoesList').innerHTML = '<p style="color:red;">Erro: ' + err.message + '</p>'; }
+  } catch (err) {
+    console.error(err);
+    document.getElementById('solicitacoesList').innerHTML = '<p style="color:red;">Erro: ' + err.message + '</p>';
+  }
 }
 
 // ========================================================================
@@ -2318,4 +2340,4 @@ document.querySelectorAll('.modal-overlay').forEach(modal => {
   });
 });
 
-console.log('✅ Sistema completo com busca, reabrir/editar solicitações e outras melhorias.');
+console.log('✅ Sistema completo com busca, reabrir/editar solicitações, contraste corrigido e outras melhorias.');
